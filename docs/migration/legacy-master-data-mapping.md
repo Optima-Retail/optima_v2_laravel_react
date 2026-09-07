@@ -32,7 +32,7 @@ FM profile tables still exist in production and also represent parties. Collapse
 
 If two FM rows share a NIF, keep one `companies` row (prefer V2 id). Store colliding FM ids in a later **`legacy_party_map`** only if needed. Do **not** add `legacy_id` to every table now.
 
-Customer-only columns (`serie_id`, `po_requerida`, responsables, QC flags) stay off `companies`.
+Customer-only columns (`serie_id`, `po_requerida`, responsables, QC flags) stay off `companies`; they live on **`company_relationships`**.
 
 ## Membership: `companies_users` → `company_user`
 
@@ -71,7 +71,16 @@ Transform a V2 provider/customer row into at least one new row:
 
 Reject `owner_company_id = related_company_id`.
 
-Accounting / credit / tax FKs on V2 relationships are **deferred** (not data-loss): destination TBD on a relationship profile table.
+FM `clientes` / `proveedores` / `tecnicos` extras that are tenant-role (not legal identity) land on **`company_relationships`** with English names. See `old-to-new-table-mappings.json` for the column list.
+
+Party identity extras on **`companies`**: `language_id` (`idioma_id`), `latitude` / `longitude` (technician HQ), `legacy_erp_id` (`id_fixner`).
+
+| Kind of field | Table | Examples |
+|---|---|---|
+| Legal identity / HQ | `companies` | name, tax_id, address, language, geo, Fixner id |
+| Role for an owner | `company_relationships` | codes, notes, delegation, invoicing flags, responsables, scores, technician availability |
+
+Skipped on purpose: `clientes.uuid`, `tecnicos.peticion_id` (no `peticiones` table). `tecnicos.estado_id` is kept as `legacy_status_id` without FK.
 
 ## Sites: `workplaces` + `establecimientos` → `establishments`
 
@@ -124,15 +133,16 @@ Customer commercial brand lives on **`company_relationships.brand_id`** when `ki
 
 ## Deferred (not data-loss)
 
-These FM / V2 columns have **no table yet**. Keep them in the mapping JSON as `old_only` / deferred notes until profile tables exist:
+These FM / V2 columns have **no table yet**. Keep them in the mapping JSON as `old_only` / deferred notes:
 
 - `operarios` (site people)
 - FM collaborator ACL
 - Dual-write `cliente_id` / `proveedor_id` / `tecnico_id` bridges
-- Technician geo, SLA, scores → future `technician_profiles` on the technician relationship
-- Relationship accounting: receivable/payable accounts, tax rates, credit limits, payment terms
-- Customer extras: `serie_id`, `po_requerida`, responsables, QC / chivato / PRL flags
+- `peticion_id` (onboarding requests catalog not in NEW)
+- `tecnicos.estado_id` stored as `company_relationships.legacy_status_id` until a statuses catalog exists
+- Remaining V2 relationship accounting: receivable/payable accounts, tax-rate FKs, credit limits, payment terms
 - Establishment extras: Nora slots, Service Channel ids, recipient emails
+- `clientes.uuid` (NEW uses bigint ids)
 
 ## Seed in laravel_optima
 

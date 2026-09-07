@@ -33,6 +33,5 @@ export type SharedPageProps = {
     supportedLocales: SupportedLocale[];
     app: {
         name: string;
-        apiVersion: string;
     };
 };

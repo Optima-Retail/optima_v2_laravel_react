@@ -305,6 +305,10 @@ final class CompanyService
             'employee_count' => $company->employee_count,
             'is_active' => $company->is_active,
             'brand_id' => $company->brand_id,
+            'language_id' => $company->language_id,
+            'latitude' => $company->latitude,
+            'longitude' => $company->longitude,
+            'legacy_erp_id' => $company->legacy_erp_id,
         ];
     }
 
@@ -335,7 +339,7 @@ final class CompanyService
             'tradename', 'slug', 'tax_id', 'country_id', 'residence_country_id',
             'person_type', 'email', 'phone', 'website', 'address_line_1',
             'address_line_2', 'city', 'province', 'postal_code', 'employee_count',
-            'logo', 'brand_id',
+            'logo', 'brand_id', 'language_id', 'latitude', 'longitude', 'legacy_erp_id',
         ];
 
         foreach ($nullable as $key) {

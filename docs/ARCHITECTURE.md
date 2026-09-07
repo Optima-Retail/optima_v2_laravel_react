@@ -2,14 +2,14 @@
 
 ## Goals
 
-`laravel_optima` is an **API-first** Laravel application with an **Inertia + React**
-control plane. Versioning starts at **`/api/v3`**.
+`laravel_optima` is an **Inertia + React** Laravel application. The UI is the
+only HTTP surface: session auth, Inertia pages, and JSON data endpoints used by
+the React tables (`/…/data`).
 
 ## Stack
 
 - Laravel 13
 - Laravel Sail (Docker) + MySQL 8.4
-- Laravel Sanctum (Bearer tokens for API)
 - Spatie Laravel Permission (roles & permissions)
 - Inertia.js + React 19 + TypeScript + Tailwind + Lucide (web UI)
 
@@ -35,18 +35,15 @@ app/
       Roles/Services/     # RoleService
     Auth/                 # enums, permission discovery/sync
   Http/
-    Controllers/Api/V3/
-      Auth/               # Token auth
-      Config/             # Versioned JSON API under /api/v3/config/*
     Controllers/Web/
       Auth/
+      Companies/
       Config/             # Inertia controllers under /config/*
     Middleware/HandleInertiaRequests.php
   Models/
   Policies/
   Support/
 routes/
-  api.php / api/v3.php    # JSON API (`config` prefix for config domains)
   web.php                 # Inertia pages (`/config/*`)
 resources/js/             # See docs/FRONTEND.md
 ```
@@ -57,16 +54,15 @@ Domain records (`users`, `roles`, `permissions`) use **soft deletes** only. Dele
 domain services (`UserService`, `RoleService`, `PolicyPermissionSync`) and never hard-delete rows.
 Unique emails/role names are released on soft delete so they can be reused.
 
-## Auth surfaces
+## Auth
 
 | Surface | Mechanism |
 |---------|-----------|
 | Web UI (`/`, `/dashboard`, `/config/*`) | Session + Inertia |
-| API (`/api/v3/auth/*`, `/api/v3/config/users`) | Sanctum personal access tokens |
 
 Public registration is disabled. Users are created by admins via Configuration → Users CRUD.
 
-Middleware aliases: `auth:sanctum`, `auth`, `guest`, `role`, `permission`, `role_or_permission`.
+Middleware aliases: `auth`, `guest`, `role`, `permission`, `role_or_permission`.
 
 ## Default seed
 

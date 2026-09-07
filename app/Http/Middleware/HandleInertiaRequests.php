@@ -55,7 +55,6 @@ class HandleInertiaRequests extends Middleware
             'supportedLocales' => Locale::options(),
             'app' => [
                 'name' => config('app.name'),
-                'apiVersion' => 'v3',
             ],
         ];
     }

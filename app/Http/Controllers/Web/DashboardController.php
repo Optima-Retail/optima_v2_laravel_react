@@ -17,7 +17,6 @@ final class DashboardController extends Controller
 
         return Inertia::render('Dashboard/Index', [
             'stats' => [
-                'apiVersion' => 'v3',
                 'roles' => $user?->getRoleNames()->values()->all() ?? [],
                 'permissions' => $user?->getAllPermissions()->pluck('name')->values()->all() ?? [],
             ],

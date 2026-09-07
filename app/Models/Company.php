@@ -46,6 +46,10 @@ class Company extends Model
         'is_active',
         'logo',
         'brand_id',
+        'language_id',
+        'latitude',
+        'longitude',
+        'legacy_erp_id',
     ];
 
     /**
@@ -58,6 +62,8 @@ class Company extends Model
             'person_type' => PersonType::class,
             'is_active' => 'boolean',
             'employee_count' => 'integer',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
         ];
     }
 
@@ -92,6 +98,14 @@ class Company extends Model
     public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);
+    }
+
+    /**
+     * @return BelongsTo<Language, $this>
+     */
+    public function language(): BelongsTo
+    {
+        return $this->belongsTo(Language::class);
     }
 
     /**

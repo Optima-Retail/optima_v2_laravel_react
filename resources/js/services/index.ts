@@ -16,6 +16,5 @@ export { brandsService } from '@/services/brands';
 export { companiesService } from '@/services/companies';
 export { clientsService } from '@/services/clients';
 export { suppliersService } from '@/services/suppliers';
-export { relationshipsService } from '@/services/relationships';
 export { establishmentsService } from '@/services/establishments';
 export { localeService } from '@/services/locale';

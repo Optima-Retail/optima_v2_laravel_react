@@ -20,10 +20,7 @@ final class StoreCompanyRelationshipRequest extends FormRequest
     {
         $owner = app(ActiveCompany::class)->forUser($this->user());
 
-        $this->merge(CompanyValidation::blankToNull($this->all(), [
-            'owner_reference', 'related_reference', 'brand_id', 'external_code',
-            'notes', 'starts_at', 'ends_at', 'related_company_id',
-        ]));
+        $this->merge(CompanyValidation::blankToNull($this->all(), CompanyValidation::relationshipNullableKeys()));
 
         $relatedCompany = $this->input('related_company');
         if (is_array($relatedCompany)) {

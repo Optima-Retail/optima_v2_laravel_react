@@ -23,10 +23,7 @@ final class UpdateCompanyRelationshipRequest extends FormRequest
         /** @var CompanyRelationship $relationship */
         $relationship = $this->route('relationship');
 
-        $this->merge(CompanyValidation::blankToNull($this->all(), [
-            'owner_reference', 'related_reference', 'brand_id', 'external_code',
-            'notes', 'starts_at', 'ends_at',
-        ]));
+        $this->merge(CompanyValidation::blankToNull($this->all(), CompanyValidation::relationshipNullableKeys()));
 
         $this->merge([
             'owner_company_id' => $relationship->owner_company_id,

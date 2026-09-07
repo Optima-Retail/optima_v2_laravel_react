@@ -17,12 +17,7 @@ final class StoreCompanyRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $this->merge(CompanyValidation::blankToNull($this->all(), [
-            'tradename', 'slug', 'tax_id', 'country_id', 'residence_country_id',
-            'person_type', 'email', 'phone', 'website', 'address_line_1',
-            'address_line_2', 'city', 'province', 'postal_code', 'employee_count',
-            'brand_id',
-        ]));
+        $this->merge(CompanyValidation::blankToNull($this->all(), CompanyValidation::companyNullableKeys()));
 
         $this->merge([
             'is_active' => $this->boolean('is_active', true),

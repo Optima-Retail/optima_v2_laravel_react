@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Companies\Services;
 
 use App\Domain\Companies\Enums\CompanyKind;
+use App\Domain\Companies\Support\CompanyValidation;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\User;
@@ -219,7 +220,7 @@ final class CompanyRelationshipService
     {
         unset($data['related_mode'], $data['related_company'], $data['owner_company_id']);
 
-        foreach (['owner_reference', 'related_reference', 'brand_id', 'external_code', 'notes', 'starts_at', 'ends_at'] as $key) {
+        foreach (CompanyValidation::relationshipNullableKeys() as $key) {
             if (array_key_exists($key, $data) && $data[$key] === '') {
                 $data[$key] = null;
             }

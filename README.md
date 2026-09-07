@@ -1,9 +1,9 @@
 # Laravel Optima
 
-Laravel API + Inertia/React control plane.
+Inertia + React Laravel application.
 
-- **API:** Sanctum + Spatie Permission under `/api/v3`
 - **UI:** React 19 + Inertia + TypeScript + Tailwind
+- **Auth:** Session + Spatie Permission
 
 ## Setup
 
@@ -47,5 +47,5 @@ open http://127.0.0.1:8000/login
 ## Tests
 
 ```bash
-php artisan test --filter=AuthTest
+php artisan test
 ```

@@ -49,6 +49,7 @@ services:
             retries: 3
             timeout: 5s
     phpmyadmin:
+        profiles: ['tools']
         image: 'phpmyadmin:5'
         ports:
             - '${FORWARD_PHPMYADMIN_PORT:-8089}:80'

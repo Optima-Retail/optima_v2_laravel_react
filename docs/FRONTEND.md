@@ -60,4 +60,4 @@ resources/js/
 
 Permissions are auto-imported from policy methods via `permissions:sync-from-policies`.
 
-UI copy is English for now. API remains at `/api/v3/*` (Sanctum tokens), with config resources under `/api/v3/config/*`. Public registration is disabled; users are created by admins.
+UI copy is English for now. Public registration is disabled; users are created by admins.
