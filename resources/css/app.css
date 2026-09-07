@@ -1,0 +1,152 @@
+@import 'tailwindcss';
+@import 'tabulator-tables/dist/css/tabulator.min.css';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../js/**/*.{js,ts,tsx}';
+
+@theme {
+    --font-sans: 'Source Sans 3', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+
+    --color-canvas: #f5f7fb;
+    --color-surface: #ffffff;
+    --color-ink: #0f172a;
+    --color-ink-muted: #64748b;
+    --color-line: #e2e8f0;
+    --color-brand: #2563eb;
+    --color-brand-strong: #1d4ed8;
+    --color-brand-soft: #dbeafe;
+    --color-danger: #dc2626;
+    --color-success: #16a34a;
+}
+
+@layer base {
+    html {
+        scroll-behavior: smooth;
+    }
+
+    body {
+        background-color: var(--color-canvas);
+    }
+}
+
+@layer utilities {
+    .font-display {
+        font-family: var(--font-display);
+    }
+}
+
+@layer components {
+    /*
+     * Shared remote Tabulator — mirror Clients HTML table:
+     * thead: border-b border-line bg-canvas text-xs uppercase tracking-[0.08em] text-ink-muted
+     * th/td: px-3 py-2 / px-3 py-1.5
+     */
+    .app-tabulator.tabulator {
+        border: 0 !important;
+        background: transparent !important;
+        font-family: var(--font-sans);
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        color: var(--color-ink);
+        width: 100%;
+    }
+
+    .app-tabulator .tabulator-tableholder {
+        overflow: visible !important;
+    }
+
+    .app-tabulator .tabulator-table {
+        background: transparent !important;
+        color: inherit;
+        width: 100%;
+    }
+
+    .app-tabulator .tabulator-header {
+        background-color: var(--color-canvas) !important;
+        border-bottom: 1px solid var(--color-line) !important;
+        border-top: 0 !important;
+        color: var(--color-ink-muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .app-tabulator .tabulator-header .tabulator-headers {
+        background: transparent !important;
+    }
+
+    .app-tabulator .tabulator-col,
+    .app-tabulator .tabulator-col.tabulator-sortable {
+        background: transparent !important;
+        border-right: 0 !important;
+        height: auto !important;
+    }
+
+    .app-tabulator .tabulator-col .tabulator-col-content {
+        padding: 0.5rem 0.75rem !important; /* py-2 px-3 */
+    }
+
+    .app-tabulator .tabulator-col .tabulator-col-title {
+        padding: 0 !important;
+        color: inherit;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .app-tabulator .tabulator-col .tabulator-col-sorter {
+        display: none !important;
+    }
+
+    .app-tabulator .tabulator-col .tabulator-arrow {
+        display: none !important;
+    }
+
+    .app-tabulator .tabulator-row {
+        background: var(--color-surface) !important;
+        border-bottom: 1px solid var(--color-line) !important;
+        min-height: 0 !important;
+        cursor: default !important;
+    }
+
+    .app-tabulator .tabulator-row:last-child {
+        border-bottom: 0 !important;
+    }
+
+    .app-tabulator .tabulator-row.tabulator-row-even,
+    .app-tabulator .tabulator-row.tabulator-row-odd,
+    .app-tabulator .tabulator-row.tabulator-selected {
+        background: var(--color-surface) !important;
+    }
+
+    .app-tabulator .tabulator-row:hover,
+    .app-tabulator .tabulator-row.tabulator-selectable:hover {
+        background: var(--color-surface) !important;
+    }
+
+    .app-tabulator .tabulator-cell {
+        border-right: 0 !important;
+        padding: 0.375rem 0.75rem !important; /* py-1.5 px-3 */
+        height: auto !important;
+        min-height: 0 !important;
+    }
+
+    .app-tabulator .tabulator-cell.cell-muted {
+        color: var(--color-ink-muted);
+    }
+
+    .app-tabulator .tabulator-cell.cell-strong {
+        color: var(--color-ink);
+        font-weight: 500;
+    }
+
+    .app-tabulator .tabulator-footer {
+        display: none !important;
+    }
+
+    .app-tabulator .tabulator-placeholder {
+        display: none !important;
+    }
+}

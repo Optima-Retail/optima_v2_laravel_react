@@ -1,0 +1,67 @@
+import type { FormEvent, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
+import { Input } from '@/components/ui/Input';
+
+export type TimezoneFormValues = {
+    name: string;
+    timezone: string;
+};
+
+type TimezoneFormProps = {
+    mode: 'create' | 'edit';
+    values: TimezoneFormValues;
+    errors: Partial<Record<keyof TimezoneFormValues, string>>;
+    processing: boolean;
+    onChange: (key: keyof TimezoneFormValues, value: string) => void;
+    onSubmit: (event: FormEvent) => void;
+    submitLabel: string;
+    submitIcon?: ReactNode;
+    actions?: ReactNode;
+};
+
+export function TimezoneForm({
+    values,
+    errors,
+    processing,
+    onChange,
+    onSubmit,
+    submitLabel,
+    submitIcon,
+    actions,
+}: TimezoneFormProps) {
+    const { t } = useTranslation();
+
+    return (
+        <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
+            <Field label={t('common.name')} htmlFor="name" error={errors.name} required>
+                <Input
+                    id="name"
+                    value={values.name}
+                    placeholder={t('timezones.placeholder')}
+                    invalid={Boolean(errors.name)}
+                    onChange={(event) => onChange('name', event.target.value)}
+                />
+            </Field>
+
+            <Field label={t('timezones.timezone')} htmlFor="timezone" error={errors.timezone} required>
+                <Input
+                    id="timezone"
+                    value={values.timezone}
+                    placeholder={t('timezones.placeholder')}
+                    invalid={Boolean(errors.timezone)}
+                    onChange={(event) => onChange('timezone', event.target.value)}
+                />
+            </Field>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
+                {actions}
+                <Button type="submit" loading={processing}>
+                    {submitIcon}
+                    {submitLabel}
+                </Button>
+            </div>
+        </form>
+    );
+}
