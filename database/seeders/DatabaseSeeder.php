@@ -27,6 +27,7 @@ class DatabaseSeeder extends Seeder
             EstablishmentTypeSeeder::class,
             TimezoneSeeder::class,
             CountrySeeder::class,
+            ProvinceSeeder::class,
             BankSeeder::class,
             SeriesSeeder::class,
             CurrencySeeder::class,

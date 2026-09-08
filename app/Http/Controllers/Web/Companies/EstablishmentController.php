@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Web\Companies;
 
 use App\Domain\Companies\Services\CompanyService;
 use App\Domain\Companies\Services\EstablishmentService;
+use App\Domain\Config\Provinces\Services\ProvinceService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Companies\StoreEstablishmentRequest;
@@ -27,6 +28,7 @@ final class EstablishmentController extends Controller
     public function __construct(
         private readonly EstablishmentService $establishments,
         private readonly CompanyService $companies,
+        private readonly ProvinceService $provinces,
     ) {}
 
     public function index(Request $request): Response
@@ -81,6 +83,7 @@ final class EstablishmentController extends Controller
             'defaultCompanyId' => $this->establishments->accessibleCompanyIds($owner)[0] ?? null,
             'companyOptions' => $this->establishments->clientCompanyOptions($owner),
             'countryOptions' => $this->companies->countryOptions(),
+            'provinceOptions' => $this->provinces->options(),
             'timezoneOptions' => $this->establishments->timezoneOptions(),
             'delegationOptions' => $this->establishments->delegationOptions(),
             'languageOptions' => $this->establishments->languageOptions(),
@@ -109,6 +112,7 @@ final class EstablishmentController extends Controller
             'establishment' => $this->establishments->toFormData($establishment),
             'companyOptions' => $this->establishments->clientCompanyOptions($owner),
             'countryOptions' => $this->companies->countryOptions(),
+            'provinceOptions' => $this->provinces->options(),
             'timezoneOptions' => $this->establishments->timezoneOptions(),
             'delegationOptions' => $this->establishments->delegationOptions(),
             'languageOptions' => $this->establishments->languageOptions(),

@@ -6,12 +6,13 @@ import { defaultEstablishmentFormValues, EstablishmentForm } from '@/components/
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { establishmentsService } from '@/services';
-import type { UserOption } from '@/support/types/domain';
+import type { ProvinceOption, UserOption } from '@/support/types/domain';
 
 type CreateEstablishmentProps = {
     defaultCompanyId: number | null;
     companyOptions: UserOption[];
     countryOptions: UserOption[];
+    provinceOptions: ProvinceOption[];
     timezoneOptions: UserOption[];
     delegationOptions: UserOption[];
     languageOptions: UserOption[];
@@ -24,6 +25,7 @@ export default function CreateEstablishment({
     defaultCompanyId,
     companyOptions,
     countryOptions,
+    provinceOptions,
     timezoneOptions,
     delegationOptions,
     languageOptions,
@@ -61,13 +63,14 @@ export default function CreateEstablishment({
                     processing={form.processing}
                     companyOptions={companyOptions}
                     countryOptions={countryOptions}
+                    provinceOptions={provinceOptions}
                     timezoneOptions={timezoneOptions}
                     delegationOptions={delegationOptions}
                     languageOptions={languageOptions}
                     establishmentTypeOptions={establishmentTypeOptions}
                     seriesOptions={seriesOptions}
                     userOptions={userOptions}
-                    onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
+                    onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.createItem', { resource: t('establishments.resource') })}
                     submitIcon={<Plus className="size-4" aria-hidden />}

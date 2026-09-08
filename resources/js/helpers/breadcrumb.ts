@@ -19,6 +19,7 @@ const labelKeys: Record<string, string> = {
     banks: 'nav.banks',
     timezones: 'nav.timezones',
     countries: 'nav.countries',
+    provinces: 'nav.provinces',
     series: 'nav.series',
     currencies: 'nav.currencies',
     delegations: 'nav.delegations',

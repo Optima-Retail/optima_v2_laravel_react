@@ -6,15 +6,16 @@ import { CompanyForm } from '@/components/companies/CompanyForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { companiesService } from '@/services';
-import type { UserOption } from '@/support/types/domain';
+import type { ProvinceOption, UserOption } from '@/support/types/domain';
 
 type CreateCompanyProps = {
     countryOptions: UserOption[];
+    provinceOptions: ProvinceOption[];
     brandOptions: UserOption[];
     languageOptions: UserOption[];
 };
 
-export default function CreateCompany({ countryOptions, brandOptions, languageOptions }: CreateCompanyProps) {
+export default function CreateCompany({ countryOptions, provinceOptions, brandOptions, languageOptions }: CreateCompanyProps) {
     const { t } = useTranslation();
     const form = useForm({
         name: '',
@@ -30,7 +31,7 @@ export default function CreateCompany({ countryOptions, brandOptions, languageOp
         address_line_1: '',
         address_line_2: '',
         city: '',
-        province: '',
+        province_id: '',
         postal_code: '',
         employee_count: '',
         is_active: true,
@@ -63,9 +64,10 @@ export default function CreateCompany({ countryOptions, brandOptions, languageOp
                     errors={form.errors}
                     processing={form.processing}
                     countryOptions={countryOptions}
+                    provinceOptions={provinceOptions}
                     brandOptions={brandOptions}
                     languageOptions={languageOptions}
-                    onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
+                    onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.createItem', { resource: t('companies.resource') })}
                     submitIcon={<Plus className="size-4" aria-hidden />}

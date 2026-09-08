@@ -7,7 +7,7 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { EstablishmentFormData, UserOption } from '@/support/types/domain';
+import type { EstablishmentFormData, ProvinceOption, UserOption } from '@/support/types/domain';
 
 const textareaClassName =
     'min-h-20 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20';
@@ -25,7 +25,7 @@ export type EstablishmentFormValues = {
     address_line_1: string;
     address_line_2: string;
     city: string;
-    province: string;
+    province_id: string;
     postal_code: string;
     country_id: string;
     timezone_id: string;
@@ -62,6 +62,7 @@ type EstablishmentFormProps = {
     processing: boolean;
     companyOptions: UserOption[];
     countryOptions: UserOption[];
+    provinceOptions: ProvinceOption[];
     timezoneOptions: UserOption[];
     delegationOptions: UserOption[];
     languageOptions: UserOption[];
@@ -101,7 +102,7 @@ export function defaultEstablishmentFormValues(overrides: Partial<EstablishmentF
         address_line_1: '',
         address_line_2: '',
         city: '',
-        province: '',
+        province_id: '',
         postal_code: '',
         country_id: '',
         timezone_id: '',
@@ -148,7 +149,7 @@ export function establishmentFormValuesFromData(establishment: EstablishmentForm
         address_line_1: establishment.address_line_1 ?? '',
         address_line_2: establishment.address_line_2 ?? '',
         city: establishment.city ?? '',
-        province: establishment.province ?? '',
+        province_id: id(establishment.province_id),
         postal_code: establishment.postal_code ?? '',
         country_id: id(establishment.country_id),
         timezone_id: id(establishment.timezone_id),
@@ -193,6 +194,7 @@ export function EstablishmentForm({
     processing,
     companyOptions,
     countryOptions,
+    provinceOptions,
     timezoneOptions,
     delegationOptions,
     languageOptions,
@@ -206,6 +208,14 @@ export function EstablishmentForm({
     actions,
 }: EstablishmentFormProps) {
     const { t } = useTranslation();
+
+    const filteredProvinceOptions = useMemo(() => {
+        if (!values.country_id) {
+            return provinceOptions;
+        }
+
+        return provinceOptions.filter((option) => String(option.country_id) === values.country_id);
+    }, [provinceOptions, values.country_id]);
 
     const tabItems = useMemo<TabItem[]>(
         () => [
@@ -340,12 +350,17 @@ export function EstablishmentForm({
                         />
                     </Field>
 
-                    <Field label={t('companies.province')} htmlFor="province" error={errors.province}>
-                        <Input
-                            id="province"
-                            value={values.province}
-                            invalid={Boolean(errors.province)}
-                            onChange={(event) => onChange('province', event.target.value)}
+                    <Field label={t('companies.province')} htmlFor="province_id" error={errors.province_id}>
+                        <SearchableSelect
+                            id="province_id"
+                            value={values.province_id}
+                            invalid={Boolean(errors.province_id)}
+                            onChange={(value) => onChange('province_id', value)}
+                            emptyLabel={t('common.none')}
+                            options={filteredProvinceOptions.map((option) => ({
+                                value: String(option.id),
+                                label: option.label,
+                            }))}
                         />
                     </Field>
 
@@ -367,7 +382,17 @@ export function EstablishmentForm({
                             id="country_id"
                             value={values.country_id}
                             invalid={Boolean(errors.country_id)}
-                            onChange={(value) => onChange('country_id', value)}
+                            onChange={(value) => {
+                                onChange('country_id', value);
+                                const stillValid = provinceOptions.some(
+                                    (option) =>
+                                        String(option.id) === values.province_id &&
+                                        String(option.country_id) === value,
+                                );
+                                if (values.province_id && !stillValid) {
+                                    onChange('province_id', '');
+                                }
+                            }}
                             emptyLabel={t('common.none')}
                             options={toSelectOptions(countryOptions)}
                         />

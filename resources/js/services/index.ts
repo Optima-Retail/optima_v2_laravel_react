@@ -12,6 +12,7 @@ export { delegationsService } from '@/services/delegations';
 export { banksService } from '@/services/banks';
 export { timezonesService } from '@/services/timezones';
 export { countriesService } from '@/services/countries';
+export { provincesService } from '@/services/provinces';
 export { seriesService } from '@/services/series';
 export { currenciesService } from '@/services/currencies';
 export { brandsService } from '@/services/brands';

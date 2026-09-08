@@ -51,7 +51,7 @@ final class CountryController extends Controller
 
         $filters = TabulatorQuery::fromRequest(
             $request,
-            allowedSorts: ['id', 'name', 'iso_code', 'timezone_id'],
+            allowedSorts: ['id', 'name', 'iso_code', 'timezone_id', 'provinces_count'],
             defaultSort: 'name',
             defaultDirection: 'asc',
             filterKeys: ['search'],

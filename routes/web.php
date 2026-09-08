@@ -17,6 +17,7 @@ use App\Http\Controllers\Web\Config\EstablishmentTypeController;
 use App\Http\Controllers\Web\Config\FieldHelpController as ConfigFieldHelpController;
 use App\Http\Controllers\Web\Config\IntegrationController;
 use App\Http\Controllers\Web\Config\LanguageController;
+use App\Http\Controllers\Web\Config\ProvinceController;
 use App\Http\Controllers\Web\Config\RatingTypeController;
 use App\Http\Controllers\Web\Config\RoleController;
 use App\Http\Controllers\Web\Config\SeriesController;
@@ -366,6 +367,14 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:countries.delete')->group(function (): void {
             Route::delete('/countries/{country}', [CountryController::class, 'destroy'])->name('countries.destroy');
         });
+
+        Route::middleware('permission:provinces.view')->group(function (): void {
+            Route::get('/countries/{country}/provinces', [ProvinceController::class, 'forCountry'])
+                ->name('countries.provinces.index');
+        });
+
+        Route::put('/countries/{country}/provinces', [ProvinceController::class, 'syncForCountry'])
+            ->name('countries.provinces.sync');
 
         Route::middleware('permission:series.view')->group(function (): void {
             Route::get('/series', [SeriesController::class, 'index'])->name('series.index');

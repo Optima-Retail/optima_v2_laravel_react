@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Web\Companies;
 
 use App\Domain\Companies\Enums\CompanyKind;
 use App\Domain\Companies\Services\CompanyService;
+use App\Domain\Config\Provinces\Services\ProvinceService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Companies\StoreCompanyRequest;
 use App\Http\Requests\Web\Companies\UpdateCompanyRequest;
@@ -23,6 +24,7 @@ final class CompanyController extends Controller
 {
     public function __construct(
         private readonly CompanyService $companies,
+        private readonly ProvinceService $provinces,
     ) {}
 
     public function index(Request $request): Response
@@ -78,6 +80,7 @@ final class CompanyController extends Controller
 
         return Inertia::render('Companies/Create', [
             'countryOptions' => $this->companies->countryOptions(),
+            'provinceOptions' => $this->provinces->options(),
             'brandOptions' => $this->companies->brandOptions(),
             'languageOptions' => $this->companies->languageOptions(),
         ]);
@@ -99,6 +102,7 @@ final class CompanyController extends Controller
         return Inertia::render('Companies/Edit', [
             'company' => $this->companies->toFormData($company),
             'countryOptions' => $this->companies->countryOptions(),
+            'provinceOptions' => $this->provinces->options(),
             'brandOptions' => $this->companies->brandOptions(),
             'languageOptions' => $this->companies->languageOptions(),
             'members' => $this->companies->members($company),

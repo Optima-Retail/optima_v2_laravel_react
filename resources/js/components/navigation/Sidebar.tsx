@@ -1,7 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { Building2, LayoutDashboard, Settings, Tags, Truck, UserRound, Warehouse } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { firstConfigHref, isConfigRoute } from '@/components/navigation/ConfigSidebar';
+import { firstConfigHref, isConfigRoute, useConfigPermissions } from '@/components/navigation/ConfigSidebar';
 import { useCan } from '@/hooks/useAuth';
 import { useUiStore } from '@/stores/uiStore';
 import { cn } from '@/support/cn';
@@ -33,20 +33,7 @@ const nav: NavItem[] = [
 export function Sidebar() {
     const { t } = useTranslation();
     const { url, props } = usePage<SharedPageProps>();
-    const canViewUsers = useCan('users.view');
-    const canViewRoles = useCan('roles.view');
-    const canViewWorkOrderTypes = useCan('work_order_types.view');
-    const canViewTeams = useCan('teams.view');
-    const canViewLanguages = useCan('languages.view');
-    const canViewIntegrations = useCan('integrations.view');
-    const canViewRatingTypes = useCan('rating_types.view');
-    const canViewEstablishmentTypes = useCan('establishment_types.view');
-    const canViewBanks = useCan('banks.view');
-    const canViewTimezones = useCan('timezones.view');
-    const canViewCountries = useCan('countries.view');
-    const canViewSeries = useCan('series.view');
-    const canViewCurrencies = useCan('currencies.view');
-    const canViewDelegations = useCan('delegations.view');
+    const configPermissions = useConfigPermissions();
     const canViewBrands = useCan('brands.view');
     const canViewCompanies = useCan('companies.view');
     const canViewRelationships = useCan('company_relationships.view');
@@ -55,22 +42,7 @@ export function Sidebar() {
     const sidebarOpen = useUiStore((state) => state.sidebarOpen);
     const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
     const configActive = isConfigRoute(url);
-    const configHref = firstConfigHref(
-        canViewUsers,
-        canViewRoles,
-        canViewWorkOrderTypes,
-        canViewTeams,
-        canViewLanguages,
-        canViewIntegrations,
-        canViewRatingTypes,
-        canViewEstablishmentTypes,
-        canViewBanks,
-        canViewTimezones,
-        canViewCountries,
-        canViewSeries,
-        canViewCurrencies,
-        canViewDelegations,
-    );
+    const configHref = firstConfigHref(configPermissions);
 
     function openConfig() {
         if (!configHref) {

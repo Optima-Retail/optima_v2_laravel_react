@@ -10,6 +10,8 @@ use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Enums\CompanyRelationshipStatus;
 use App\Domain\Companies\Enums\PersonType;
 use App\Domain\Companies\Enums\WorkOrderGroupingBasis;
+use App\Models\Province;
+use Closure;
 use Illuminate\Validation\Rule;
 
 final class CompanyValidation
@@ -42,7 +44,7 @@ final class CompanyValidation
             'address_line_1' => ['nullable', 'string', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
-            'province' => ['nullable', 'string', 'max:255'],
+            'province_id' => self::provinceIdRules(),
             'postal_code' => ['nullable', 'string', 'max:20'],
             'employee_count' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
@@ -86,7 +88,7 @@ final class CompanyValidation
             'address_line_1' => ['nullable', 'string', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
-            'province' => ['nullable', 'string', 'max:255'],
+            'province_id' => self::provinceIdRules(),
             'postal_code' => ['nullable', 'string', 'max:20'],
             'country_id' => ['nullable', 'integer', Rule::exists('countries', 'id')],
             'timezone_id' => ['nullable', 'integer', Rule::exists('timezones', 'id')->whereNull('deleted_at')],
@@ -263,7 +265,7 @@ final class CompanyValidation
         return [
             'tradename', 'slug', 'tax_id', 'country_id', 'residence_country_id',
             'person_type', 'email', 'phone', 'website', 'address_line_1',
-            'address_line_2', 'city', 'province', 'postal_code', 'employee_count',
+            'address_line_2', 'city', 'province_id', 'postal_code', 'employee_count',
             'brand_id', 'language_id', 'latitude', 'longitude', 'legacy_erp_id',
         ];
     }
@@ -317,6 +319,38 @@ final class CompanyValidation
             'has_site_health_and_safety', 'has_customer_health_and_safety',
             'is_quality_control_contactable', 'has_parking', 'is_ulez_zone',
             'tax_included', 'notes_alert', 'internal_notes_alert',
+        ];
+    }
+
+    /**
+     * @return list<mixed>
+     */
+    private static function provinceIdRules(): array
+    {
+        return [
+            'nullable',
+            'integer',
+            Rule::exists('provinces', 'id')->whereNull('deleted_at'),
+            function (string $attribute, mixed $value, Closure $fail): void {
+                if ($value === null || $value === '') {
+                    return;
+                }
+
+                $countryId = request()->input('country_id');
+
+                if ($countryId === null || $countryId === '') {
+                    return;
+                }
+
+                $matches = Province::query()
+                    ->whereKey($value)
+                    ->where('country_id', (int) $countryId)
+                    ->exists();
+
+                if (! $matches) {
+                    $fail(__('validation.exists', ['attribute' => $attribute]));
+                }
+            },
         ];
     }
 

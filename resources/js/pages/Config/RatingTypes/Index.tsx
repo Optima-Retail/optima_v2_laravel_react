@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { Plus, Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CellComponent, ColumnDefinition } from 'tabulator-tables';
+import { TypesConfigTabs } from '@/components/config/TypesConfigTabs';
 import { PageHeader } from '@/components/page/PageHeader';
 import {
     RemoteDataTable,
@@ -132,11 +133,11 @@ export default function RatingTypesIndex({ filters, can }: RatingTypesIndexProps
     }
 
     return (
-        <AppLayout title={t('ratingTypes.title')}>
-            <Head title={t('ratingTypes.title')} />
+        <AppLayout title={t('nav.types')}>
+            <Head title={t('nav.types')} />
             <div className="space-y-6">
                 <PageHeader
-                    title={t('ratingTypes.title')}
+                    title={t('nav.types')}
                     description={t('ratingTypes.description')}
                     actions={
                         can.create ? (
@@ -150,6 +151,8 @@ export default function RatingTypesIndex({ filters, can }: RatingTypesIndexProps
                         ) : null
                     }
                 />
+
+                <TypesConfigTabs activeId="rating" />
 
                 <RemoteDataTable<RatingTypeListItem>
                     ref={tableRef}

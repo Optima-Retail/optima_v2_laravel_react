@@ -317,7 +317,7 @@ final class CompanyService
             'address_line_1' => $company->address_line_1,
             'address_line_2' => $company->address_line_2,
             'city' => $company->city,
-            'province' => $company->province,
+            'province_id' => $company->province_id,
             'postal_code' => $company->postal_code,
             'employee_count' => $company->employee_count,
             'is_active' => $company->is_active,
@@ -355,7 +355,7 @@ final class CompanyService
         $nullable = [
             'tradename', 'slug', 'tax_id', 'country_id', 'residence_country_id',
             'person_type', 'email', 'phone', 'website', 'address_line_1',
-            'address_line_2', 'city', 'province', 'postal_code', 'employee_count',
+            'address_line_2', 'city', 'province_id', 'postal_code', 'employee_count',
             'logo', 'brand_id', 'language_id', 'latitude', 'longitude', 'legacy_erp_id',
         ];
 

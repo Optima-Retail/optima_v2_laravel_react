@@ -21,10 +21,15 @@ final class CountryService
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
-        [$sort, $direction] = ListQuery::sort($filters, ['id', 'name', 'iso_code', 'timezone_id'], 'name');
+        [$sort, $direction] = ListQuery::sort(
+            $filters,
+            ['id', 'name', 'iso_code', 'timezone_id', 'provinces_count'],
+            'name',
+        );
 
         return Country::query()
             ->with('timezone')
+            ->withCount('provinces')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner
@@ -126,7 +131,7 @@ final class CountryService
     }
 
     /**
-     * @return array{id: int, name: string, iso_code: string|null, timezone_id: int|null, timezone_name: string|null, created_at: string|null}
+     * @return array{id: int, name: string, iso_code: string|null, timezone_id: int|null, timezone_name: string|null, provinces_count: int, created_at: string|null}
      */
     public function toListItem(Country $country): array
     {
@@ -136,6 +141,7 @@ final class CountryService
             'iso_code' => $country->iso_code,
             'timezone_id' => $country->timezone_id,
             'timezone_name' => $country->timezone?->name,
+            'provinces_count' => (int) ($country->provinces_count ?? $country->provinces()->count()),
             'created_at' => $country->created_at?->toIso8601String(),
         ];
     }

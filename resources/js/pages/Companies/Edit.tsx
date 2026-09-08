@@ -11,7 +11,7 @@ import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { companiesService } from '@/services';
 import { tableBodyCellClass, tableHeadCellClass } from '@/support/table';
-import type { CompanyFormData, UserOption } from '@/support/types/domain';
+import type { CompanyFormData, ProvinceOption, UserOption } from '@/support/types/domain';
 
 type CompanyMember = {
     id: number;
@@ -23,6 +23,7 @@ type CompanyMember = {
 type EditCompanyProps = {
     company: CompanyFormData;
     countryOptions: UserOption[];
+    provinceOptions: ProvinceOption[];
     brandOptions: UserOption[];
     languageOptions: UserOption[];
     members: CompanyMember[];
@@ -36,6 +37,7 @@ type EditCompanyProps = {
 export default function EditCompany({
     company,
     countryOptions,
+    provinceOptions,
     brandOptions,
     languageOptions,
     members,
@@ -58,7 +60,7 @@ export default function EditCompany({
         address_line_1: company.address_line_1 ?? '',
         address_line_2: company.address_line_2 ?? '',
         city: company.city ?? '',
-        province: company.province ?? '',
+        province_id: company.province_id ? String(company.province_id) : '',
         postal_code: company.postal_code ?? '',
         employee_count: company.employee_count !== null ? String(company.employee_count) : '',
         is_active: company.is_active,
@@ -193,9 +195,10 @@ export default function EditCompany({
                     errors={form.errors}
                     processing={form.processing}
                     countryOptions={countryOptions}
+                    provinceOptions={provinceOptions}
                     brandOptions={brandOptions}
                     languageOptions={languageOptions}
-                    onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
+                    onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.save')}
                     submitIcon={<Save className="size-4" aria-hidden />}

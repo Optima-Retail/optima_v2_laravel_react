@@ -244,7 +244,7 @@ final class EstablishmentService
             'address_line_1' => $establishment->address_line_1,
             'address_line_2' => $establishment->address_line_2,
             'city' => $establishment->city,
-            'province' => $establishment->province,
+            'province_id' => $establishment->province_id,
             'postal_code' => $establishment->postal_code,
             'country_id' => $establishment->country_id,
             'timezone_id' => $establishment->timezone_id,
@@ -302,7 +302,7 @@ final class EstablishmentService
     {
         foreach ([
             'code', 'store_code', 'alternate_store_code', 'phone', 'email', 'emails', 'recipient_emails',
-            'address_line_1', 'address_line_2', 'city', 'province', 'postal_code',
+            'address_line_1', 'address_line_2', 'city', 'province_id', 'postal_code',
             'country_id', 'timezone_id', 'language_id', 'establishment_type_id', 'delegation_id', 'series_id',
             'billing_company_id', 'responsible_user_id',
             'latitude', 'longitude', 'tax_rate', 'legacy_erp_id', 'integration_external_id',

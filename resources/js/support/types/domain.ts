@@ -247,6 +247,7 @@ export type CountryListItem = {
     iso_code: string | null;
     timezone_id: number | null;
     timezone_name: string | null;
+    provinces_count: number;
     created_at: string | null;
 };
 
@@ -255,6 +256,28 @@ export type CountryFormData = {
     name: string;
     iso_code: string | null;
     timezone_id: number | null;
+};
+
+export type ProvinceListItem = {
+    id: number;
+    name: string;
+    code: string | null;
+    country_id: number;
+    country_name: string | null;
+    created_at: string | null;
+};
+
+export type ProvinceFormData = {
+    id: number;
+    name: string;
+    code: string | null;
+    country_id: number;
+};
+
+export type ProvinceOption = {
+    id: number;
+    label: string;
+    country_id: number;
 };
 
 export type TimezoneOption = {
@@ -370,7 +393,8 @@ export type CompanyFormData = {
     address_line_1: string | null;
     address_line_2: string | null;
     city: string | null;
-    province: string | null;
+    province_id: number | null;
+    province_name?: string | null;
     postal_code: string | null;
     employee_count: number | null;
     is_active: boolean;
@@ -506,7 +530,8 @@ export type EstablishmentFormData = {
     address_line_1: string | null;
     address_line_2: string | null;
     city: string | null;
-    province: string | null;
+    province_id: number | null;
+    province_name?: string | null;
     postal_code: string | null;
     country_id: number | null;
     timezone_id: number | null;

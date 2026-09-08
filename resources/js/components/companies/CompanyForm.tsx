@@ -8,7 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { UserOption } from '@/support/types/domain';
+import type { ProvinceOption, UserOption } from '@/support/types/domain';
 
 export type CompanyFormValues = {
     name: string;
@@ -24,7 +24,7 @@ export type CompanyFormValues = {
     address_line_1: string;
     address_line_2: string;
     city: string;
-    province: string;
+    province_id: string;
     postal_code: string;
     employee_count: string;
     is_active: boolean;
@@ -40,6 +40,7 @@ type CompanyFormProps = {
     errors: Partial<Record<keyof CompanyFormValues, string>>;
     processing: boolean;
     countryOptions: UserOption[];
+    provinceOptions: ProvinceOption[];
     brandOptions: UserOption[];
     languageOptions: UserOption[];
     onChange: (key: keyof CompanyFormValues, value: string | boolean) => void;
@@ -58,6 +59,7 @@ export function CompanyForm({
     errors,
     processing,
     countryOptions,
+    provinceOptions,
     brandOptions,
     languageOptions,
     onChange,
@@ -68,6 +70,14 @@ export function CompanyForm({
     usersPanel,
 }: CompanyFormProps) {
     const { t } = useTranslation();
+
+    const filteredProvinceOptions = useMemo(() => {
+        if (!values.country_id) {
+            return provinceOptions;
+        }
+
+        return provinceOptions.filter((option) => String(option.country_id) === values.country_id);
+    }, [provinceOptions, values.country_id]);
 
     const tabItems = useMemo<TabItem[]>(() => {
         const items: TabItem[] = [
@@ -255,12 +265,17 @@ export function CompanyForm({
                             />
                         </Field>
 
-                        <Field label={t('companies.province')} htmlFor="province" error={errors.province}>
-                            <Input
-                                id="province"
-                                value={values.province}
-                                invalid={Boolean(errors.province)}
-                                onChange={(event) => onChange('province', event.target.value)}
+                        <Field label={t('companies.province')} htmlFor="province_id" error={errors.province_id}>
+                            <SearchableSelect
+                                id="province_id"
+                                value={values.province_id}
+                                invalid={Boolean(errors.province_id)}
+                                onChange={(value) => onChange('province_id', value)}
+                                emptyLabel={t('common.none')}
+                                options={filteredProvinceOptions.map((option) => ({
+                                    value: String(option.id),
+                                    label: option.label,
+                                }))}
                             />
                         </Field>
 
@@ -278,7 +293,17 @@ export function CompanyForm({
                                 id="country_id"
                                 value={values.country_id}
                                 invalid={Boolean(errors.country_id)}
-                                onChange={(value) => onChange('country_id', value)}
+                                onChange={(value) => {
+                                    onChange('country_id', value);
+                                    const stillValid = provinceOptions.some(
+                                        (option) =>
+                                            String(option.id) === values.province_id &&
+                                            String(option.country_id) === value,
+                                    );
+                                    if (values.province_id && !stillValid) {
+                                        onChange('province_id', '');
+                                    }
+                                }}
                                 emptyLabel={t('common.none')}
                                 options={countryOptions.map((option) => ({
                                     value: String(option.id),

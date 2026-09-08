@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { ClipboardList, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CellComponent, ColumnDefinition } from 'tabulator-tables';
+import { TypesConfigTabs } from '@/components/config/TypesConfigTabs';
 import { PageHeader } from '@/components/page/PageHeader';
 import {
     RemoteDataTable,
@@ -138,11 +139,11 @@ export default function WorkOrderTypesIndex({ filters, can }: WorkOrderTypesInde
     }
 
     return (
-        <AppLayout title={t('workOrderTypes.title')}>
-            <Head title={t('workOrderTypes.title')} />
+        <AppLayout title={t('nav.types')}>
+            <Head title={t('nav.types')} />
             <div className="space-y-6">
                 <PageHeader
-                    title={t('workOrderTypes.title')}
+                    title={t('nav.types')}
                     description={t('workOrderTypes.description')}
                     actions={
                         can.create ? (
@@ -156,6 +157,8 @@ export default function WorkOrderTypesIndex({ filters, can }: WorkOrderTypesInde
                         ) : null
                     }
                 />
+
+                <TypesConfigTabs activeId="work-order" />
 
                 <RemoteDataTable<WorkOrderTypeListItem>
                     ref={tableRef}

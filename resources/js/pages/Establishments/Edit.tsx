@@ -8,12 +8,13 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { establishmentsService } from '@/services';
-import type { EstablishmentFormData, UserOption } from '@/support/types/domain';
+import type { EstablishmentFormData, ProvinceOption, UserOption } from '@/support/types/domain';
 
 type EditEstablishmentProps = {
     establishment: EstablishmentFormData;
     companyOptions: UserOption[];
     countryOptions: UserOption[];
+    provinceOptions: ProvinceOption[];
     timezoneOptions: UserOption[];
     delegationOptions: UserOption[];
     languageOptions: UserOption[];
@@ -29,6 +30,7 @@ export default function EditEstablishment({
     establishment,
     companyOptions,
     countryOptions,
+    provinceOptions,
     timezoneOptions,
     delegationOptions,
     languageOptions,
@@ -78,13 +80,14 @@ export default function EditEstablishment({
                     processing={form.processing}
                     companyOptions={companyOptions}
                     countryOptions={countryOptions}
+                    provinceOptions={provinceOptions}
                     timezoneOptions={timezoneOptions}
                     delegationOptions={delegationOptions}
                     languageOptions={languageOptions}
                     establishmentTypeOptions={establishmentTypeOptions}
                     seriesOptions={seriesOptions}
                     userOptions={userOptions}
-                    onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
+                    onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.save')}
                     submitIcon={<Save className="size-4" aria-hidden />}

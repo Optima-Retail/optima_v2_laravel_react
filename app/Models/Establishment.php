@@ -33,7 +33,7 @@ class Establishment extends Model
         'address_line_1',
         'address_line_2',
         'city',
-        'province',
+        'province_id',
         'postal_code',
         'country_id',
         'timezone_id',
@@ -112,6 +112,14 @@ class Establishment extends Model
     public function country(): BelongsTo
     {
         return $this->belongsTo(Country::class);
+    }
+
+    /**
+     * @return BelongsTo<Province, $this>
+     */
+    public function province(): BelongsTo
+    {
+        return $this->belongsTo(Province::class);
     }
 
     /**

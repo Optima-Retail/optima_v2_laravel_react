@@ -40,7 +40,7 @@ class Company extends Model
         'address_line_1',
         'address_line_2',
         'city',
-        'province',
+        'province_id',
         'postal_code',
         'employee_count',
         'is_active',
@@ -90,6 +90,14 @@ class Company extends Model
     public function residenceCountry(): BelongsTo
     {
         return $this->belongsTo(Country::class, 'residence_country_id');
+    }
+
+    /**
+     * @return BelongsTo<Province, $this>
+     */
+    public function province(): BelongsTo
+    {
+        return $this->belongsTo(Province::class);
     }
 
     /**

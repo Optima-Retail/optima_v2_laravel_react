@@ -106,6 +106,9 @@ export function createSortTitleFormatter(
     };
 }
 
+const mapPinIcon =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>';
+
 export function tabulatorEditLink(href: string, ariaLabel: string): string {
     return `<a href="${href}" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${ariaLabel}" data-action="edit">${editIcon}</a>`;
 }
@@ -114,12 +117,20 @@ export function tabulatorDeleteButton(ariaLabel: string): string {
     return `<button type="button" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-danger/40 hover:text-danger" aria-label="${ariaLabel}" data-action="delete">${deleteIcon}</button>`;
 }
 
+export function tabulatorProvincesButton(ariaLabel: string): string {
+    return `<button type="button" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${ariaLabel}" data-action="provinces">${mapPinIcon}</button>`;
+}
+
 export function tabulatorActionsCell(parts: string[]): string {
     return `<div class="flex items-center justify-end gap-1.5">${parts.join('')}</div>`;
 }
 
 export function isDeleteActionClick(event: UIEvent): boolean {
+    return isActionClick(event, 'delete');
+}
+
+export function isActionClick(event: UIEvent, action: string): boolean {
     const target = event.target as HTMLElement | null;
 
-    return Boolean(target?.closest('[data-action="delete"]'));
+    return Boolean(target?.closest(`[data-action="${action}"]`));
 }
