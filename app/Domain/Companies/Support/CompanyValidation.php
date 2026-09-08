@@ -71,10 +71,18 @@ final class CompanyValidation
             $uniqueCode = $uniqueCode->ignore($ignoreId);
         }
 
+        $liveUser = Rule::exists('users', 'id')->whereNull('deleted_at');
+
         return [
             'company_id' => ['required', 'integer', Rule::in($companyId)],
             'name' => ['required', 'string', 'max:255'],
             'code' => ['nullable', 'string', 'max:64', $uniqueCode],
+            'store_code' => ['nullable', 'string', 'max:64'],
+            'alternate_store_code' => ['nullable', 'string', 'max:64'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'emails' => ['nullable', 'string'],
+            'recipient_emails' => ['nullable', 'string'],
             'address_line_1' => ['nullable', 'string', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
@@ -82,9 +90,32 @@ final class CompanyValidation
             'postal_code' => ['nullable', 'string', 'max:20'],
             'country_id' => ['nullable', 'integer', Rule::exists('countries', 'id')],
             'timezone_id' => ['nullable', 'integer', Rule::exists('timezones', 'id')->whereNull('deleted_at')],
+            'language_id' => ['nullable', 'integer', Rule::exists('languages', 'id')->whereNull('deleted_at')],
+            'establishment_type_id' => ['nullable', 'integer', Rule::exists('establishment_types', 'id')->whereNull('deleted_at')],
             'delegation_id' => ['nullable', 'integer', Rule::exists('delegations', 'id')->whereNull('deleted_at')],
-            'is_active' => ['required', 'boolean'],
+            'series_id' => ['nullable', 'integer', Rule::exists('series', 'id')->whereNull('deleted_at')],
             'billing_company_id' => ['nullable', 'integer', Rule::exists('companies', 'id')->whereNull('deleted_at')],
+            'responsible_user_id' => ['nullable', 'integer', $liveUser],
+            'is_active' => ['required', 'boolean'],
+            'is_client_priority' => ['nullable', 'boolean'],
+            'is_reviewed' => ['nullable', 'boolean'],
+            'is_email_reviewed' => ['nullable', 'boolean'],
+            'has_site_health_and_safety' => ['nullable', 'boolean'],
+            'has_customer_health_and_safety' => ['nullable', 'boolean'],
+            'is_quality_control_contactable' => ['nullable', 'boolean'],
+            'has_parking' => ['nullable', 'boolean'],
+            'is_ulez_zone' => ['nullable', 'boolean'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'tax_rate' => ['nullable', 'numeric'],
+            'tax_included' => ['nullable', 'boolean'],
+            'legacy_erp_id' => ['nullable', 'string', 'max:64'],
+            'integration_external_id' => ['nullable', 'string', 'max:80'],
+            'notes' => ['nullable', 'string'],
+            'notes_alert' => ['nullable', 'boolean'],
+            'internal_notes' => ['nullable', 'string'],
+            'internal_notes_alert' => ['nullable', 'boolean'],
+            'voicebot_time_slots' => ['nullable', 'array'],
         ];
     }
 
@@ -255,6 +286,37 @@ final class CompanyValidation
             'group_preventives_by', 'group_correctives_by', 'optima_score',
             'customer_score', 'average_score', 'day_start_at', 'day_end_at',
             'registered_at', 'legacy_status_id',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function relationshipBooleanKeys(): array
+    {
+        return [
+            'notes_alert', 'internal_notes_alert', 'is_reviewed', 'is_email_reviewed',
+            'is_invoicing_reviewed', 'group_zero_cost_work_orders', 'load_materials_on_corrective',
+            'group_preventive_and_corrective', 'invoice_at_month_end', 'requires_purchase_order',
+            'requires_requester', 'is_franchise', 'requires_justification', 'auto_send_invoices',
+            'send_invoices_individually', 'send_debt_reminders', 'is_quality_control_contactable',
+            'requires_client_informed_check', 'requires_intervention_scheduled_check',
+            'requires_budget_approval_limit', 'is_intercompany', 'has_health_and_safety',
+            'is_field_technician', 'is_creditor', 'is_vip', 'is_available_24h',
+            'has_garnishment', 'whatsapp_messaging_authorized',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function establishmentBooleanKeys(): array
+    {
+        return [
+            'is_active', 'is_client_priority', 'is_reviewed', 'is_email_reviewed',
+            'has_site_health_and_safety', 'has_customer_health_and_safety',
+            'is_quality_control_contactable', 'has_parking', 'is_ulez_zone',
+            'tax_included', 'notes_alert', 'internal_notes_alert',
         ];
     }
 

@@ -5,20 +5,30 @@
     "scripts": {
         "build": "vite build",
         "dev": "vite",
-        "dev:all": "concurrently -c \"#1d4ed8,#2563eb\" \"./vendor/bin/sail up\" \"npm run dev\" --names=sail,vite"
+        "dev:all": "concurrently -c \"#1d4ed8,#2563eb\" \"./vendor/bin/sail up\" \"npm run dev\" --names=sail,vite",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "lint": "tsc --noEmit -p tsconfig.json",
+        "typecheck": "tsc --noEmit -p tsconfig.json"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
+        "@testing-library/dom": "^10.4.1",
+        "@testing-library/jest-dom": "^6.9.1",
+        "@testing-library/react": "^16.3.0",
+        "@testing-library/user-event": "^14.6.1",
         "@types/node": "^26.4.1",
         "@types/react": "^19.2.18",
         "@types/react-dom": "^19.2.5",
         "@types/tabulator-tables": "^6.3.6",
         "@vitejs/plugin-react": "^6.1.1",
         "concurrently": "^10.0.3",
+        "jsdom": "^26.1.0",
         "laravel-vite-plugin": "^3.1",
         "tailwindcss": "^4.0.0",
         "typescript": "^7.0.2",
-        "vite": "^8.0.0"
+        "vite": "^8.0.0",
+        "vitest": "^3.2.4"
     },
     "optionalDependencies": {
         "@laravel/multiplex": "^0.4.1"

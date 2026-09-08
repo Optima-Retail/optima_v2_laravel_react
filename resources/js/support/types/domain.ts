@@ -139,6 +139,40 @@ export type RatingTypeFormData = {
     max_score: number;
 };
 
+export type FieldHelpListItem = {
+    id: number;
+    key: string;
+    context: string | null;
+    is_active: boolean;
+    title: string | null;
+    created_at: string | null;
+};
+
+export type FieldHelpFormData = {
+    id: number;
+    key: string;
+    table: string | null;
+    column: string | null;
+    context: string | null;
+    is_active: boolean;
+    translations: Array<{ locale: string; title: string; description: string }>;
+};
+
+export type EstablishmentTypeListItem = {
+    id: number;
+    name: string;
+    code: string;
+    health_and_safety_delay_days: number;
+    created_at: string | null;
+};
+
+export type EstablishmentTypeFormData = {
+    id: number;
+    name: string;
+    code: string;
+    health_and_safety_delay_days: number;
+};
+
 export type DelegationListItem = {
     id: number;
     name: string;
@@ -341,6 +375,10 @@ export type CompanyFormData = {
     employee_count: number | null;
     is_active: boolean;
     brand_id: number | null;
+    language_id: number | null;
+    latitude: string | null;
+    longitude: string | null;
+    legacy_erp_id: number | null;
 };
 
 export type CompanyRelationshipListItem = {
@@ -359,6 +397,7 @@ export type CompanyRelationshipFormData = {
     id: number;
     owner_company_id: number;
     related_company_id: number;
+    related_company_name: string | null;
     kind: string;
     status: string;
     classification: string;
@@ -369,6 +408,77 @@ export type CompanyRelationshipFormData = {
     notes: string | null;
     starts_at: string | null;
     ends_at: string | null;
+    delegation_id: number | null;
+    billing_language_id: number | null;
+    series_id: number | null;
+    rating_type_id: number | null;
+    integration_id: number | null;
+    integration_external_id: string | null;
+    corrective_work_order_owner_id: number | null;
+    preventive_work_order_owner_id: number | null;
+    quality_owner_id: number | null;
+    account_owner_id: number | null;
+    commercial_owner_id: number | null;
+    sourced_by_user_id: number | null;
+    internal_notes: string | null;
+    notes_alert: boolean | null;
+    internal_notes_alert: boolean | null;
+    onboarding_notes: string | null;
+    billing_comments: string | null;
+    rates_notes: string | null;
+    archetype: string | null;
+    tax_rate: number | string | null;
+    is_reviewed: boolean | null;
+    is_email_reviewed: boolean | null;
+    is_invoicing_reviewed: boolean | null;
+    invoicing_reviewed_at: string | null;
+    quote_close_days: number | null;
+    recurring_meeting_frequency: number | null;
+    sales_feedback_meeting_frequency: number | null;
+    group_zero_cost_work_orders: boolean | null;
+    load_materials_on_corrective: boolean | null;
+    group_preventive_and_corrective: boolean | null;
+    group_preventives_by: string | null;
+    group_correctives_by: string | null;
+    invoice_at_month_end: boolean | null;
+    requires_purchase_order: boolean | null;
+    requires_requester: boolean | null;
+    is_franchise: boolean | null;
+    requires_justification: boolean | null;
+    auto_send_invoices: boolean | null;
+    send_invoices_individually: boolean | null;
+    send_debt_reminders: boolean | null;
+    is_quality_control_contactable: boolean | null;
+    requires_client_informed_check: boolean | null;
+    requires_intervention_scheduled_check: boolean | null;
+    requires_budget_approval_limit: boolean | null;
+    is_intercompany: boolean | null;
+    optima_score: number | string | null;
+    customer_score: number | string | null;
+    average_score: number | string | null;
+    optima_score_count: number | null;
+    customer_score_count: number | null;
+    has_health_and_safety: boolean | null;
+    is_field_technician: boolean | null;
+    is_creditor: boolean | null;
+    is_vip: boolean | null;
+    is_available_24h: boolean | null;
+    day_start_at: string | null;
+    day_end_at: string | null;
+    has_garnishment: boolean | null;
+    whatsapp_messaging_authorized: boolean | null;
+    registered_at: string | null;
+    legacy_status_id: number | null;
+};
+
+export type RelationshipFormOptions = {
+    brandOptions: UserOption[];
+    delegationOptions: UserOption[];
+    languageOptions: UserOption[];
+    seriesOptions: UserOption[];
+    ratingTypeOptions: UserOption[];
+    integrationOptions: UserOption[];
+    userOptions: UserOption[];
 };
 
 export type EstablishmentListItem = {
@@ -387,6 +497,12 @@ export type EstablishmentFormData = {
     company_id: number;
     name: string;
     code: string | null;
+    store_code: string | null;
+    alternate_store_code: string | null;
+    phone: string | null;
+    email: string | null;
+    emails: string | null;
+    recipient_emails: string | null;
     address_line_1: string | null;
     address_line_2: string | null;
     city: string | null;
@@ -394,7 +510,30 @@ export type EstablishmentFormData = {
     postal_code: string | null;
     country_id: number | null;
     timezone_id: number | null;
+    language_id: number | null;
+    establishment_type_id: number | null;
     delegation_id: number | null;
-    is_active: boolean;
+    series_id: number | null;
     billing_company_id: number | null;
+    responsible_user_id: number | null;
+    is_active: boolean;
+    is_client_priority: boolean | null;
+    is_reviewed: boolean | null;
+    is_email_reviewed: boolean | null;
+    has_site_health_and_safety: boolean | null;
+    has_customer_health_and_safety: boolean | null;
+    is_quality_control_contactable: boolean | null;
+    has_parking: boolean | null;
+    is_ulez_zone: boolean | null;
+    latitude: string | null;
+    longitude: string | null;
+    tax_rate: number | string | null;
+    tax_included: boolean | null;
+    legacy_erp_id: number | null;
+    integration_external_id: string | null;
+    notes: string | null;
+    notes_alert: boolean | null;
+    internal_notes: string | null;
+    internal_notes_alert: boolean | null;
+    voicebot_time_slots: unknown[] | null;
 };

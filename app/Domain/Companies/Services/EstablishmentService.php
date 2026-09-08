@@ -8,7 +8,11 @@ use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Models\Company;
 use App\Models\Delegation;
 use App\Models\Establishment;
+use App\Models\EstablishmentType;
+use App\Models\Language;
+use App\Models\Series;
 use App\Models\Timezone;
+use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -158,6 +162,70 @@ final class EstablishmentService
     }
 
     /**
+     * @return list<array{id: int, label: string}>
+     */
+    public function languageOptions(): array
+    {
+        return Language::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'code'])
+            ->map(fn (Language $language): array => [
+                'id' => $language->id,
+                'label' => "{$language->name} ({$language->code})",
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    public function establishmentTypeOptions(): array
+    {
+        return EstablishmentType::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'code'])
+            ->map(fn (EstablishmentType $type): array => [
+                'id' => $type->id,
+                'label' => "{$type->name} ({$type->code})",
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    public function seriesOptions(): array
+    {
+        return Series::query()
+            ->orderBy('key')
+            ->get(['id', 'key'])
+            ->map(fn (Series $series): array => [
+                'id' => $series->id,
+                'label' => $series->key,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    public function userOptions(): array
+    {
+        return User::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'email'])
+            ->map(fn (User $user): array => [
+                'id' => $user->id,
+                'label' => "{$user->name} ({$user->email})",
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toFormData(Establishment $establishment): array
@@ -167,6 +235,12 @@ final class EstablishmentService
             'company_id' => $establishment->company_id,
             'name' => $establishment->name,
             'code' => $establishment->code,
+            'store_code' => $establishment->store_code,
+            'alternate_store_code' => $establishment->alternate_store_code,
+            'phone' => $establishment->phone,
+            'email' => $establishment->email,
+            'emails' => $establishment->emails,
+            'recipient_emails' => $establishment->recipient_emails,
             'address_line_1' => $establishment->address_line_1,
             'address_line_2' => $establishment->address_line_2,
             'city' => $establishment->city,
@@ -174,9 +248,32 @@ final class EstablishmentService
             'postal_code' => $establishment->postal_code,
             'country_id' => $establishment->country_id,
             'timezone_id' => $establishment->timezone_id,
+            'language_id' => $establishment->language_id,
+            'establishment_type_id' => $establishment->establishment_type_id,
             'delegation_id' => $establishment->delegation_id,
-            'is_active' => $establishment->is_active,
+            'series_id' => $establishment->series_id,
             'billing_company_id' => $establishment->billing_company_id,
+            'responsible_user_id' => $establishment->responsible_user_id,
+            'is_active' => $establishment->is_active,
+            'is_client_priority' => $establishment->is_client_priority,
+            'is_reviewed' => $establishment->is_reviewed,
+            'is_email_reviewed' => $establishment->is_email_reviewed,
+            'has_site_health_and_safety' => $establishment->has_site_health_and_safety,
+            'has_customer_health_and_safety' => $establishment->has_customer_health_and_safety,
+            'is_quality_control_contactable' => $establishment->is_quality_control_contactable,
+            'has_parking' => $establishment->has_parking,
+            'is_ulez_zone' => $establishment->is_ulez_zone,
+            'latitude' => $establishment->latitude,
+            'longitude' => $establishment->longitude,
+            'tax_rate' => $establishment->tax_rate,
+            'tax_included' => $establishment->tax_included,
+            'legacy_erp_id' => $establishment->legacy_erp_id,
+            'integration_external_id' => $establishment->integration_external_id,
+            'notes' => $establishment->notes,
+            'notes_alert' => $establishment->notes_alert,
+            'internal_notes' => $establishment->internal_notes,
+            'internal_notes_alert' => $establishment->internal_notes_alert,
+            'voicebot_time_slots' => $establishment->voicebot_time_slots,
         ];
     }
 
@@ -204,8 +301,12 @@ final class EstablishmentService
     private function attributes(array $data): array
     {
         foreach ([
-            'code', 'address_line_1', 'address_line_2', 'city', 'province', 'postal_code',
-            'country_id', 'timezone_id', 'delegation_id', 'billing_company_id',
+            'code', 'store_code', 'alternate_store_code', 'phone', 'email', 'emails', 'recipient_emails',
+            'address_line_1', 'address_line_2', 'city', 'province', 'postal_code',
+            'country_id', 'timezone_id', 'language_id', 'establishment_type_id', 'delegation_id', 'series_id',
+            'billing_company_id', 'responsible_user_id',
+            'latitude', 'longitude', 'tax_rate', 'legacy_erp_id', 'integration_external_id',
+            'notes', 'internal_notes',
         ] as $key) {
             if (array_key_exists($key, $data) && $data[$key] === '') {
                 $data[$key] = null;

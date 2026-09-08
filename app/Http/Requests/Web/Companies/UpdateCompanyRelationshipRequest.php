@@ -25,7 +25,22 @@ final class UpdateCompanyRelationshipRequest extends FormRequest
 
         $this->merge(CompanyValidation::blankToNull($this->all(), CompanyValidation::relationshipNullableKeys()));
 
+        $booleans = [];
+        foreach (CompanyValidation::relationshipBooleanKeys() as $key) {
+            if ($this->has($key)) {
+                $booleans[$key] = $this->boolean($key);
+            }
+        }
+
+        foreach (['day_start_at', 'day_end_at'] as $timeKey) {
+            $value = $this->input($timeKey);
+            if (is_string($value) && preg_match('/^\d{2}:\d{2}$/', $value) === 1) {
+                $booleans[$timeKey] = $value.':00';
+            }
+        }
+
         $this->merge([
+            ...$booleans,
             'owner_company_id' => $relationship->owner_company_id,
             'related_mode' => 'existing',
         ]);

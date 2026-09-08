@@ -40,6 +40,7 @@ export function Sidebar() {
     const canViewLanguages = useCan('languages.view');
     const canViewIntegrations = useCan('integrations.view');
     const canViewRatingTypes = useCan('rating_types.view');
+    const canViewEstablishmentTypes = useCan('establishment_types.view');
     const canViewBanks = useCan('banks.view');
     const canViewTimezones = useCan('timezones.view');
     const canViewCountries = useCan('countries.view');
@@ -62,6 +63,7 @@ export function Sidebar() {
         canViewLanguages,
         canViewIntegrations,
         canViewRatingTypes,
+        canViewEstablishmentTypes,
         canViewBanks,
         canViewTimezones,
         canViewCountries,

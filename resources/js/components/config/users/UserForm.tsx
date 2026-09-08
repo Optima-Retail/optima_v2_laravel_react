@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
 import type { UserFormOptions } from '@/support/types/domain';
 import type { SharedPageProps } from '@/types';
+import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type UserFormValues = {
     name: string;
@@ -74,6 +75,7 @@ export function UserForm({
     const { supportedLocales } = usePage<SharedPageProps>().props;
 
     return (
+        <FieldHelpScope table="users">
         <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
             <Field label={t('common.name')} htmlFor="name" error={errors.name} required>
                 <Input
@@ -425,5 +427,6 @@ export function UserForm({
                 </Button>
             </div>
         </form>
+        </FieldHelpScope>
     );
 }

@@ -8,39 +8,22 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { suppliersService } from '@/services';
-import type { CompanyRelationshipFormData, UserOption } from '@/support/types/domain';
+import { relationshipFormValuesFromData } from '@/support/relationshipForm';
+import type { CompanyRelationshipFormData, RelationshipFormOptions, UserOption } from '@/support/types/domain';
 
 type EditSupplierProps = {
     relationship: CompanyRelationshipFormData;
     companyOptions: UserOption[];
+    formOptions: RelationshipFormOptions;
     can: {
         delete: boolean;
     };
 };
 
-export default function EditSupplier({ relationship, companyOptions, can }: EditSupplierProps) {
+export default function EditSupplier({ relationship, companyOptions, formOptions, can }: EditSupplierProps) {
     const { t } = useTranslation();
-    const form = useForm({
-        related_mode: 'existing' as const,
-        related_company_id: String(relationship.related_company_id),
-        related_company: {
-            name: '',
-            tradename: '',
-            tax_id: '',
-            email: '',
-            phone: '',
-        },
-        kind: relationship.kind,
-        status: relationship.status,
-        classification: relationship.classification,
-        owner_reference: relationship.owner_reference ?? '',
-        related_reference: relationship.related_reference ?? '',
-        brand_id: relationship.brand_id ? String(relationship.brand_id) : '',
-        external_code: relationship.external_code ?? '',
-        notes: relationship.notes ?? '',
-        starts_at: relationship.starts_at ?? '',
-        ends_at: relationship.ends_at ?? '',
-    });
+    const form = useForm(relationshipFormValuesFromData(relationship));
+    const displayName = relationship.related_company_name ?? String(relationship.id);
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -50,7 +33,7 @@ export default function EditSupplier({ relationship, companyOptions, can }: Edit
     async function destroySupplier() {
         const confirmed = await confirmAction({
             title: t('common.deleteTitle', { resource: t('suppliers.resource') }),
-            message: t('common.deleteMessage', { name: String(relationship.id) }),
+            message: t('common.deleteMessage', { name: displayName }),
             confirmLabel: t('common.delete'),
             tone: 'danger',
         });
@@ -64,12 +47,12 @@ export default function EditSupplier({ relationship, companyOptions, can }: Edit
 
     return (
         <AppLayout title={t('common.editResource', { resource: t('suppliers.resource') })}>
-            <Head title={t('common.editResource', { resource: t('suppliers.resource') })} />
+            <Head title={t('common.editItem', { name: displayName })} />
             <div className="w-full space-y-6">
                 <PageHeader
                     eyebrow={t('suppliers.title')}
                     title={t('common.editResource', { resource: t('suppliers.resource') })}
-                    description={t('common.updateDetails', { name: String(relationship.id) })}
+                    description={t('common.updateDetails', { name: displayName })}
                     backHref={suppliersService.indexPath}
                     backLabel={t('common.backTo', { resource: t('suppliers.resourcePlural') })}
                 />
@@ -79,6 +62,8 @@ export default function EditSupplier({ relationship, companyOptions, can }: Edit
                     errors={form.errors}
                     processing={form.processing}
                     companyOptions={companyOptions}
+                    formOptions={formOptions}
+                    profileMode="supplier"
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.save')}

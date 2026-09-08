@@ -6,21 +6,15 @@ import { PageHeader } from '@/components/page/PageHeader';
 import { RelationshipForm } from '@/components/relationships/RelationshipForm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { clientsService } from '@/services';
-import type { UserOption } from '@/support/types/domain';
+import { defaultRelationshipProfileValues, emptyRelatedCompany } from '@/support/relationshipForm';
+import type { RelationshipFormOptions, UserOption } from '@/support/types/domain';
 
 type CreateClientProps = {
     companyOptions: UserOption[];
+    formOptions: RelationshipFormOptions;
 };
 
-const emptyRelatedCompany = {
-    name: '',
-    tradename: '',
-    tax_id: '',
-    email: '',
-    phone: '',
-};
-
-export default function CreateClient({ companyOptions }: CreateClientProps) {
+export default function CreateClient({ companyOptions, formOptions }: CreateClientProps) {
     const { t } = useTranslation();
     const form = useForm({
         related_mode: 'new' as const,
@@ -36,6 +30,7 @@ export default function CreateClient({ companyOptions }: CreateClientProps) {
         notes: '',
         starts_at: '',
         ends_at: '',
+        ...defaultRelationshipProfileValues(),
     });
 
     function submit(event: FormEvent) {
@@ -60,6 +55,8 @@ export default function CreateClient({ companyOptions }: CreateClientProps) {
                     errors={form.errors}
                     processing={form.processing}
                     companyOptions={companyOptions}
+                    formOptions={formOptions}
+                    profileMode="customer"
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onRelatedCompanyChange={(key, value) =>
                         form.setData((data) => ({

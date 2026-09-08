@@ -2,7 +2,7 @@ import { FormEvent } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { EstablishmentForm } from '@/components/establishments/EstablishmentForm';
+import { establishmentFormValuesFromData, EstablishmentForm } from '@/components/establishments/EstablishmentForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
@@ -16,6 +16,10 @@ type EditEstablishmentProps = {
     countryOptions: UserOption[];
     timezoneOptions: UserOption[];
     delegationOptions: UserOption[];
+    languageOptions: UserOption[];
+    establishmentTypeOptions: UserOption[];
+    seriesOptions: UserOption[];
+    userOptions: UserOption[];
     can: {
         delete: boolean;
     };
@@ -27,24 +31,14 @@ export default function EditEstablishment({
     countryOptions,
     timezoneOptions,
     delegationOptions,
+    languageOptions,
+    establishmentTypeOptions,
+    seriesOptions,
+    userOptions,
     can,
 }: EditEstablishmentProps) {
     const { t } = useTranslation();
-    const form = useForm({
-        company_id: String(establishment.company_id),
-        name: establishment.name,
-        code: establishment.code ?? '',
-        address_line_1: establishment.address_line_1 ?? '',
-        address_line_2: establishment.address_line_2 ?? '',
-        city: establishment.city ?? '',
-        province: establishment.province ?? '',
-        postal_code: establishment.postal_code ?? '',
-        country_id: establishment.country_id ? String(establishment.country_id) : '',
-        timezone_id: establishment.timezone_id ? String(establishment.timezone_id) : '',
-        delegation_id: establishment.delegation_id ? String(establishment.delegation_id) : '',
-        is_active: establishment.is_active,
-        billing_company_id: establishment.billing_company_id ? String(establishment.billing_company_id) : '',
-    });
+    const form = useForm(establishmentFormValuesFromData(establishment));
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -86,6 +80,10 @@ export default function EditEstablishment({
                     countryOptions={countryOptions}
                     timezoneOptions={timezoneOptions}
                     delegationOptions={delegationOptions}
+                    languageOptions={languageOptions}
+                    establishmentTypeOptions={establishmentTypeOptions}
+                    seriesOptions={seriesOptions}
+                    userOptions={userOptions}
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.save')}

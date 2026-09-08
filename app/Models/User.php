@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -27,6 +28,7 @@ use Spatie\Permission\Traits\HasRoles;
     'team_id',
     'timezone_id',
     'brand_id',
+    'tenant_id',
     'phone',
     'telephony_phone_number',
     'pbx_extension',
@@ -97,6 +99,16 @@ class User extends Authenticatable
     }
 
     /**
+     * Customer org used to resolve SSO IdP credentials.
+     *
+     * @return BelongsTo<Tenant, $this>
+     */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    /**
      * @return BelongsTo<Company, $this>
      */
     public function activeCompany(): BelongsTo
@@ -113,6 +125,25 @@ class User extends Authenticatable
             ->withPivot(['id', 'is_active'])
             ->withTimestamps()
             ->wherePivotNull('deleted_at');
+    }
+
+    /**
+     * @return BelongsToMany<SsoProvider, $this>
+     */
+    public function ssoProviders(): BelongsToMany
+    {
+        return $this->belongsToMany(SsoProvider::class, 'user_sso_identities')
+            ->using(UserSsoIdentity::class)
+            ->withPivot(['external_id'])
+            ->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<UserSsoIdentity, $this>
+     */
+    public function ssoIdentities(): HasMany
+    {
+        return $this->hasMany(UserSsoIdentity::class);
     }
 
     public function belongsToCompany(int $companyId): bool

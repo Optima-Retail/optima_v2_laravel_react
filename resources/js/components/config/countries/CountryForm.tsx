@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import type { TimezoneOption } from '@/support/types/domain';
 
 export type CountryFormValues = {
@@ -39,6 +40,7 @@ export function CountryForm({
     const { t } = useTranslation();
 
     return (
+        <FieldHelpScope table="countries">
         <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
             <div className="grid gap-5 sm:grid-cols-2">
                 <Field label={t('common.name')} htmlFor="name" error={errors.name} className="sm:col-span-2" required>
@@ -84,5 +86,6 @@ export function CountryForm({
                 </Button>
             </div>
         </form>
+        </FieldHelpScope>
     );
 }

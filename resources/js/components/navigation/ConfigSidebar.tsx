@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Building2, Cable, ClipboardList, Clock, Coins, Globe2, Hash, Landmark, Languages, Shield, Star, Users, UsersRound } from 'lucide-react';
+import { Building2, Cable, CircleHelp, ClipboardList, Clock, Coins, Globe2, Hash, Landmark, Languages, Shield, Star, Store, Users, UsersRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCan } from '@/hooks/useAuth';
 import { cn } from '@/support/cn';
@@ -49,6 +49,20 @@ const configItems: ConfigItem[] = [
         match: '/config/rating-types',
         icon: Star,
         permission: 'rating_types.view',
+    },
+    {
+        href: '/config/field-helps',
+        labelKey: 'nav.fieldHelps',
+        match: '/config/field-helps',
+        icon: CircleHelp,
+        permission: 'field_helps.view',
+    },
+    {
+        href: '/config/establishment-types',
+        labelKey: 'nav.establishmentTypes',
+        match: '/config/establishment-types',
+        icon: Store,
+        permission: 'establishment_types.view',
     },
     {
         href: '/config/banks',
@@ -106,6 +120,7 @@ export function firstConfigHref(
     canViewLanguages = false,
     canViewIntegrations = false,
     canViewRatingTypes = false,
+    canViewEstablishmentTypes = false,
     canViewBanks = false,
     canViewTimezones = false,
     canViewCountries = false,
@@ -139,6 +154,10 @@ export function firstConfigHref(
 
     if (canViewRatingTypes) {
         return '/config/rating-types';
+    }
+
+    if (canViewEstablishmentTypes) {
+        return '/config/establishment-types';
     }
 
     if (canViewBanks) {
@@ -178,6 +197,8 @@ export function ConfigSidebar() {
     const canViewLanguages = useCan('languages.view');
     const canViewIntegrations = useCan('integrations.view');
     const canViewRatingTypes = useCan('rating_types.view');
+    const canViewFieldHelps = useCan('field_helps.view');
+    const canViewEstablishmentTypes = useCan('establishment_types.view');
     const canViewBanks = useCan('banks.view');
     const canViewTimezones = useCan('timezones.view');
     const canViewCountries = useCan('countries.view');
@@ -193,6 +214,8 @@ export function ConfigSidebar() {
         'languages.view': canViewLanguages,
         'integrations.view': canViewIntegrations,
         'rating_types.view': canViewRatingTypes,
+        'field_helps.view': canViewFieldHelps,
+        'establishment_types.view': canViewEstablishmentTypes,
         'banks.view': canViewBanks,
         'timezones.view': canViewTimezones,
         'countries.view': canViewCountries,

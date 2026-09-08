@@ -11,9 +11,10 @@ import type { UserOption } from '@/support/types/domain';
 type CreateCompanyProps = {
     countryOptions: UserOption[];
     brandOptions: UserOption[];
+    languageOptions: UserOption[];
 };
 
-export default function CreateCompany({ countryOptions, brandOptions }: CreateCompanyProps) {
+export default function CreateCompany({ countryOptions, brandOptions, languageOptions }: CreateCompanyProps) {
     const { t } = useTranslation();
     const form = useForm({
         name: '',
@@ -34,6 +35,10 @@ export default function CreateCompany({ countryOptions, brandOptions }: CreateCo
         employee_count: '',
         is_active: true,
         brand_id: '',
+        language_id: '',
+        latitude: '',
+        longitude: '',
+        legacy_erp_id: '',
     });
 
     function submit(event: FormEvent) {
@@ -59,6 +64,7 @@ export default function CreateCompany({ countryOptions, brandOptions }: CreateCo
                     processing={form.processing}
                     countryOptions={countryOptions}
                     brandOptions={brandOptions}
+                    languageOptions={languageOptions}
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.createItem', { resource: t('companies.resource') })}

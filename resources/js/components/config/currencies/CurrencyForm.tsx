@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type CurrencyFormValues = {
     name: string;
@@ -34,6 +35,7 @@ export function CurrencyForm({
     const { t } = useTranslation();
 
     return (
+        <FieldHelpScope table="currencies">
         <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
             <div className="grid gap-5 sm:grid-cols-2">
                 <Field label={t('common.name')} htmlFor="name" error={errors.name} required>
@@ -64,5 +66,6 @@ export function CurrencyForm({
                 </Button>
             </div>
         </form>
+        </FieldHelpScope>
     );
 }

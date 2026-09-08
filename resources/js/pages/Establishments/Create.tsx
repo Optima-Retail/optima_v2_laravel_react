@@ -2,7 +2,7 @@ import { FormEvent } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { EstablishmentForm } from '@/components/establishments/EstablishmentForm';
+import { defaultEstablishmentFormValues, EstablishmentForm } from '@/components/establishments/EstablishmentForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { establishmentsService } from '@/services';
@@ -14,6 +14,10 @@ type CreateEstablishmentProps = {
     countryOptions: UserOption[];
     timezoneOptions: UserOption[];
     delegationOptions: UserOption[];
+    languageOptions: UserOption[];
+    establishmentTypeOptions: UserOption[];
+    seriesOptions: UserOption[];
+    userOptions: UserOption[];
 };
 
 export default function CreateEstablishment({
@@ -22,23 +26,17 @@ export default function CreateEstablishment({
     countryOptions,
     timezoneOptions,
     delegationOptions,
+    languageOptions,
+    establishmentTypeOptions,
+    seriesOptions,
+    userOptions,
 }: CreateEstablishmentProps) {
     const { t } = useTranslation();
-    const form = useForm({
-        company_id: defaultCompanyId ? String(defaultCompanyId) : '',
-        name: '',
-        code: '',
-        address_line_1: '',
-        address_line_2: '',
-        city: '',
-        province: '',
-        postal_code: '',
-        country_id: '',
-        timezone_id: '',
-        delegation_id: '',
-        is_active: true,
-        billing_company_id: '',
-    });
+    const form = useForm(
+        defaultEstablishmentFormValues({
+            company_id: defaultCompanyId ? String(defaultCompanyId) : '',
+        }),
+    );
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -65,6 +63,10 @@ export default function CreateEstablishment({
                     countryOptions={countryOptions}
                     timezoneOptions={timezoneOptions}
                     delegationOptions={delegationOptions}
+                    languageOptions={languageOptions}
+                    establishmentTypeOptions={establishmentTypeOptions}
+                    seriesOptions={seriesOptions}
+                    userOptions={userOptions}
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.createItem', { resource: t('establishments.resource') })}

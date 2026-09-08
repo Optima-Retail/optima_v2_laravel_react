@@ -19,5 +19,6 @@
     },
     "types": ["vite/client"]
   },
-  "include": ["resources/js/**/*.ts", "resources/js/**/*.tsx"]
+  "include": ["resources/js/**/*.ts", "resources/js/**/*.tsx"],
+  "exclude": ["resources/js/**/*.test.ts", "resources/js/**/*.test.tsx"]
 }

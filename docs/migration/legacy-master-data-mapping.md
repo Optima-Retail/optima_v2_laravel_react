@@ -91,20 +91,52 @@ One new row per workplace (preferred PK). Overlay store fields from `establecimi
 | Source | New |
 |---|---|
 | `workplaces.company_id` | `company_id` |
+| `establecimientos.nombre` | `name` |
 | `establecimientos.codigo` | `code` |
+| `establecimientos.codigo_tienda` / `_2` | `store_code` / `alternate_store_code` |
+| `establecimientos.telefono` / `correo` | `phone` / `email` |
+| `establecimientos.correos` / `correos_destinatarios` | `emails` / `recipient_emails` |
 | `workplaces.address` / FM address | `address_line_1` |
 | `workplaces.town` | `city` |
 | `workplaces.province` | `province` |
 | `workplaces.cp` | `postal_code` |
-| `workplaces.pais_id` | `country_id` (remap) |
-| `establecimientos` timezone | `timezone_id` |
-| `establecimientos.cliente_facturacion_id` | `billing_company_id` (via party map) |
+| `workplaces.pais_id` / FM `pais_id` | `country_id` (remap) |
+| `establecimientos.zona_horaria_id` | `timezone_id` |
+| `establecimientos.idioma_id` | `language_id` |
+| `establecimientos.tipos_establecimiento_id` | `establishment_type_id` |
 | `establecimientos.delegacion_id` | `delegation_id` |
-| `workplaces.is_active` | `is_active` |
+| `establecimientos.serie_id` | `series_id` |
+| `establecimientos.cliente_facturacion_id` | `billing_company_id` (via party map) |
+| `establecimientos.responsable_id` | `responsible_user_id` |
+| `establecimientos.tipos_establecimiento_id` | `establishment_type_id` |
+| `workplaces.is_active` / `estado` | `is_active` |
+| `importante_cliente` | `is_client_priority` |
+| `revisado` / `revisado_email` | `is_reviewed` / `is_email_reviewed` |
+| `prl_centro` / `prl_cliente` | `has_site_health_and_safety` / `has_customer_health_and_safety` |
+| `contactable_qc` | `is_quality_control_contactable` |
+| `parking` / `ulez` | `has_parking` / `is_ulez_zone` |
+| `latitud` / `longitud` | `latitude` / `longitude` |
+| `iva_valor` / `iva_incluido` | `tax_rate` / `tax_included` |
+| `id_fixner` | `legacy_erp_id` |
+| `integracion_relacion_id` | `integration_external_id` |
+| notes + alerts | `notes` / `notes_alert` / `internal_notes` / `internal_notes_alert` |
+| `nora_franjas_horario` | `voicebot_time_slots` |
+
+Skipped: `workplaces.featured` / `uuid`, dropped IVA-delegation cols.
 
 Unique `(company_id, code)` among live rows when `code` is not null.
 
 Do **not** create a nested `workplaces` table. A “zone inside a store” is **not** old workplaces and is out of scope.
+
+## Establishment types: `tipos_establecimiento` → `establishment_types`
+
+Config catalog (`/config/establishment-types`). Import before establishments.
+
+| Old | New |
+|---|---|
+| `nombre` | `name` |
+| (enum key) | `code` (`store` / `eci` / `cc`) |
+| `dias_atraso_prl` | `health_and_safety_delay_days` |
 
 ## Delegations: `delegaciones` → `delegations`
 
@@ -131,6 +163,23 @@ Deferred / dead: `impuesto`, `serie_factura_venta`, `serie_factura_compra`, `id_
 
 Customer commercial brand lives on **`company_relationships.brand_id`** when `kind = customer`, not on the party.
 
+## SSO tenants: `tenants` + IdP tables
+
+SSO customer orgs and IdP credentials (not the same as `owner_company_id` commercial tenancy).
+
+| Old | New |
+|---|---|
+| `tenants` | `tenants` (`name` unique slug, e.g. `hermes`) |
+| `proveedores_sso` | `sso_providers` (`nombre` → `name`, `slug`, `driver`) |
+| `tenant_proveedores_sso_configuraciones` | `tenant_sso_provider_settings` (`proveedor_sso_id` → `sso_provider_id`, `config_key` → `key`, `config_value` → `value`) |
+| `users_identificadores_sso` | `user_sso_identities` (`identificador` → `external_id`, `proveedor_sso_id` → `sso_provider_id`) |
+| `users.tenant_id` | `users.tenant_id` (nullable FK `tenants`) |
+| `users.login_unicamente_sso` | `users.sso_only` (already on users) |
+
+Azure required setting keys stay `client_id`, `client_secret`, `tenant_id` (IdP directory id inside `value`). Values may be encrypted at rest in OLD — decrypt/re-encrypt on import as needed.
+
+Skipped: one-off data migration that bulk-assigned Hermes users by collaborator graph (import logic, not schema).
+
 ## Deferred (not data-loss)
 
 These FM / V2 columns have **no table yet**. Keep them in the mapping JSON as `old_only` / deferred notes:
@@ -141,7 +190,6 @@ These FM / V2 columns have **no table yet**. Keep them in the mapping JSON as `o
 - `peticion_id` (onboarding requests catalog not in NEW)
 - `tecnicos.estado_id` stored as `company_relationships.legacy_status_id` until a statuses catalog exists
 - Remaining V2 relationship accounting: receivable/payable accounts, tax-rate FKs, credit limits, payment terms
-- Establishment extras: Nora slots, Service Channel ids, recipient emails
 - `clientes.uuid` (NEW uses bigint ids)
 
 ## Seed in laravel_optima

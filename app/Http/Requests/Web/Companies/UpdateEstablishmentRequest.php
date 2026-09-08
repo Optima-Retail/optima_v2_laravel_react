@@ -23,13 +23,22 @@ final class UpdateEstablishmentRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge(CompanyValidation::blankToNull($this->all(), [
-            'code', 'address_line_1', 'address_line_2', 'city', 'province',
-            'postal_code', 'country_id', 'timezone_id', 'delegation_id', 'billing_company_id', 'company_id',
+            'code', 'store_code', 'alternate_store_code', 'phone', 'email', 'emails', 'recipient_emails',
+            'address_line_1', 'address_line_2', 'city', 'province', 'postal_code',
+            'country_id', 'timezone_id', 'language_id', 'establishment_type_id', 'delegation_id', 'series_id',
+            'billing_company_id', 'responsible_user_id', 'company_id',
+            'latitude', 'longitude', 'tax_rate', 'legacy_erp_id', 'integration_external_id',
+            'notes', 'internal_notes',
         ]));
 
-        $this->merge([
-            'is_active' => $this->boolean('is_active', true),
-        ]);
+        $booleans = [];
+        foreach (CompanyValidation::establishmentBooleanKeys() as $key) {
+            if ($key === 'is_active' || $this->has($key)) {
+                $booleans[$key] = $this->boolean($key, $key === 'is_active');
+            }
+        }
+
+        $this->merge($booleans);
     }
 
     /**

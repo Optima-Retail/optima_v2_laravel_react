@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/Input';
 import { toggleGroupItems, toggleItem } from '@/helpers/array';
 import { cn } from '@/support/cn';
 import type { PermissionGroup } from '@/support/types/domain';
+import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type RoleFormValues = {
     name: string;
@@ -70,6 +71,7 @@ export function RoleForm({
     }
 
     return (
+        <FieldHelpScope table="roles">
         <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
             <Field label={t('common.name')} htmlFor="name" error={errors.name} required>
                 <Input
@@ -172,5 +174,6 @@ export function RoleForm({
                 </Button>
             </div>
         </form>
+        </FieldHelpScope>
     );
 }

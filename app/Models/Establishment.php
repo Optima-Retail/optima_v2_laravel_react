@@ -24,6 +24,12 @@ class Establishment extends Model
         'company_id',
         'name',
         'code',
+        'store_code',
+        'alternate_store_code',
+        'phone',
+        'email',
+        'emails',
+        'recipient_emails',
         'address_line_1',
         'address_line_2',
         'city',
@@ -31,9 +37,32 @@ class Establishment extends Model
         'postal_code',
         'country_id',
         'timezone_id',
+        'language_id',
+        'establishment_type_id',
         'delegation_id',
-        'is_active',
+        'series_id',
         'billing_company_id',
+        'responsible_user_id',
+        'is_active',
+        'is_client_priority',
+        'is_reviewed',
+        'is_email_reviewed',
+        'has_site_health_and_safety',
+        'has_customer_health_and_safety',
+        'is_quality_control_contactable',
+        'has_parking',
+        'is_ulez_zone',
+        'latitude',
+        'longitude',
+        'tax_rate',
+        'tax_included',
+        'legacy_erp_id',
+        'integration_external_id',
+        'notes',
+        'notes_alert',
+        'internal_notes',
+        'internal_notes_alert',
+        'voicebot_time_slots',
     ];
 
     /**
@@ -43,6 +72,21 @@ class Establishment extends Model
     {
         return [
             'is_active' => 'boolean',
+            'is_client_priority' => 'boolean',
+            'is_reviewed' => 'boolean',
+            'is_email_reviewed' => 'boolean',
+            'has_site_health_and_safety' => 'boolean',
+            'has_customer_health_and_safety' => 'boolean',
+            'is_quality_control_contactable' => 'boolean',
+            'has_parking' => 'boolean',
+            'is_ulez_zone' => 'boolean',
+            'tax_included' => 'boolean',
+            'notes_alert' => 'boolean',
+            'internal_notes_alert' => 'boolean',
+            'latitude' => 'decimal:7',
+            'longitude' => 'decimal:7',
+            'tax_rate' => 'decimal:2',
+            'voicebot_time_slots' => 'array',
         ];
     }
 
@@ -79,11 +123,43 @@ class Establishment extends Model
     }
 
     /**
+     * @return BelongsTo<Language, $this>
+     */
+    public function language(): BelongsTo
+    {
+        return $this->belongsTo(Language::class);
+    }
+
+    /**
+     * @return BelongsTo<EstablishmentType, $this>
+     */
+    public function establishmentType(): BelongsTo
+    {
+        return $this->belongsTo(EstablishmentType::class);
+    }
+
+    /**
      * @return BelongsTo<Delegation, $this>
      */
     public function delegation(): BelongsTo
     {
         return $this->belongsTo(Delegation::class);
+    }
+
+    /**
+     * @return BelongsTo<Series, $this>
+     */
+    public function series(): BelongsTo
+    {
+        return $this->belongsTo(Series::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function responsibleUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'responsible_user_id');
     }
 
     public function softDeleteSafely(): bool

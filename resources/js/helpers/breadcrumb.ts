@@ -15,6 +15,7 @@ const labelKeys: Record<string, string> = {
     languages: 'nav.languages',
     integrations: 'nav.integrations',
     'rating-types': 'nav.ratingTypes',
+    'establishment-types': 'nav.establishmentTypes',
     banks: 'nav.banks',
     timezones: 'nav.timezones',
     countries: 'nav.countries',

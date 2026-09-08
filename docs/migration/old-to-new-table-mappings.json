@@ -41,7 +41,11 @@
     "series",
     "work_order_types",
     "teams",
+    "tenants",
+    "sso_providers",
     "users",
+    "tenant_sso_provider_settings",
+    "user_sso_identities",
     "permissions",
     "roles",
     "role_has_permissions",
@@ -53,6 +57,7 @@
     "company_user",
     "company_relationships",
     "delegations",
+    "establishment_types",
     "establishments"
   ],
   "tables": [
@@ -671,7 +676,8 @@
       "depends_on": [
         "teams",
         "timezones",
-        "brands"
+        "brands",
+        "tenants"
       ],
       "columns": [
         {
@@ -813,6 +819,13 @@
           "source": "later_migration"
         },
         {
+          "from": "tenant_id",
+          "to": "tenant_id",
+          "transform": "copy",
+          "source": "later_migration",
+          "notes": "FK tenants; SSO customer org for IdP credentials"
+        },
+        {
           "from": "login_unicamente_sso",
           "to": "sso_only",
           "transform": "boolean",
@@ -860,8 +873,7 @@
       "old_only": [
         "ringover_key",
         "establecimiento_id",
-        "id_partner",
-        "tenant_id"
+        "id_partner"
       ],
       "new_only": [],
       "related_auth": {
@@ -869,6 +881,197 @@
         "new_table": "model_has_roles",
         "notes": "See permissions/roles mappings; not columns on users."
       }
+    },
+    {
+      "old_table": "tenants",
+      "new_table": "tenants",
+      "confidence": "high",
+      "soft_deletes": {
+        "old": false,
+        "new": false
+      },
+      "timestamps": true,
+      "notes": [
+        "SSO customer org slug (e.g. hermes). Not the same as company_relationships owner_company_id commercial tenancy.",
+        "Seed preserves id=1 hermes from TenantEnum."
+      ],
+      "columns": [
+        {
+          "from": "id",
+          "to": "id",
+          "transform": "copy"
+        },
+        {
+          "from": "name",
+          "to": "name",
+          "transform": "copy",
+          "notes": "Unique slug used in SSO URLs"
+        },
+        {
+          "from": "created_at",
+          "to": "created_at",
+          "transform": "copy"
+        },
+        {
+          "from": "updated_at",
+          "to": "updated_at",
+          "transform": "copy"
+        }
+      ],
+      "old_only": [],
+      "new_only": []
+    },
+    {
+      "old_table": "proveedores_sso",
+      "new_table": "sso_providers",
+      "confidence": "high",
+      "soft_deletes": {
+        "old": false,
+        "new": false
+      },
+      "timestamps": true,
+      "notes": [
+        "IdP catalog (Azure, …). Seed preserves id=1 azure from ProveedorSsoEnum."
+      ],
+      "columns": [
+        {
+          "from": "id",
+          "to": "id",
+          "transform": "copy"
+        },
+        {
+          "from": "nombre",
+          "to": "name",
+          "transform": "rename"
+        },
+        {
+          "from": "slug",
+          "to": "slug",
+          "transform": "copy"
+        },
+        {
+          "from": "driver",
+          "to": "driver",
+          "transform": "copy",
+          "notes": "Socialite driver name"
+        },
+        {
+          "from": "created_at",
+          "to": "created_at",
+          "transform": "copy"
+        },
+        {
+          "from": "updated_at",
+          "to": "updated_at",
+          "transform": "copy"
+        }
+      ],
+      "old_only": [],
+      "new_only": []
+    },
+    {
+      "old_table": "tenant_proveedores_sso_configuraciones",
+      "new_table": "tenant_sso_provider_settings",
+      "confidence": "high",
+      "soft_deletes": {
+        "old": false,
+        "new": false
+      },
+      "timestamps": true,
+      "depends_on": [
+        "tenants",
+        "sso_providers"
+      ],
+      "notes": [
+        "Per-tenant IdP credentials as key/value rows (client_id, client_secret, tenant_id).",
+        "NEW unique (tenant_id, sso_provider_id, key). OLD values may be encrypted — handle on import."
+      ],
+      "columns": [
+        {
+          "from": "id",
+          "to": "id",
+          "transform": "copy"
+        },
+        {
+          "from": "tenant_id",
+          "to": "tenant_id",
+          "transform": "copy"
+        },
+        {
+          "from": "proveedor_sso_id",
+          "to": "sso_provider_id",
+          "transform": "rename"
+        },
+        {
+          "from": "config_key",
+          "to": "key",
+          "transform": "rename"
+        },
+        {
+          "from": "config_value",
+          "to": "value",
+          "transform": "rename"
+        },
+        {
+          "from": "created_at",
+          "to": "created_at",
+          "transform": "copy"
+        },
+        {
+          "from": "updated_at",
+          "to": "updated_at",
+          "transform": "copy"
+        }
+      ],
+      "old_only": [],
+      "new_only": []
+    },
+    {
+      "old_table": "users_identificadores_sso",
+      "new_table": "user_sso_identities",
+      "confidence": "high",
+      "soft_deletes": {
+        "old": false,
+        "new": false
+      },
+      "timestamps": true,
+      "depends_on": [
+        "users",
+        "sso_providers"
+      ],
+      "notes": [
+        "Composite PK (user_id, sso_provider_id). NEW also unique (sso_provider_id, external_id) for login lookup."
+      ],
+      "columns": [
+        {
+          "from": "user_id",
+          "to": "user_id",
+          "transform": "copy"
+        },
+        {
+          "from": "proveedor_sso_id",
+          "to": "sso_provider_id",
+          "transform": "rename"
+        },
+        {
+          "from": "identificador",
+          "to": "external_id",
+          "transform": "rename",
+          "notes": "IdP subject / oid"
+        },
+        {
+          "from": "created_at",
+          "to": "created_at",
+          "transform": "copy"
+        },
+        {
+          "from": "updated_at",
+          "to": "updated_at",
+          "transform": "copy"
+        }
+      ],
+      "old_only": [],
+      "new_only": []
     },
     {
       "old_table": "permissions",
@@ -2688,6 +2891,63 @@
       "new_only": []
     },
     {
+      "old_table": "tipos_establecimiento",
+      "new_table": "establishment_types",
+      "confidence": "high",
+      "soft_deletes": {
+        "old": true,
+        "new": true
+      },
+      "timestamps": true,
+      "depends_on": [],
+      "notes": [
+        "Config catalog. Import before establishments.",
+        "Added professional code for TIENDA/ECI/CC (store/eci/cc)."
+      ],
+      "columns": [
+        {
+          "from": "id",
+          "to": "id",
+          "transform": "copy"
+        },
+        {
+          "from": "nombre",
+          "to": "name",
+          "transform": "rename"
+        },
+        {
+          "from": null,
+          "to": "code",
+          "transform": "derive",
+          "notes": "From TipoEstablecimientoEnum keys: Tienda→store, ECI→eci, CC→cc."
+        },
+        {
+          "from": "dias_atraso_prl",
+          "to": "health_and_safety_delay_days",
+          "transform": "rename"
+        },
+        {
+          "from": "created_at",
+          "to": "created_at",
+          "transform": "copy"
+        },
+        {
+          "from": "updated_at",
+          "to": "updated_at",
+          "transform": "copy"
+        },
+        {
+          "from": "deleted_at",
+          "to": "deleted_at",
+          "transform": "copy"
+        }
+      ],
+      "old_only": [],
+      "new_only": [
+        "code"
+      ]
+    },
+    {
       "old_table": "workplaces",
       "new_table": "establishments",
       "confidence": "high",
@@ -2700,12 +2960,17 @@
         "companies",
         "countries",
         "timezones",
-        "delegations"
+        "languages",
+        "delegations",
+        "series",
+        "users",
+        "establishment_types"
       ],
       "notes": [
         "Physical site of a company. Merge store overlay from establecimientos (cliente_id + unique workplace_id).",
         "Do not create a nested workplaces table.",
-        "establecimientos.delegacion_id → delegation_id."
+        "establecimientos store profile columns land on establishments with English names.",
+        "Skip workplaces.featured / workplaces.uuid."
       ],
       "columns": [
         {
@@ -2722,7 +2987,7 @@
           "from": null,
           "to": "name",
           "transform": "derive",
-          "notes": "From establecimientos name/codigo or workplace town."
+          "notes": "From establecimientos.nombre or workplace town."
         },
         {
           "from": "address",
@@ -2766,18 +3031,276 @@
       ],
       "new_only": [
         "address_line_2",
+        "alternate_store_code",
         "billing_company_id",
         "code",
-        "timezone_id",
-        "delegation_id",
         "created_at",
-        "updated_at"
+        "delegation_id",
+        "email",
+        "emails",
+        "establishment_type_id",
+        "has_customer_health_and_safety",
+        "has_parking",
+        "has_site_health_and_safety",
+        "integration_external_id",
+        "internal_notes",
+        "internal_notes_alert",
+        "is_client_priority",
+        "is_email_reviewed",
+        "is_quality_control_contactable",
+        "is_reviewed",
+        "is_ulez_zone",
+        "language_id",
+        "latitude",
+        "legacy_erp_id",
+        "longitude",
+        "notes",
+        "notes_alert",
+        "phone",
+        "recipient_emails",
+        "responsible_user_id",
+        "series_id",
+        "store_code",
+        "tax_included",
+        "tax_rate",
+        "timezone_id",
+        "updated_at",
+        "voicebot_time_slots"
       ],
       "alternate_sources": [
         {
           "old_table": "establecimientos",
-          "confidence": "medium_high",
-          "notes": "codigo → code; timezone; cliente_facturacion_id → billing_company_id via party map; delegacion_id → delegation_id. Store extras (Nora, Service Channel, emails) deferred."
+          "confidence": "high",
+          "notes": "Overlay onto workplace row when workplace_id matches. cliente_id owns the customer party; company_id comes from workplaces (or customer company map).",
+          "columns": [
+            {
+              "from": "nombre",
+              "to": "name",
+              "transform": "rename"
+            },
+            {
+              "from": "codigo",
+              "to": "code",
+              "transform": "rename"
+            },
+            {
+              "from": "codigo_tienda",
+              "to": "store_code",
+              "transform": "rename"
+            },
+            {
+              "from": "codigo_tienda_2",
+              "to": "alternate_store_code",
+              "transform": "rename"
+            },
+            {
+              "from": "telefono",
+              "to": "phone",
+              "transform": "rename"
+            },
+            {
+              "from": "correo",
+              "to": "email",
+              "transform": "rename"
+            },
+            {
+              "from": "correos",
+              "to": "emails",
+              "transform": "rename"
+            },
+            {
+              "from": "correos_destinatarios",
+              "to": "recipient_emails",
+              "transform": "rename"
+            },
+            {
+              "from": "direccion_1",
+              "to": "address_line_1",
+              "transform": "rename"
+            },
+            {
+              "from": "direccion_2",
+              "to": "address_line_2",
+              "transform": "rename"
+            },
+            {
+              "from": "poblacion",
+              "to": "city",
+              "transform": "rename"
+            },
+            {
+              "from": "provincia",
+              "to": "province",
+              "transform": "copy"
+            },
+            {
+              "from": "codigo_postal",
+              "to": "postal_code",
+              "transform": "rename"
+            },
+            {
+              "from": "pais_id",
+              "to": "country_id",
+              "transform": "remap_pk"
+            },
+            {
+              "from": "zona_horaria_id",
+              "to": "timezone_id",
+              "transform": "remap_pk"
+            },
+            {
+              "from": "idioma_id",
+              "to": "language_id",
+              "transform": "remap_pk"
+            },
+            {
+              "from": "delegacion_id",
+              "to": "delegation_id",
+              "transform": "remap_pk"
+            },
+            {
+              "from": "serie_id",
+              "to": "series_id",
+              "transform": "remap_pk"
+            },
+            {
+              "from": "cliente_facturacion_id",
+              "to": "billing_company_id",
+              "transform": "remap_pk",
+              "notes": "via party map"
+            },
+            {
+              "from": "responsable_id",
+              "to": "responsible_user_id",
+              "transform": "remap_pk"
+            },
+            {
+              "from": "estado",
+              "to": "is_active",
+              "transform": "boolean"
+            },
+            {
+              "from": "importante_cliente",
+              "to": "is_client_priority",
+              "transform": "boolean"
+            },
+            {
+              "from": "revisado",
+              "to": "is_reviewed",
+              "transform": "boolean"
+            },
+            {
+              "from": "revisado_email",
+              "to": "is_email_reviewed",
+              "transform": "boolean"
+            },
+            {
+              "from": "prl_centro",
+              "to": "has_site_health_and_safety",
+              "transform": "boolean"
+            },
+            {
+              "from": "prl_cliente",
+              "to": "has_customer_health_and_safety",
+              "transform": "boolean"
+            },
+            {
+              "from": "contactable_qc",
+              "to": "is_quality_control_contactable",
+              "transform": "boolean"
+            },
+            {
+              "from": "parking",
+              "to": "has_parking",
+              "transform": "boolean"
+            },
+            {
+              "from": "ulez",
+              "to": "is_ulez_zone",
+              "transform": "boolean"
+            },
+            {
+              "from": "latitud",
+              "to": "latitude",
+              "transform": "decimal"
+            },
+            {
+              "from": "longitud",
+              "to": "longitude",
+              "transform": "decimal"
+            },
+            {
+              "from": "iva_valor",
+              "to": "tax_rate",
+              "transform": "rename"
+            },
+            {
+              "from": "iva_incluido",
+              "to": "tax_included",
+              "transform": "boolean"
+            },
+            {
+              "from": "id_fixner",
+              "to": "legacy_erp_id",
+              "transform": "rename"
+            },
+            {
+              "from": "integracion_relacion_id",
+              "to": "integration_external_id",
+              "transform": "cast_string"
+            },
+            {
+              "from": "observaciones",
+              "to": "notes",
+              "transform": "rename"
+            },
+            {
+              "from": "observaciones_aviso",
+              "to": "notes_alert",
+              "transform": "boolean"
+            },
+            {
+              "from": "observaciones_privadas",
+              "to": "internal_notes",
+              "transform": "rename"
+            },
+            {
+              "from": "observaciones_privadas_aviso",
+              "to": "internal_notes_alert",
+              "transform": "boolean"
+            },
+            {
+              "from": "nora_franjas_horario",
+              "to": "voicebot_time_slots",
+              "transform": "json"
+            },
+            {
+              "from": "created_at",
+              "to": "created_at",
+              "transform": "copy"
+            },
+            {
+              "from": "updated_at",
+              "to": "updated_at",
+              "transform": "copy"
+            },
+            {
+              "from": "deleted_at",
+              "to": "deleted_at",
+              "transform": "copy"
+            },
+            {
+              "from": "tipos_establecimiento_id",
+              "to": "establishment_type_id",
+              "transform": "remap_pk"
+            }
+          ],
+          "old_only": [
+            "cliente_id",
+            "workplace_id",
+            "iva_incluido_delegacion",
+            "iva_valor_delegacion"
+          ]
         }
       ]
     },

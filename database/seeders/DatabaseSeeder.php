@@ -16,6 +16,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolesAndPermissionsSeeder::class,
             AdminUserSeeder::class,
+            TenantSsoSeeder::class,
             CompanySeeder::class,
             BrandSeeder::class,
             WorkOrderTypeSeeder::class,
@@ -23,6 +24,7 @@ class DatabaseSeeder extends Seeder
             LanguageSeeder::class,
             IntegrationSeeder::class,
             RatingTypeSeeder::class,
+            EstablishmentTypeSeeder::class,
             TimezoneSeeder::class,
             CountrySeeder::class,
             BankSeeder::class,
@@ -30,6 +32,7 @@ class DatabaseSeeder extends Seeder
             CurrencySeeder::class,
             DelegationSeeder::class,
             EstablishmentSeeder::class,
+            FieldHelpSeeder::class,
         ]);
     }
 }

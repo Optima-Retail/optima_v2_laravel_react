@@ -8,39 +8,22 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { clientsService } from '@/services';
-import type { CompanyRelationshipFormData, UserOption } from '@/support/types/domain';
+import { relationshipFormValuesFromData } from '@/support/relationshipForm';
+import type { CompanyRelationshipFormData, RelationshipFormOptions, UserOption } from '@/support/types/domain';
 
 type EditClientProps = {
     relationship: CompanyRelationshipFormData;
     companyOptions: UserOption[];
+    formOptions: RelationshipFormOptions;
     can: {
         delete: boolean;
     };
 };
 
-export default function EditClient({ relationship, companyOptions, can }: EditClientProps) {
+export default function EditClient({ relationship, companyOptions, formOptions, can }: EditClientProps) {
     const { t } = useTranslation();
-    const form = useForm({
-        related_mode: 'existing' as const,
-        related_company_id: String(relationship.related_company_id),
-        related_company: {
-            name: '',
-            tradename: '',
-            tax_id: '',
-            email: '',
-            phone: '',
-        },
-        kind: relationship.kind,
-        status: relationship.status,
-        classification: relationship.classification,
-        owner_reference: relationship.owner_reference ?? '',
-        related_reference: relationship.related_reference ?? '',
-        brand_id: relationship.brand_id ? String(relationship.brand_id) : '',
-        external_code: relationship.external_code ?? '',
-        notes: relationship.notes ?? '',
-        starts_at: relationship.starts_at ?? '',
-        ends_at: relationship.ends_at ?? '',
-    });
+    const form = useForm(relationshipFormValuesFromData(relationship));
+    const displayName = relationship.related_company_name ?? String(relationship.id);
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -50,7 +33,7 @@ export default function EditClient({ relationship, companyOptions, can }: EditCl
     async function destroyClient() {
         const confirmed = await confirmAction({
             title: t('common.deleteTitle', { resource: t('clients.resource') }),
-            message: t('common.deleteMessage', { name: String(relationship.id) }),
+            message: t('common.deleteMessage', { name: displayName }),
             confirmLabel: t('common.delete'),
             tone: 'danger',
         });
@@ -64,12 +47,12 @@ export default function EditClient({ relationship, companyOptions, can }: EditCl
 
     return (
         <AppLayout title={t('common.editResource', { resource: t('clients.resource') })}>
-            <Head title={t('common.editResource', { resource: t('clients.resource') })} />
+            <Head title={t('common.editItem', { name: displayName })} />
             <div className="w-full space-y-6">
                 <PageHeader
                     eyebrow={t('clients.title')}
                     title={t('common.editResource', { resource: t('clients.resource') })}
-                    description={t('common.updateDetails', { name: String(relationship.id) })}
+                    description={t('common.updateDetails', { name: displayName })}
                     backHref={clientsService.indexPath}
                     backLabel={t('common.backTo', { resource: t('clients.resourcePlural') })}
                 />
@@ -79,6 +62,8 @@ export default function EditClient({ relationship, companyOptions, can }: EditCl
                     errors={form.errors}
                     processing={form.processing}
                     companyOptions={companyOptions}
+                    formOptions={formOptions}
+                    profileMode="customer"
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.save')}

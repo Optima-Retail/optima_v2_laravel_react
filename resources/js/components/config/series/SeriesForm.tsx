@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
 import type { SeriesOption } from '@/support/types/domain';
+import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type SeriesFormValues = {
     key: string;
@@ -41,6 +42,7 @@ export function SeriesForm({
     const { t } = useTranslation();
 
     return (
+        <FieldHelpScope table="series">
         <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
             <div className="grid gap-5 sm:grid-cols-2">
                 <Field label={t('series.key')} htmlFor="key" error={errors.key} required>
@@ -104,5 +106,6 @@ export function SeriesForm({
                 </Button>
             </div>
         </form>
+        </FieldHelpScope>
     );
 }

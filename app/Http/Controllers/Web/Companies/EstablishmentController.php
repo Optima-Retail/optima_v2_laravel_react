@@ -83,6 +83,10 @@ final class EstablishmentController extends Controller
             'countryOptions' => $this->companies->countryOptions(),
             'timezoneOptions' => $this->establishments->timezoneOptions(),
             'delegationOptions' => $this->establishments->delegationOptions(),
+            'languageOptions' => $this->establishments->languageOptions(),
+            'establishmentTypeOptions' => $this->establishments->establishmentTypeOptions(),
+            'seriesOptions' => $this->establishments->seriesOptions(),
+            'userOptions' => $this->establishments->userOptions(),
         ]);
     }
 
@@ -107,6 +111,10 @@ final class EstablishmentController extends Controller
             'countryOptions' => $this->companies->countryOptions(),
             'timezoneOptions' => $this->establishments->timezoneOptions(),
             'delegationOptions' => $this->establishments->delegationOptions(),
+            'languageOptions' => $this->establishments->languageOptions(),
+            'establishmentTypeOptions' => $this->establishments->establishmentTypeOptions(),
+            'seriesOptions' => $this->establishments->seriesOptions(),
+            'userOptions' => $this->establishments->userOptions(),
             'can' => [
                 'delete' => $request->user()?->can('delete', $establishment) ?? false,
             ],

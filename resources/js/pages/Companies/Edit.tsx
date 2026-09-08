@@ -24,6 +24,7 @@ type EditCompanyProps = {
     company: CompanyFormData;
     countryOptions: UserOption[];
     brandOptions: UserOption[];
+    languageOptions: UserOption[];
     members: CompanyMember[];
     assignableUserOptions: UserOption[];
     can: {
@@ -36,6 +37,7 @@ export default function EditCompany({
     company,
     countryOptions,
     brandOptions,
+    languageOptions,
     members,
     assignableUserOptions,
     can,
@@ -61,6 +63,10 @@ export default function EditCompany({
         employee_count: company.employee_count !== null ? String(company.employee_count) : '',
         is_active: company.is_active,
         brand_id: company.brand_id ? String(company.brand_id) : '',
+        language_id: company.language_id ? String(company.language_id) : '',
+        latitude: company.latitude !== null && company.latitude !== undefined ? String(company.latitude) : '',
+        longitude: company.longitude !== null && company.longitude !== undefined ? String(company.longitude) : '',
+        legacy_erp_id: company.legacy_erp_id !== null && company.legacy_erp_id !== undefined ? String(company.legacy_erp_id) : '',
     });
 
     function submit(event: FormEvent) {
@@ -107,6 +113,69 @@ export default function EditCompany({
         companiesService.unlinkUser(company.id, member.id);
     }
 
+    const usersPanel = can.manage_users ? (
+        <div className="space-y-4">
+            <p className="text-sm text-ink-muted">{t('companies.users.usersDescription')}</p>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                <Field label={t('companies.users.selectUser')} htmlFor="assign_user_id" className="min-w-0 flex-1">
+                    <SearchableSelect
+                        id="assign_user_id"
+                        value={selectedUserId}
+                        onChange={setSelectedUserId}
+                        emptyLabel={t('common.none')}
+                        options={assignableUserOptions.map((option) => ({
+                            value: String(option.id),
+                            label: option.label,
+                        }))}
+                    />
+                </Field>
+                <Button type="button" onClick={assignUser} disabled={!selectedUserId}>
+                    <UserPlus className="size-4" aria-hidden />
+                    {t('companies.users.assignUser')}
+                </Button>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-line">
+                {members.length > 0 ? (
+                    <table className="min-w-full text-left text-sm">
+                        <thead className="border-b border-line bg-canvas text-xs uppercase tracking-[0.08em] text-ink-muted">
+                            <tr>
+                                <th className={tableHeadCellClass}>{t('common.name')}</th>
+                                <th className={tableHeadCellClass}>{t('common.email')}</th>
+                                <th className={`${tableHeadCellClass} text-right`}>{t('common.actions')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {members.map((member) => (
+                                <tr key={member.id} className="border-b border-line last:border-b-0">
+                                    <td className={`${tableBodyCellClass} font-medium text-ink`}>{member.name}</td>
+                                    <td className={`${tableBodyCellClass} text-ink-muted`}>{member.email}</td>
+                                    <td className={tableBodyCellClass}>
+                                        <div className="flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => unlinkUser(member)}
+                                                className="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-danger/40 hover:text-danger"
+                                                aria-label={t('companies.users.unlinkUser')}
+                                            >
+                                                <UserMinus className="size-3.5" aria-hidden />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                ) : (
+                    <p className="px-4 py-8 text-center text-sm text-ink-muted">
+                        {t('common.empty', { resource: t('users.resourcePlural') })}
+                    </p>
+                )}
+            </div>
+        </div>
+    ) : undefined;
+
     return (
         <AppLayout title={t('common.editResource', { resource: t('companies.resource') })}>
             <Head title={t('common.editItem', { name: company.name })} />
@@ -125,10 +194,12 @@ export default function EditCompany({
                     processing={form.processing}
                     countryOptions={countryOptions}
                     brandOptions={brandOptions}
+                    languageOptions={languageOptions}
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.save')}
                     submitIcon={<Save className="size-4" aria-hidden />}
+                    usersPanel={usersPanel}
                     actions={
                         can.delete ? (
                             <Button type="button" variant="danger" onClick={destroyCompany}>
@@ -138,80 +209,6 @@ export default function EditCompany({
                         ) : null
                     }
                 />
-
-                {can.manage_users ? (
-                    <section className="space-y-4 rounded-2xl border border-line bg-surface p-6 sm:p-8">
-                        <div>
-                            <h2 className="font-display text-lg font-semibold text-ink">
-                                {t('companies.users.associatedUsers')}
-                            </h2>
-                            <p className="mt-1 text-sm text-ink-muted">{t('companies.users.usersDescription')}</p>
-                        </div>
-
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                            <Field
-                                label={t('companies.users.selectUser')}
-                                htmlFor="assign_user_id"
-                                className="min-w-0 flex-1"
-                            >
-                                <SearchableSelect
-                                    id="assign_user_id"
-                                    value={selectedUserId}
-                                    onChange={setSelectedUserId}
-                                    emptyLabel={t('common.none')}
-                                    options={assignableUserOptions.map((option) => ({
-                                        value: String(option.id),
-                                        label: option.label,
-                                    }))}
-                                />
-                            </Field>
-                            <Button type="button" onClick={assignUser} disabled={!selectedUserId}>
-                                <UserPlus className="size-4" aria-hidden />
-                                {t('companies.users.assignUser')}
-                            </Button>
-                        </div>
-
-                        <div className="overflow-hidden rounded-xl border border-line">
-                            {members.length > 0 ? (
-                                <table className="min-w-full text-left text-sm">
-                                    <thead className="border-b border-line bg-canvas text-xs uppercase tracking-[0.08em] text-ink-muted">
-                                        <tr>
-                                            <th className={tableHeadCellClass}>{t('common.name')}</th>
-                                            <th className={tableHeadCellClass}>{t('common.email')}</th>
-                                            <th className={`${tableHeadCellClass} text-right`}>{t('common.actions')}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {members.map((member) => (
-                                            <tr key={member.id} className="border-b border-line last:border-b-0">
-                                                <td className={`${tableBodyCellClass} font-medium text-ink`}>
-                                                    {member.name}
-                                                </td>
-                                                <td className={`${tableBodyCellClass} text-ink-muted`}>{member.email}</td>
-                                                <td className={tableBodyCellClass}>
-                                                    <div className="flex justify-end">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => unlinkUser(member)}
-                                                            className="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-danger/40 hover:text-danger"
-                                                            aria-label={t('companies.users.unlinkUser')}
-                                                        >
-                                                            <UserMinus className="size-3.5" aria-hidden />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            ) : (
-                                <p className="px-4 py-8 text-center text-sm text-ink-muted">
-                                    {t('common.empty', { resource: t('users.resourcePlural') })}
-                                </p>
-                            )}
-                        </div>
-                    </section>
-                ) : null}
             </div>
         </AppLayout>
     );

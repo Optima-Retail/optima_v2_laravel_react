@@ -79,6 +79,7 @@ final class CompanyController extends Controller
         return Inertia::render('Companies/Create', [
             'countryOptions' => $this->companies->countryOptions(),
             'brandOptions' => $this->companies->brandOptions(),
+            'languageOptions' => $this->companies->languageOptions(),
         ]);
     }
 
@@ -99,6 +100,7 @@ final class CompanyController extends Controller
             'company' => $this->companies->toFormData($company),
             'countryOptions' => $this->companies->countryOptions(),
             'brandOptions' => $this->companies->brandOptions(),
+            'languageOptions' => $this->companies->languageOptions(),
             'members' => $this->companies->members($company),
             'assignableUserOptions' => $this->companies->assignableUserOptions($company),
             'can' => [

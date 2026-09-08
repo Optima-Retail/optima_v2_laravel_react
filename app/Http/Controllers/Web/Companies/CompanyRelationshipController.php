@@ -67,6 +67,7 @@ final class CompanyRelationshipController extends Controller
 
         return Inertia::render('Clients/Create', [
             'companyOptions' => $this->companies->companyOptions($owner->id),
+            'formOptions' => $this->relationships->formOptions(),
         ]);
     }
 
@@ -78,6 +79,7 @@ final class CompanyRelationshipController extends Controller
 
         return Inertia::render('Suppliers/Create', [
             'companyOptions' => $this->companies->companyOptions($owner->id),
+            'formOptions' => $this->relationships->formOptions(),
         ]);
     }
 
@@ -123,6 +125,7 @@ final class CompanyRelationshipController extends Controller
         return Inertia::render('Clients/Edit', [
             'relationship' => $this->relationships->toFormData($relationship),
             'companyOptions' => $this->companies->companyOptions($owner->id),
+            'formOptions' => $this->relationships->formOptions(),
             'can' => [
                 'delete' => $request->user()?->can('delete', $relationship) ?? false,
             ],
@@ -139,6 +142,7 @@ final class CompanyRelationshipController extends Controller
         return Inertia::render('Suppliers/Edit', [
             'relationship' => $this->relationships->toFormData($relationship),
             'companyOptions' => $this->companies->companyOptions($owner->id),
+            'formOptions' => $this->relationships->formOptions(),
             'can' => [
                 'delete' => $request->user()?->can('delete', $relationship) ?? false,
             ],

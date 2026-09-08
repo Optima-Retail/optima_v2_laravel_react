@@ -13,6 +13,8 @@ use App\Http\Controllers\Web\Config\BrandController;
 use App\Http\Controllers\Web\Config\CountryController;
 use App\Http\Controllers\Web\Config\CurrencyController;
 use App\Http\Controllers\Web\Config\DelegationController;
+use App\Http\Controllers\Web\Config\EstablishmentTypeController;
+use App\Http\Controllers\Web\Config\FieldHelpController as ConfigFieldHelpController;
 use App\Http\Controllers\Web\Config\IntegrationController;
 use App\Http\Controllers\Web\Config\LanguageController;
 use App\Http\Controllers\Web\Config\RatingTypeController;
@@ -23,6 +25,7 @@ use App\Http\Controllers\Web\Config\TimezoneController;
 use App\Http\Controllers\Web\Config\UserController;
 use App\Http\Controllers\Web\Config\WorkOrderTypeController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\FieldHelpController;
 use App\Http\Controllers\Web\LocaleController;
 use Illuminate\Support\Facades\Route;
 
@@ -37,6 +40,8 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     Route::post('/me/company/switch', SwitchCompanyController::class)->name('me.company.switch');
+
+    Route::get('/field-help', [FieldHelpController::class, 'resolve'])->name('field-help.resolve');
 
     Route::middleware('permission:companies.view')->group(function (): void {
         Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
@@ -265,6 +270,44 @@ Route::middleware('auth')->group(function (): void {
 
         Route::middleware('permission:rating_types.delete')->group(function (): void {
             Route::delete('/rating-types/{rating_type}', [RatingTypeController::class, 'destroy'])->name('rating-types.destroy');
+        });
+
+        Route::middleware('permission:field_helps.view')->group(function (): void {
+            Route::get('/field-helps', [ConfigFieldHelpController::class, 'index'])->name('field-helps.index');
+            Route::get('/field-helps/data', [ConfigFieldHelpController::class, 'data'])->name('field-helps.data');
+        });
+
+        Route::middleware('permission:field_helps.create')->group(function (): void {
+            Route::get('/field-helps/create', [ConfigFieldHelpController::class, 'create'])->name('field-helps.create');
+            Route::post('/field-helps', [ConfigFieldHelpController::class, 'store'])->name('field-helps.store');
+        });
+
+        Route::middleware('permission:field_helps.update')->group(function (): void {
+            Route::get('/field-helps/{field_help}/edit', [ConfigFieldHelpController::class, 'edit'])->name('field-helps.edit');
+            Route::put('/field-helps/{field_help}', [ConfigFieldHelpController::class, 'update'])->name('field-helps.update');
+        });
+
+        Route::middleware('permission:field_helps.delete')->group(function (): void {
+            Route::delete('/field-helps/{field_help}', [ConfigFieldHelpController::class, 'destroy'])->name('field-helps.destroy');
+        });
+
+        Route::middleware('permission:establishment_types.view')->group(function (): void {
+            Route::get('/establishment-types', [EstablishmentTypeController::class, 'index'])->name('establishment-types.index');
+            Route::get('/establishment-types/data', [EstablishmentTypeController::class, 'data'])->name('establishment-types.data');
+        });
+
+        Route::middleware('permission:establishment_types.create')->group(function (): void {
+            Route::get('/establishment-types/create', [EstablishmentTypeController::class, 'create'])->name('establishment-types.create');
+            Route::post('/establishment-types', [EstablishmentTypeController::class, 'store'])->name('establishment-types.store');
+        });
+
+        Route::middleware('permission:establishment_types.update')->group(function (): void {
+            Route::get('/establishment-types/{establishment_type}/edit', [EstablishmentTypeController::class, 'edit'])->name('establishment-types.edit');
+            Route::put('/establishment-types/{establishment_type}', [EstablishmentTypeController::class, 'update'])->name('establishment-types.update');
+        });
+
+        Route::middleware('permission:establishment_types.delete')->group(function (): void {
+            Route::delete('/establishment-types/{establishment_type}', [EstablishmentTypeController::class, 'destroy'])->name('establishment-types.destroy');
         });
 
         Route::middleware('permission:banks.view')->group(function (): void {

@@ -6,6 +6,8 @@ export { teamsService } from '@/services/teams';
 export { languagesService } from '@/services/languages';
 export { integrationsService } from '@/services/integrations';
 export { ratingTypesService } from '@/services/ratingTypes';
+export { fieldHelpsService } from '@/services/fieldHelps';
+export { establishmentTypesService } from '@/services/establishmentTypes';
 export { delegationsService } from '@/services/delegations';
 export { banksService } from '@/services/banks';
 export { timezonesService } from '@/services/timezones';

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
+import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import type { UserOption } from '@/support/types/domain';
 
 export type BrandFormValues = {
@@ -44,6 +45,7 @@ export function BrandForm({
     const { t } = useTranslation();
 
     return (
+        <FieldHelpScope table="brands">
         <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
             <div className="grid gap-5 sm:grid-cols-2">
                 <Field label={t('common.name')} htmlFor="name" error={errors.name} className="sm:col-span-2" required>
@@ -123,6 +125,7 @@ export function BrandForm({
                 <Field label={t('brands.qualityControlContact')} htmlFor="is_quality_control_contactable">
                     <Toggle
                         id="is_quality_control_contactable"
+                        helpField={false}
                         checked={values.is_quality_control_contactable}
                         onCheckedChange={(checked) => onChange('is_quality_control_contactable', checked)}
                         checkedLabel={t('brands.contactable')}
@@ -133,6 +136,7 @@ export function BrandForm({
                 <Field label={t('brands.debtReminders')} htmlFor="send_debt_reminders">
                     <Toggle
                         id="send_debt_reminders"
+                        helpField={false}
                         checked={values.send_debt_reminders}
                         onCheckedChange={(checked) => onChange('send_debt_reminders', checked)}
                         checkedLabel={t('brands.sendReminders')}
@@ -149,5 +153,6 @@ export function BrandForm({
                 </Button>
             </div>
         </form>
+        </FieldHelpScope>
     );
 }

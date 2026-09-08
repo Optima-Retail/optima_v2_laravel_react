@@ -8,6 +8,7 @@ use App\Models\Brand;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Country;
+use App\Models\Language;
 use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -253,6 +254,22 @@ final class CompanyService
             ->map(fn (Brand $brand): array => [
                 'id' => $brand->id,
                 'label' => $brand->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    public function languageOptions(): array
+    {
+        return Language::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'code'])
+            ->map(fn (Language $language): array => [
+                'id' => $language->id,
+                'label' => "{$language->name} ({$language->code})",
             ])
             ->values()
             ->all();
