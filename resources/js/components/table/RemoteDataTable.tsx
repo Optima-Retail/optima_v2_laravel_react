@@ -272,7 +272,11 @@ function RemoteDataTableInner<T = unknown>(
                     last_row: total,
                 };
             },
+            // fitColumns fills the card width; on small screens CSS min-width enables horizontal scroll.
             layout: 'fitColumns',
+            columnDefaults: {
+                resizable: false,
+            },
             reactiveData: false,
             height: 'auto',
             headerVisible: true,
@@ -302,6 +306,7 @@ function RemoteDataTableInner<T = unknown>(
 
         table.on('dataLoaded', () => {
             setLoading(false);
+            table.redraw(true);
             // Enable URL sync only after bootstrap load (prevents extra /companies Inertia visit on entry).
             window.setTimeout(() => {
                 allowQueryEmitRef.current = true;
@@ -320,12 +325,18 @@ function RemoteDataTableInner<T = unknown>(
             }
         });
 
+        const onWindowResize = () => {
+            table.redraw(true);
+        };
+        window.addEventListener('resize', onWindowResize);
+
         tableHostRef.current.classList.add('app-tabulator');
         tabulatorRef.current = table;
         setLoading(true);
 
         return () => {
             allowQueryEmitRef.current = false;
+            window.removeEventListener('resize', onWindowResize);
             table.destroy();
             tabulatorRef.current = null;
         };
@@ -392,10 +403,10 @@ function RemoteDataTableInner<T = unknown>(
 
             <LoadingOverlay
                 show={loading}
-                className="overflow-hidden rounded-2xl border border-line bg-surface"
+                className="app-scroll overflow-x-auto overscroll-x-contain rounded-2xl border border-line bg-surface"
                 label={loadingLabel ?? t('common.loading')}
             >
-                <div className={showEmpty ? 'hidden' : 'overflow-x-auto'}>
+                <div className={showEmpty ? 'hidden' : 'min-w-0'}>
                     <div ref={tableHostRef} />
                 </div>
                 {showEmpty ? (

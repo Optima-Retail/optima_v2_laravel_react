@@ -1,10 +1,11 @@
-import type { CompanyRelationshipFormData } from '@/support/types/domain';
+import type { CompanyRelationshipFormData } from '@/support/types/domain/company-relationship';
 
 export type RelationshipProfileValues = {
     delegation_id: string;
     billing_language_id: string;
     series_id: string;
     rating_type_id: string;
+    priority_ids: string[];
     integration_id: string;
     integration_external_id: string;
     corrective_work_order_owner_id: string;
@@ -77,6 +78,7 @@ export const defaultRelationshipProfileValues = (): RelationshipProfileValues =>
     billing_language_id: '',
     series_id: '',
     rating_type_id: '',
+    priority_ids: [],
     integration_id: '',
     integration_external_id: '',
     corrective_work_order_owner_id: '',
@@ -170,6 +172,7 @@ export function relationshipFormValuesFromData(
         billing_language_id: id(relationship.billing_language_id),
         series_id: id(relationship.series_id),
         rating_type_id: id(relationship.rating_type_id),
+        priority_ids: (relationship.priority_ids ?? []).map(String),
         integration_id: id(relationship.integration_id),
         integration_external_id: relationship.integration_external_id ?? '',
         corrective_work_order_owner_id: id(relationship.corrective_work_order_owner_id),

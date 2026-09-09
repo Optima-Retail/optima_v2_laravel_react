@@ -55,7 +55,7 @@ final class UserController extends Controller
 
         $filters = TabulatorQuery::fromRequest(
             $request,
-            allowedSorts: ['id', 'name', 'email'],
+            allowedSorts: ['id', 'name', 'email', 'is_active'],
             defaultSort: 'name',
             defaultDirection: 'asc',
             filterKeys: ['search', 'role'],

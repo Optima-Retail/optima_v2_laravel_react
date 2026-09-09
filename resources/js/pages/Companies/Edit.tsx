@@ -11,7 +11,9 @@ import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { companiesService } from '@/services';
 import { tableBodyCellClass, tableHeadCellClass } from '@/support/table';
-import type { CompanyFormData, ProvinceOption, UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
+import type { CompanyFormData } from '@/support/types/domain/company';
+import type { ProvinceOption } from '@/support/types/domain/province';
 
 type CompanyMember = {
     id: number;
@@ -138,7 +140,7 @@ export default function EditCompany({
                 </Button>
             </div>
 
-            <div className="overflow-hidden rounded-xl border border-line">
+            <div className="app-scroll overflow-x-auto overscroll-x-contain rounded-xl border border-line">
                 {members.length > 0 ? (
                     <table className="min-w-full text-left text-sm">
                         <thead className="border-b border-line bg-canvas text-xs uppercase tracking-[0.08em] text-ink-muted">

@@ -62,7 +62,7 @@ final class EstablishmentController extends Controller
 
         $filters = TabulatorQuery::fromRequest(
             $request,
-            allowedSorts: ['id', 'name', 'code', 'city'],
+            allowedSorts: ['id', 'name', 'code', 'city', 'is_active'],
             defaultSort: 'name',
             defaultDirection: 'asc',
             filterKeys: ['search'],

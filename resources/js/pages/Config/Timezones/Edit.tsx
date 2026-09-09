@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { timezonesService } from '@/services';
-import type { TimezoneFormData } from '@/support/types/domain';
+import type { TimezoneFormData } from '@/support/types/domain/timezone';
 
 type EditTimezoneProps = {
     timezone: TimezoneFormData;

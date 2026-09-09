@@ -18,7 +18,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { IntegrationListItem } from '@/support/types/domain';
+import type { IntegrationListItem } from '@/support/types/domain/integration';
 
 type IntegrationsIndexProps = {
     filters: {

@@ -6,7 +6,7 @@ import { CountryForm } from '@/components/config/countries/CountryForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { countriesService } from '@/services';
-import type { TimezoneOption } from '@/support/types/domain';
+import type { TimezoneOption } from '@/support/types/domain/timezone';
 
 type CreateCountryProps = {
     timezoneOptions: TimezoneOption[];

@@ -6,7 +6,7 @@ import { UserForm } from '@/components/config/users/UserForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { usersService } from '@/services';
-import type { UserFormOptions } from '@/support/types/domain';
+import type { UserFormOptions } from '@/support/types/domain/user';
 import type { SharedPageProps } from '@/types';
 
 type CreateUserProps = {

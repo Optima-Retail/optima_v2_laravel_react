@@ -5,7 +5,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { TimezoneOption } from '@/support/types/domain';
+import type { TimezoneOption } from '@/support/types/domain/timezone';
 
 export type CountryFormValues = {
     name: string;

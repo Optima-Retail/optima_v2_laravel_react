@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { delegationsService } from '@/services';
-import type { DelegationFormData, UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
+import type { DelegationFormData } from '@/support/types/domain/delegation';
 
 type EditDelegationProps = {
     delegation: DelegationFormData;

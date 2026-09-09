@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { seriesService } from '@/services';
-import type { SeriesFormData, SeriesOption } from '@/support/types/domain';
+import type { SeriesFormData, SeriesOption } from '@/support/types/domain/series';
 
 type EditSeriesProps = {
     seriesItem: SeriesFormData;

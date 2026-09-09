@@ -3,16 +3,16 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import type { RelationshipProfileValues } from '@/support/relationshipForm';
-import type { RelationshipFormOptions, UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
+import type { RelationshipFormOptions } from '@/support/types/domain/company-relationship';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-
-const textareaClassName =
-    'min-h-20 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20';
 
 export type RelationshipFormValues = {
     related_mode: 'existing' | 'new';
@@ -44,7 +44,7 @@ type RelationshipFormProps = {
     brandOptions?: UserOption[];
     formOptions?: RelationshipFormOptions;
     profileMode?: 'customer' | 'supplier';
-    onChange: (key: string, value: string | boolean) => void;
+    onChange: (key: string, value: string | boolean | string[]) => void;
     onRelatedCompanyChange?: (key: keyof RelationshipFormValues['related_company'], value: string) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
@@ -70,12 +70,14 @@ const emptyFormOptions: RelationshipFormOptions = {
     ratingTypeOptions: [],
     integrationOptions: [],
     userOptions: [],
+    priorityOptions: [],
 };
 
 function toSelectOptions(options: UserOption[]) {
     return options.map((option) => ({
         value: String(option.id),
         label: option.label,
+        color: option.color ?? null,
     }));
 }
 
@@ -350,11 +352,11 @@ export function RelationshipForm({
                 </Field>
 
                 <Field label={t('relationships.notes')} htmlFor="notes" error={errors.notes} className="sm:col-span-2">
-                    <Input
+                    <RichTextEditor
                         id="notes"
                         value={values.notes}
                         invalid={Boolean(errors.notes)}
-                        onChange={(event) => onChange('notes', event.target.value)}
+                        onChange={(html) => onChange('notes', html)}
                     />
                 </Field>
                     </div>
@@ -405,6 +407,24 @@ export function RelationshipForm({
                             options={toSelectOptions(formOptions.ratingTypeOptions)}
                         />
                     </Field>
+
+                    {isCustomerProfile ? (
+                        <Field
+                            label={t('relationships.priorities')}
+                            htmlFor="priority_ids"
+                            error={errors.priority_ids}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="priority_ids"
+                                value={values.priority_ids}
+                                invalid={Boolean(errors.priority_ids)}
+                                onChange={(value) => onChange('priority_ids', value)}
+                                placeholder={t('relationships.prioritiesPlaceholder')}
+                                options={toSelectOptions(formOptions.priorityOptions)}
+                            />
+                        </Field>
+                    ) : null}
 
                     <Field label={t('relationships.integration')} htmlFor="integration_id" error={errors.integration_id}>
                         <SearchableSelect
@@ -503,38 +523,38 @@ export function RelationshipForm({
                 <TabPanel id="notes">
                     <div className="grid gap-5 sm:grid-cols-2">
                     <Field label={t('relationships.internalNotes')} htmlFor="internal_notes" error={errors.internal_notes} className="sm:col-span-2">
-                        <textarea
+                        <RichTextEditor
                             id="internal_notes"
-                            className={textareaClassName}
                             value={values.internal_notes}
-                            onChange={(event) => onChange('internal_notes', event.target.value)}
+                            invalid={Boolean(errors.internal_notes)}
+                            onChange={(html) => onChange('internal_notes', html)}
                         />
                     </Field>
 
                     <Field label={t('relationships.onboardingNotes')} htmlFor="onboarding_notes" error={errors.onboarding_notes} className="sm:col-span-2">
-                        <textarea
+                        <RichTextEditor
                             id="onboarding_notes"
-                            className={textareaClassName}
                             value={values.onboarding_notes}
-                            onChange={(event) => onChange('onboarding_notes', event.target.value)}
+                            invalid={Boolean(errors.onboarding_notes)}
+                            onChange={(html) => onChange('onboarding_notes', html)}
                         />
                     </Field>
 
                     <Field label={t('relationships.billingComments')} htmlFor="billing_comments" error={errors.billing_comments} className="sm:col-span-2">
-                        <textarea
+                        <RichTextEditor
                             id="billing_comments"
-                            className={textareaClassName}
                             value={values.billing_comments}
-                            onChange={(event) => onChange('billing_comments', event.target.value)}
+                            invalid={Boolean(errors.billing_comments)}
+                            onChange={(html) => onChange('billing_comments', html)}
                         />
                     </Field>
 
                     <Field label={t('relationships.ratesNotes')} htmlFor="rates_notes" error={errors.rates_notes} className="sm:col-span-2">
-                        <textarea
+                        <RichTextEditor
                             id="rates_notes"
-                            className={textareaClassName}
                             value={values.rates_notes}
-                            onChange={(event) => onChange('rates_notes', event.target.value)}
+                            invalid={Boolean(errors.rates_notes)}
+                            onChange={(html) => onChange('rates_notes', html)}
                         />
                     </Field>
 

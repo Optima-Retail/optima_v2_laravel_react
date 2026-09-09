@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { Plus, Truck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CellComponent, ColumnDefinition } from 'tabulator-tables';
+import { badgeVariantForRelationshipStatus } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/page/PageHeader';
 import {
     RemoteDataTable,
@@ -16,10 +17,11 @@ import { suppliersService } from '@/services';
 import {
     isDeleteActionClick,
     tabulatorActionsCell,
+    tabulatorBadge,
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { CompanyRelationshipListItem } from '@/support/types/domain';
+import type { CompanyRelationshipListItem } from '@/support/types/domain/company-relationship';
 
 type SuppliersIndexProps = {
     filters: {
@@ -82,7 +84,14 @@ export default function SuppliersIndex({ filters, can }: SuppliersIndexProps) {
                 headerSort: true,
                 cssClass: 'cell-muted',
                 titleFormatter,
-                formatter: (cell: CellComponent) => t(`relationships.statuses.${cell.getValue()}`),
+                formatter: (cell: CellComponent) => {
+                    const status = String(cell.getValue() ?? '');
+
+                    return tabulatorBadge(
+                        t(`relationships.statuses.${status}`, { defaultValue: status }),
+                        badgeVariantForRelationshipStatus(status),
+                    );
+                },
             },
             {
                 title: t('suppliers.brand'),

@@ -57,7 +57,7 @@ final class CompanyController extends Controller
 
         $filters = TabulatorQuery::fromRequest(
             $request,
-            allowedSorts: ['id', 'name', 'tax_id', 'kind', 'created_at'],
+            allowedSorts: ['id', 'name', 'tax_id', 'kind', 'is_active', 'created_at'],
             defaultSort: 'name',
             defaultDirection: 'asc',
             filterKeys: ['search', 'kind'],

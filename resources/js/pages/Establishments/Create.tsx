@@ -6,7 +6,8 @@ import { defaultEstablishmentFormValues, EstablishmentForm } from '@/components/
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { establishmentsService } from '@/services';
-import type { ProvinceOption, UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
+import type { ProvinceOption } from '@/support/types/domain/province';
 
 type CreateEstablishmentProps = {
     defaultCompanyId: number | null;

@@ -196,6 +196,8 @@ final class CompanyValidation
             'billing_language_id' => ['nullable', 'integer', Rule::exists('languages', 'id')->whereNull('deleted_at')],
             'series_id' => ['nullable', 'integer', Rule::exists('series', 'id')->whereNull('deleted_at')],
             'rating_type_id' => ['nullable', 'integer', Rule::exists('rating_types', 'id')->whereNull('deleted_at')],
+            'priority_ids' => ['nullable', 'array'],
+            'priority_ids.*' => ['integer', Rule::exists('client_priorities', 'id')->whereNull('deleted_at')],
             'integration_id' => ['nullable', 'integer', Rule::exists('integrations', 'id')->whereNull('deleted_at')],
             'integration_external_id' => ['nullable', 'string', 'max:80'],
             'reported_customer_relationship_id' => ['nullable', 'integer', Rule::exists('company_relationships', 'id')->whereNull('deleted_at')],

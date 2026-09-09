@@ -7,6 +7,14 @@ export type ClientListQuery = ListQuery & {
     kind?: string;
 };
 
+export type ClientEstablishmentRow = {
+    id: number;
+    name: string;
+    code: string | null;
+    city: string | null;
+    is_active: boolean;
+};
+
 export const clientsService = {
     index(filters: ClientListQuery = {}, options: SearchOptions = {}) {
         router.get(
@@ -32,6 +40,25 @@ export const clientsService = {
 
     destroy(id: number, options: Record<string, unknown> = {}) {
         router.delete(`${base}/${id}`, options);
+    },
+
+    async establishments(relationshipId: number): Promise<ClientEstablishmentRow[]> {
+        const response = await fetch(`${base}/${relationshipId}/establishments`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Request failed (${response.status})`);
+        }
+
+        const payload = (await response.json()) as { data: ClientEstablishmentRow[] };
+
+        return payload.data ?? [];
     },
 
     visitPage,

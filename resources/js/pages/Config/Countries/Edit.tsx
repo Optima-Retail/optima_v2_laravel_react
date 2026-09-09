@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { countriesService } from '@/services';
-import type { CountryFormData, TimezoneOption } from '@/support/types/domain';
+import type { CountryFormData } from '@/support/types/domain/country';
+import type { TimezoneOption } from '@/support/types/domain/timezone';
 
 type EditCountryProps = {
     country: CountryFormData;

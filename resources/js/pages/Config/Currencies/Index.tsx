@@ -18,7 +18,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { CurrencyListItem } from '@/support/types/domain';
+import type { CurrencyListItem } from '@/support/types/domain/currency';
 
 type CurrenciesIndexProps = {
     filters: {

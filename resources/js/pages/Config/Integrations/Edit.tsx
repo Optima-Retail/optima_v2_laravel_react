@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { integrationsService } from '@/services';
-import type { IntegrationFormData } from '@/support/types/domain';
+import type { IntegrationFormData } from '@/support/types/domain/integration';
 
 type EditIntegrationProps = {
     integration: IntegrationFormData;

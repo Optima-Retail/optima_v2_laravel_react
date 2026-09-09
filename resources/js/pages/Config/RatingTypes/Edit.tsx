@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { ratingTypesService } from '@/services';
-import type { RatingTypeFormData } from '@/support/types/domain';
+import type { RatingTypeFormData } from '@/support/types/domain/rating-type';
 
 type EditRatingTypeProps = {
     ratingType: RatingTypeFormData;

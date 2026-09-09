@@ -18,8 +18,9 @@ import {
     tabulatorActionsCell,
     tabulatorDeleteButton,
     tabulatorEditLink,
+    tabulatorStatusBadge,
 } from '@/support/tabulator';
-import type { BankListItem } from '@/support/types/domain';
+import type { BankListItem } from '@/support/types/domain/bank';
 
 type BanksIndexProps = {
     filters: {
@@ -103,7 +104,7 @@ export default function BanksIndex({ filters, can }: BanksIndexProps) {
                 cssClass: 'cell-muted',
                 titleFormatter,
                 formatter: (cell: CellComponent) =>
-                    cell.getValue() ? t('common.active') : t('common.inactive'),
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.active'), t('common.inactive')),
             },
             {
                 title: t('common.actions'),

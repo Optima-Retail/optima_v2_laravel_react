@@ -18,7 +18,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { TeamListItem } from '@/support/types/domain';
+import type { TeamListItem } from '@/support/types/domain/team';
 
 type TeamsIndexProps = {
     filters: {

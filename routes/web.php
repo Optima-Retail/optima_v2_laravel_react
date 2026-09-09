@@ -6,17 +6,28 @@ use App\Http\Controllers\Web\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Web\Companies\CompanyController;
 use App\Http\Controllers\Web\Companies\CompanyMemberController;
 use App\Http\Controllers\Web\Companies\CompanyRelationshipController;
+use App\Http\Controllers\Web\Companies\ContractController;
 use App\Http\Controllers\Web\Companies\EstablishmentController;
+use App\Http\Controllers\Web\Companies\EvaluationController;
+use App\Http\Controllers\Web\Companies\IncidentController;
 use App\Http\Controllers\Web\Companies\SwitchCompanyController;
 use App\Http\Controllers\Web\Config\BankController;
 use App\Http\Controllers\Web\Config\BrandController;
+use App\Http\Controllers\Web\Config\ClientPriorityController;
+use App\Http\Controllers\Web\Config\ContractStatusController;
 use App\Http\Controllers\Web\Config\CountryController;
 use App\Http\Controllers\Web\Config\CurrencyController;
 use App\Http\Controllers\Web\Config\DelegationController;
 use App\Http\Controllers\Web\Config\EstablishmentTypeController;
+use App\Http\Controllers\Web\Config\EvaluationStatusController;
 use App\Http\Controllers\Web\Config\FieldHelpController as ConfigFieldHelpController;
+use App\Http\Controllers\Web\Config\IncidentPriorityController;
+use App\Http\Controllers\Web\Config\IncidentStatusController;
+use App\Http\Controllers\Web\Config\IncidentSubtypeController;
+use App\Http\Controllers\Web\Config\IncidentTypeController;
 use App\Http\Controllers\Web\Config\IntegrationController;
 use App\Http\Controllers\Web\Config\LanguageController;
+use App\Http\Controllers\Web\Config\NumberingPatternController;
 use App\Http\Controllers\Web\Config\ProvinceController;
 use App\Http\Controllers\Web\Config\RatingTypeController;
 use App\Http\Controllers\Web\Config\RoleController;
@@ -24,6 +35,7 @@ use App\Http\Controllers\Web\Config\SeriesController;
 use App\Http\Controllers\Web\Config\TeamController;
 use App\Http\Controllers\Web\Config\TimezoneController;
 use App\Http\Controllers\Web\Config\UserController;
+use App\Http\Controllers\Web\Config\WorkOrderStatusController;
 use App\Http\Controllers\Web\Config\WorkOrderTypeController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\FieldHelpController;
@@ -69,6 +81,8 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:company_relationships.view')->group(function (): void {
             Route::get('/clients', [CompanyRelationshipController::class, 'indexClients'])->name('clients.index');
             Route::get('/clients/data', [CompanyRelationshipController::class, 'dataClients'])->name('clients.data');
+            Route::get('/clients/{relationship}/establishments', [CompanyRelationshipController::class, 'establishments'])
+                ->name('clients.establishments');
             Route::get('/suppliers', [CompanyRelationshipController::class, 'indexSuppliers'])->name('suppliers.index');
             Route::get('/suppliers/data', [CompanyRelationshipController::class, 'dataSuppliers'])->name('suppliers.data');
         });
@@ -110,11 +124,91 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:establishments.delete')->group(function (): void {
             Route::delete('/establishments/{establishment}', [EstablishmentController::class, 'destroy'])->name('establishments.destroy');
         });
+
+        Route::middleware('permission:contracts.view')->group(function (): void {
+            Route::get('/contracts', [ContractController::class, 'index'])->name('contracts.index');
+            Route::get('/contracts/data', [ContractController::class, 'data'])->name('contracts.data');
+        });
+
+        Route::middleware('permission:contracts.create')->group(function (): void {
+            Route::get('/contracts/create', [ContractController::class, 'create'])->name('contracts.create');
+            Route::post('/contracts', [ContractController::class, 'store'])->name('contracts.store');
+        });
+
+        Route::middleware('permission:contracts.update')->group(function (): void {
+            Route::get('/contracts/{contract}/edit', [ContractController::class, 'edit'])->name('contracts.edit');
+            Route::put('/contracts/{contract}', [ContractController::class, 'update'])->name('contracts.update');
+        });
+
+        Route::middleware('permission:contracts.upload-attachments')->group(function (): void {
+            Route::post('/contracts/{contract}/attachments', [ContractController::class, 'storeAttachment'])
+                ->name('contracts.attachments.store');
+        });
+
+        Route::middleware('permission:contracts.download-attachments')->group(function (): void {
+            Route::get('/contracts/{contract}/attachments/{attachment}/download', [ContractController::class, 'downloadAttachment'])
+                ->name('contracts.attachments.download');
+        });
+
+        Route::middleware('permission:contracts.delete-attachments')->group(function (): void {
+            Route::delete('/contracts/{contract}/attachments/{attachment}', [ContractController::class, 'destroyAttachment'])
+                ->name('contracts.attachments.destroy');
+        });
+
+        Route::middleware('permission:contracts.delete')->group(function (): void {
+            Route::delete('/contracts/{contract}', [ContractController::class, 'destroy'])->name('contracts.destroy');
+        });
+
+        Route::middleware('permission:evaluations.view')->group(function (): void {
+            Route::get('/evaluations', [EvaluationController::class, 'index'])->name('evaluations.index');
+            Route::get('/evaluations/data', [EvaluationController::class, 'data'])->name('evaluations.data');
+        });
+
+        Route::middleware('permission:evaluations.update')->group(function (): void {
+            Route::get('/evaluations/{evaluation}/edit', [EvaluationController::class, 'edit'])
+                ->whereNumber('evaluation')
+                ->name('evaluations.edit');
+            Route::put('/evaluations/{evaluation}', [EvaluationController::class, 'update'])
+                ->whereNumber('evaluation')
+                ->name('evaluations.update');
+        });
+
+        Route::middleware('permission:evaluations.delete')->group(function (): void {
+            Route::delete('/evaluations/{evaluation}', [EvaluationController::class, 'destroy'])
+                ->whereNumber('evaluation')
+                ->name('evaluations.destroy');
+        });
+
+        Route::middleware('permission:incidents.view')->group(function (): void {
+            Route::get('/incidents', [IncidentController::class, 'index'])->name('incidents.index');
+            Route::get('/incidents/data', [IncidentController::class, 'data'])->name('incidents.data');
+        });
+
+        Route::middleware('permission:incidents.create')->group(function (): void {
+            Route::get('/incidents/create', [IncidentController::class, 'create'])->name('incidents.create');
+            Route::post('/incidents', [IncidentController::class, 'store'])->name('incidents.store');
+        });
+
+        Route::middleware('permission:incidents.update')->group(function (): void {
+            Route::get('/incidents/{incident}/edit', [IncidentController::class, 'edit'])
+                ->whereNumber('incident')
+                ->name('incidents.edit');
+            Route::put('/incidents/{incident}', [IncidentController::class, 'update'])
+                ->whereNumber('incident')
+                ->name('incidents.update');
+        });
+
+        Route::middleware('permission:incidents.delete')->group(function (): void {
+            Route::delete('/incidents/{incident}', [IncidentController::class, 'destroy'])
+                ->whereNumber('incident')
+                ->name('incidents.destroy');
+        });
     });
 
     Route::middleware('permission:brands.view')->group(function (): void {
         Route::get('/brands', [BrandController::class, 'index'])->name('brands.index');
         Route::get('/brands/data', [BrandController::class, 'data'])->name('brands.data');
+        Route::get('/brands/{brand}/clients', [BrandController::class, 'clients'])->name('brands.clients');
     });
 
     Route::middleware('permission:brands.create')->group(function (): void {
@@ -195,6 +289,147 @@ Route::middleware('auth')->group(function (): void {
 
         Route::middleware('permission:work_order_types.delete')->group(function (): void {
             Route::delete('/work-order-types/{work_order_type}', [WorkOrderTypeController::class, 'destroy'])->name('work-order-types.destroy');
+        });
+
+        Route::middleware('permission:client_priorities.view')->group(function (): void {
+            Route::get('/client-priorities', [ClientPriorityController::class, 'index'])->name('client-priorities.index');
+            Route::get('/client-priorities/data', [ClientPriorityController::class, 'data'])->name('client-priorities.data');
+        });
+
+        Route::middleware('permission:client_priorities.create')->group(function (): void {
+            Route::get('/client-priorities/create', [ClientPriorityController::class, 'create'])->name('client-priorities.create');
+            Route::post('/client-priorities', [ClientPriorityController::class, 'store'])->name('client-priorities.store');
+        });
+
+        Route::middleware('permission:client_priorities.update')->group(function (): void {
+            Route::get('/client-priorities/{client_priority}/edit', [ClientPriorityController::class, 'edit'])->name('client-priorities.edit');
+            Route::put('/client-priorities/{client_priority}', [ClientPriorityController::class, 'update'])->name('client-priorities.update');
+        });
+
+        Route::middleware('permission:client_priorities.delete')->group(function (): void {
+            Route::delete('/client-priorities/{client_priority}', [ClientPriorityController::class, 'destroy'])->name('client-priorities.destroy');
+        });
+
+        Route::middleware('permission:incident_priorities.view')->group(function (): void {
+            Route::get('/incident-priorities', [IncidentPriorityController::class, 'index'])->name('incident-priorities.index');
+            Route::get('/incident-priorities/data', [IncidentPriorityController::class, 'data'])->name('incident-priorities.data');
+        });
+
+        Route::middleware('permission:incident_priorities.create')->group(function (): void {
+            Route::get('/incident-priorities/create', [IncidentPriorityController::class, 'create'])->name('incident-priorities.create');
+            Route::post('/incident-priorities', [IncidentPriorityController::class, 'store'])->name('incident-priorities.store');
+        });
+
+        Route::middleware('permission:incident_priorities.update')->group(function (): void {
+            Route::get('/incident-priorities/{incident_priority}/edit', [IncidentPriorityController::class, 'edit'])->name('incident-priorities.edit');
+            Route::put('/incident-priorities/{incident_priority}', [IncidentPriorityController::class, 'update'])->name('incident-priorities.update');
+        });
+
+        Route::middleware('permission:incident_priorities.delete')->group(function (): void {
+            Route::delete('/incident-priorities/{incident_priority}', [IncidentPriorityController::class, 'destroy'])->name('incident-priorities.destroy');
+        });
+
+        Route::middleware('permission:incident_types.view')->group(function (): void {
+            Route::get('/incident-types', [IncidentTypeController::class, 'index'])->name('incident-types.index');
+            Route::get('/incident-types/data', [IncidentTypeController::class, 'data'])->name('incident-types.data');
+        });
+
+        Route::middleware('permission:incident_types.create')->group(function (): void {
+            Route::get('/incident-types/create', [IncidentTypeController::class, 'create'])->name('incident-types.create');
+            Route::post('/incident-types', [IncidentTypeController::class, 'store'])->name('incident-types.store');
+        });
+
+        Route::middleware('permission:incident_types.update')->group(function (): void {
+            Route::get('/incident-types/{incident_type}/edit', [IncidentTypeController::class, 'edit'])->name('incident-types.edit');
+            Route::put('/incident-types/{incident_type}', [IncidentTypeController::class, 'update'])->name('incident-types.update');
+        });
+
+        Route::middleware('permission:incident_types.delete')->group(function (): void {
+            Route::delete('/incident-types/{incident_type}', [IncidentTypeController::class, 'destroy'])->name('incident-types.destroy');
+        });
+
+        Route::middleware('permission:incident_subtypes.view')->group(function (): void {
+            Route::get('/incident-types/{incident_type}/subtypes', [IncidentSubtypeController::class, 'forType'])
+                ->name('incident-types.subtypes.index');
+        });
+
+        Route::put('/incident-types/{incident_type}/subtypes', [IncidentSubtypeController::class, 'syncForType'])
+            ->name('incident-types.subtypes.sync');
+
+        Route::middleware('permission:work_order_statuses.view')->group(function (): void {
+            Route::get('/work-order-statuses', [WorkOrderStatusController::class, 'index'])->name('work-order-statuses.index');
+            Route::get('/work-order-statuses/data', [WorkOrderStatusController::class, 'data'])->name('work-order-statuses.data');
+        });
+
+        Route::middleware('permission:work_order_statuses.create')->group(function (): void {
+            Route::get('/work-order-statuses/create', [WorkOrderStatusController::class, 'create'])->name('work-order-statuses.create');
+            Route::post('/work-order-statuses', [WorkOrderStatusController::class, 'store'])->name('work-order-statuses.store');
+        });
+
+        Route::middleware('permission:work_order_statuses.update')->group(function (): void {
+            Route::get('/work-order-statuses/{work_order_status}/edit', [WorkOrderStatusController::class, 'edit'])->name('work-order-statuses.edit');
+            Route::put('/work-order-statuses/{work_order_status}', [WorkOrderStatusController::class, 'update'])->name('work-order-statuses.update');
+        });
+
+        Route::middleware('permission:work_order_statuses.delete')->group(function (): void {
+            Route::delete('/work-order-statuses/{work_order_status}', [WorkOrderStatusController::class, 'destroy'])->name('work-order-statuses.destroy');
+        });
+
+        Route::middleware('permission:contract_statuses.view')->group(function (): void {
+            Route::get('/contract-statuses', [ContractStatusController::class, 'index'])->name('contract-statuses.index');
+            Route::get('/contract-statuses/data', [ContractStatusController::class, 'data'])->name('contract-statuses.data');
+        });
+
+        Route::middleware('permission:contract_statuses.create')->group(function (): void {
+            Route::get('/contract-statuses/create', [ContractStatusController::class, 'create'])->name('contract-statuses.create');
+            Route::post('/contract-statuses', [ContractStatusController::class, 'store'])->name('contract-statuses.store');
+        });
+
+        Route::middleware('permission:contract_statuses.update')->group(function (): void {
+            Route::get('/contract-statuses/{contract_status}/edit', [ContractStatusController::class, 'edit'])->name('contract-statuses.edit');
+            Route::put('/contract-statuses/{contract_status}', [ContractStatusController::class, 'update'])->name('contract-statuses.update');
+        });
+
+        Route::middleware('permission:contract_statuses.delete')->group(function (): void {
+            Route::delete('/contract-statuses/{contract_status}', [ContractStatusController::class, 'destroy'])->name('contract-statuses.destroy');
+        });
+
+        Route::middleware('permission:evaluation_statuses.view')->group(function (): void {
+            Route::get('/evaluation-statuses', [EvaluationStatusController::class, 'index'])->name('evaluation-statuses.index');
+            Route::get('/evaluation-statuses/data', [EvaluationStatusController::class, 'data'])->name('evaluation-statuses.data');
+        });
+
+        Route::middleware('permission:evaluation_statuses.create')->group(function (): void {
+            Route::get('/evaluation-statuses/create', [EvaluationStatusController::class, 'create'])->name('evaluation-statuses.create');
+            Route::post('/evaluation-statuses', [EvaluationStatusController::class, 'store'])->name('evaluation-statuses.store');
+        });
+
+        Route::middleware('permission:evaluation_statuses.update')->group(function (): void {
+            Route::get('/evaluation-statuses/{evaluation_status}/edit', [EvaluationStatusController::class, 'edit'])->name('evaluation-statuses.edit');
+            Route::put('/evaluation-statuses/{evaluation_status}', [EvaluationStatusController::class, 'update'])->name('evaluation-statuses.update');
+        });
+
+        Route::middleware('permission:evaluation_statuses.delete')->group(function (): void {
+            Route::delete('/evaluation-statuses/{evaluation_status}', [EvaluationStatusController::class, 'destroy'])->name('evaluation-statuses.destroy');
+        });
+
+        Route::middleware('permission:incident_statuses.view')->group(function (): void {
+            Route::get('/incident-statuses', [IncidentStatusController::class, 'index'])->name('incident-statuses.index');
+            Route::get('/incident-statuses/data', [IncidentStatusController::class, 'data'])->name('incident-statuses.data');
+        });
+
+        Route::middleware('permission:incident_statuses.create')->group(function (): void {
+            Route::get('/incident-statuses/create', [IncidentStatusController::class, 'create'])->name('incident-statuses.create');
+            Route::post('/incident-statuses', [IncidentStatusController::class, 'store'])->name('incident-statuses.store');
+        });
+
+        Route::middleware('permission:incident_statuses.update')->group(function (): void {
+            Route::get('/incident-statuses/{incident_status}/edit', [IncidentStatusController::class, 'edit'])->name('incident-statuses.edit');
+            Route::put('/incident-statuses/{incident_status}', [IncidentStatusController::class, 'update'])->name('incident-statuses.update');
+        });
+
+        Route::middleware('permission:incident_statuses.delete')->group(function (): void {
+            Route::delete('/incident-statuses/{incident_status}', [IncidentStatusController::class, 'destroy'])->name('incident-statuses.destroy');
         });
 
         Route::middleware('permission:teams.view')->group(function (): void {
@@ -393,6 +628,35 @@ Route::middleware('auth')->group(function (): void {
 
         Route::middleware('permission:series.delete')->group(function (): void {
             Route::delete('/series/{series}', [SeriesController::class, 'destroy'])->name('series.destroy');
+        });
+
+        Route::middleware('permission:numbering_patterns.view|numbering_patterns.create|numbering_patterns.update')->group(function (): void {
+            Route::get('/numbering-patterns/resource/{resource}/configure', [NumberingPatternController::class, 'configure'])
+                ->name('numbering-patterns.configure');
+        });
+
+        Route::middleware('permission:numbering_patterns.create|numbering_patterns.update')->group(function (): void {
+            Route::put('/numbering-patterns/resource/{resource}', [NumberingPatternController::class, 'upsertByResource'])
+                ->name('numbering-patterns.upsert-resource');
+        });
+
+        Route::middleware('permission:numbering_patterns.view')->group(function (): void {
+            Route::get('/numbering-patterns', [NumberingPatternController::class, 'index'])->name('numbering-patterns.index');
+            Route::get('/numbering-patterns/data', [NumberingPatternController::class, 'data'])->name('numbering-patterns.data');
+        });
+
+        Route::middleware('permission:numbering_patterns.create')->group(function (): void {
+            Route::get('/numbering-patterns/create', [NumberingPatternController::class, 'create'])->name('numbering-patterns.create');
+            Route::post('/numbering-patterns', [NumberingPatternController::class, 'store'])->name('numbering-patterns.store');
+        });
+
+        Route::middleware('permission:numbering_patterns.update')->group(function (): void {
+            Route::get('/numbering-patterns/{numbering_pattern}/edit', [NumberingPatternController::class, 'edit'])->name('numbering-patterns.edit');
+            Route::put('/numbering-patterns/{numbering_pattern}', [NumberingPatternController::class, 'update'])->name('numbering-patterns.update');
+        });
+
+        Route::middleware('permission:numbering_patterns.delete')->group(function (): void {
+            Route::delete('/numbering-patterns/{numbering_pattern}', [NumberingPatternController::class, 'destroy'])->name('numbering-patterns.destroy');
         });
 
         Route::middleware('permission:currencies.view')->group(function (): void {

@@ -17,8 +17,9 @@ import {
     tabulatorActionsCell,
     tabulatorDeleteButton,
     tabulatorEditLink,
+    tabulatorStatusBadge,
 } from '@/support/tabulator';
-import type { CompanyListItem } from '@/support/types/domain';
+import type { CompanyListItem } from '@/support/types/domain/company';
 
 type CompaniesIndexProps = {
     filters: {
@@ -94,7 +95,7 @@ export default function CompaniesIndex({ filters, can }: CompaniesIndexProps) {
                 headerSort: false,
                 cssClass: 'cell-muted',
                 formatter: (cell: CellComponent) =>
-                    cell.getValue() ? t('common.active') : t('common.inactive'),
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.active'), t('common.inactive')),
             },
             {
                 title: t('common.actions'),

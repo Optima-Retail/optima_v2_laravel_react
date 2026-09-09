@@ -108,6 +108,12 @@ export function createSortTitleFormatter(
 
 const mapPinIcon =
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>';
+const listTreeIcon =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M3 6v4c0 1.1.9 2 2 2h3"/><path d="M3 10v6c0 1.1.9 2 2 2h3"/></svg>';
+const usersIcon =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+const buildingIcon =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>';
 
 export function tabulatorEditLink(href: string, ariaLabel: string): string {
     return `<a href="${href}" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${ariaLabel}" data-action="edit">${editIcon}</a>`;
@@ -119,6 +125,18 @@ export function tabulatorDeleteButton(ariaLabel: string): string {
 
 export function tabulatorProvincesButton(ariaLabel: string): string {
     return `<button type="button" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${ariaLabel}" data-action="provinces">${mapPinIcon}</button>`;
+}
+
+export function tabulatorSubtypesButton(ariaLabel: string): string {
+    return `<button type="button" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${ariaLabel}" data-action="subtypes">${listTreeIcon}</button>`;
+}
+
+export function tabulatorClientsButton(ariaLabel: string): string {
+    return `<button type="button" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${ariaLabel}" data-action="clients">${usersIcon}</button>`;
+}
+
+export function tabulatorEstablishmentsButton(ariaLabel: string): string {
+    return `<button type="button" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${ariaLabel}" data-action="establishments">${buildingIcon}</button>`;
 }
 
 export function tabulatorActionsCell(parts: string[]): string {
@@ -133,4 +151,46 @@ export function isActionClick(event: UIEvent, action: string): boolean {
     const target = event.target as HTMLElement | null;
 
     return Boolean(target?.closest(`[data-action="${action}"]`));
+}
+
+function escapeHtml(value: string): string {
+    return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+const badgeVariantClassName: Record<string, string> = {
+    success: 'bg-success/10 text-success',
+    neutral: 'border border-line bg-canvas text-ink-muted',
+    danger: 'bg-danger/10 text-danger',
+    warning: 'bg-amber-100 text-amber-800',
+    brand: 'bg-brand-soft text-brand',
+};
+
+/** HTML badge for Tabulator formatters (same look as React `Badge`). */
+export function tabulatorBadge(
+    label: string,
+    variant: 'success' | 'neutral' | 'danger' | 'warning' | 'brand' = 'neutral',
+): string {
+    const classes = badgeVariantClassName[variant] ?? badgeVariantClassName.neutral;
+
+    return `<span class="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-semibold ${classes}">${escapeHtml(label)}</span>`;
+}
+
+/** Soft-colored pill using a custom hex (e.g. contract status colors). */
+export function tabulatorColorBadge(label: string, color: string): string {
+    const safeColor = escapeHtml(color);
+
+    return `<span class="inline-flex items-center gap-1.5 rounded-md border border-line px-1.5 py-0.5 text-xs font-semibold text-ink" style="background-color: color-mix(in srgb, ${safeColor} 18%, white)"><span class="inline-block size-2 shrink-0 rounded-full" style="background-color: ${safeColor}"></span>${escapeHtml(label)}</span>`;
+}
+
+export function tabulatorStatusBadge(
+    active: boolean,
+    activeLabel: string,
+    inactiveLabel: string,
+): string {
+    return tabulatorBadge(active ? activeLabel : inactiveLabel, active ? 'success' : 'neutral');
 }

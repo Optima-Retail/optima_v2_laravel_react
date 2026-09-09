@@ -7,7 +7,7 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
 
 export type BrandFormValues = {
     name: string;

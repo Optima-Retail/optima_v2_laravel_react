@@ -6,7 +6,7 @@ import { RoleForm } from '@/components/config/roles/RoleForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { rolesService } from '@/services';
-import type { PermissionGroup } from '@/support/types/domain';
+import type { PermissionGroup } from '@/support/types/domain/role';
 
 type CreateRoleProps = {
     permissionGroups: PermissionGroup[];

@@ -68,6 +68,15 @@ final class BrandController extends Controller
         );
     }
 
+    public function clients(Brand $brand): JsonResponse
+    {
+        $this->authorize('view', $brand);
+
+        return response()->json([
+            'data' => $this->brands->clientsForBrand($brand),
+        ]);
+    }
+
     public function create(): Response
     {
         $this->authorize('create', Brand::class);

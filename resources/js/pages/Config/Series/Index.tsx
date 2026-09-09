@@ -18,7 +18,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { SeriesListItem } from '@/support/types/domain';
+import type { SeriesListItem } from '@/support/types/domain/series';
 
 type SeriesIndexProps = {
     filters: {

@@ -17,8 +17,9 @@ import {
     tabulatorActionsCell,
     tabulatorDeleteButton,
     tabulatorEditLink,
+    tabulatorStatusBadge,
 } from '@/support/tabulator';
-import type { EstablishmentListItem } from '@/support/types/domain';
+import type { EstablishmentListItem } from '@/support/types/domain/establishment';
 
 type EstablishmentsIndexProps = {
     filters: {
@@ -95,7 +96,7 @@ export default function EstablishmentsIndex({ filters, can }: EstablishmentsInde
                 headerSort: false,
                 cssClass: 'cell-muted',
                 formatter: (cell: CellComponent) =>
-                    cell.getValue() ? t('common.active') : t('common.inactive'),
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.active'), t('common.inactive')),
             },
             {
                 title: t('common.actions'),

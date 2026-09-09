@@ -20,7 +20,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { EstablishmentTypeListItem } from '@/support/types/domain';
+import type { EstablishmentTypeListItem } from '@/support/types/domain/establishment-type';
 
 type EstablishmentTypesIndexProps = {
     filters: {

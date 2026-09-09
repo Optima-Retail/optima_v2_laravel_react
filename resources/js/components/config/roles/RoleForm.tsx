@@ -6,7 +6,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { toggleGroupItems, toggleItem } from '@/helpers/array';
 import { cn } from '@/support/cn';
-import type { PermissionGroup } from '@/support/types/domain';
+import type { PermissionGroup } from '@/support/types/domain/role';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type RoleFormValues = {

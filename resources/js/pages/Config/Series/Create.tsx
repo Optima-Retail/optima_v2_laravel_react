@@ -6,7 +6,7 @@ import { SeriesForm } from '@/components/config/series/SeriesForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { seriesService } from '@/services';
-import type { SeriesOption } from '@/support/types/domain';
+import type { SeriesOption } from '@/support/types/domain/series';
 
 type CreateSeriesProps = {
     seriesOptions: SeriesOption[];

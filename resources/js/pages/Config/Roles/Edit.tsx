@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { rolesService } from '@/services';
-import type { PermissionGroup, RoleFormData } from '@/support/types/domain';
+import type { PermissionGroup, RoleFormData } from '@/support/types/domain/role';
 
 type EditRoleProps = {
     role: RoleFormData;

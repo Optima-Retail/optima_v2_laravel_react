@@ -5,7 +5,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
-import type { UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type DelegationFormValues = {

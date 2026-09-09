@@ -152,6 +152,18 @@ class Company extends Model
     }
 
     /**
+     * Client priorities available for this company when it acts as a client (legacy clientes_prioridades).
+     *
+     * @return BelongsToMany<ClientPriority, $this>
+     */
+    public function priorities(): BelongsToMany
+    {
+        return $this->belongsToMany(ClientPriority::class, 'company_priority', 'company_id', 'client_priority_id')
+            ->withTimestamps()
+            ->wherePivotNull('deleted_at');
+    }
+
+    /**
      * @return HasMany<Establishment, $this>
      */
     public function establishments(): HasMany
@@ -173,6 +185,14 @@ class Company extends Model
     public function corporationBrands(): HasMany
     {
         return $this->hasMany(Brand::class, 'corporation_company_id');
+    }
+
+    /**
+     * @return HasMany<NumberingPattern, $this>
+     */
+    public function numberingPatterns(): HasMany
+    {
+        return $this->hasMany(NumberingPattern::class);
     }
 
     public function softDeleteSafely(): bool

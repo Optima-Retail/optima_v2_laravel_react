@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { languagesService } from '@/services';
-import type { LanguageFormData } from '@/support/types/domain';
+import type { LanguageFormData } from '@/support/types/domain/language';
 
 type EditLanguageProps = {
     language: LanguageFormData;

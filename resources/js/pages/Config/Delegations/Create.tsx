@@ -6,7 +6,7 @@ import { DelegationForm } from '@/components/config/delegations/DelegationForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { delegationsService } from '@/services';
-import type { UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
 
 type CreateDelegationProps = {
     companyOptions: UserOption[];

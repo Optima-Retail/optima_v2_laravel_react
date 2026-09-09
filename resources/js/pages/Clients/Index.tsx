@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { Handshake, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CellComponent, ColumnDefinition } from 'tabulator-tables';
+import { ClientEstablishmentsModal } from '@/components/clients/ClientEstablishmentsModal';
+import { badgeVariantForRelationshipStatus } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/page/PageHeader';
 import {
     RemoteDataTable,
@@ -14,12 +16,15 @@ import { useCan } from '@/hooks/useAuth';
 import { AppLayout } from '@/layouts/AppLayout';
 import { clientsService } from '@/services';
 import {
+    isActionClick,
     isDeleteActionClick,
     tabulatorActionsCell,
+    tabulatorBadge,
     tabulatorDeleteButton,
     tabulatorEditLink,
+    tabulatorEstablishmentsButton,
 } from '@/support/tabulator';
-import type { CompanyRelationshipListItem } from '@/support/types/domain';
+import type { CompanyRelationshipListItem } from '@/support/types/domain/company-relationship';
 
 type ClientsIndexProps = {
     filters: {
@@ -34,12 +39,19 @@ type ClientsIndexProps = {
     };
 };
 
+type EstablishmentsModalState = {
+    relationshipId: number;
+    clientName: string;
+} | null;
+
 export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
     const { t, i18n } = useTranslation();
     const canUpdate = useCan('company_relationships.update');
     const canDelete = useCan('company_relationships.delete');
+    const canEditEstablishments = useCan('establishments.update');
     const tableRef = useRef<RemoteDataTableHandle>(null);
     const canRef = useRef({ update: canUpdate, delete: canDelete });
+    const [establishmentsModal, setEstablishmentsModal] = useState<EstablishmentsModalState>(null);
 
     useEffect(() => {
         canRef.current = { update: canUpdate, delete: canDelete };
@@ -71,7 +83,14 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                 headerSort: true,
                 cssClass: 'cell-muted',
                 titleFormatter,
-                formatter: (cell: CellComponent) => t(`relationships.statuses.${cell.getValue()}`),
+                formatter: (cell: CellComponent) => {
+                    const status = String(cell.getValue() ?? '');
+
+                    return tabulatorBadge(
+                        t(`relationships.statuses.${status}`, { defaultValue: status }),
+                        badgeVariantForRelationshipStatus(status),
+                    );
+                },
             },
             {
                 title: t('clients.brand'),
@@ -84,14 +103,16 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
             {
                 title: t('common.actions'),
                 field: 'actions',
-                width: 104,
+                width: 140,
                 hozAlign: 'right',
                 headerHozAlign: 'right',
                 headerSort: false,
                 formatter: (cell: CellComponent) => {
                     const client = cell.getRow().getData() as CompanyRelationshipListItem;
-                    const parts: string[] = [];
                     const name = client.related_company_name ?? String(client.id);
+                    const parts: string[] = [
+                        tabulatorEstablishmentsButton(t('clients.viewEstablishments', { name })),
+                    ];
 
                     if (canRef.current.update) {
                         parts.push(
@@ -106,17 +127,27 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                     return tabulatorActionsCell(parts);
                 },
                 cellClick: async (event: UIEvent, cell: CellComponent) => {
+                    const client = cell.getRow().getData() as CompanyRelationshipListItem;
+                    const name = client.related_company_name ?? String(client.id);
+
+                    if (isActionClick(event, 'establishments')) {
+                        event.preventDefault();
+                        setEstablishmentsModal({
+                            relationshipId: client.id,
+                            clientName: name,
+                        });
+
+                        return;
+                    }
+
                     if (!isDeleteActionClick(event)) {
                         return;
                     }
 
                     event.preventDefault();
-                    const client = cell.getRow().getData() as CompanyRelationshipListItem;
                     const confirmed = await confirmAction({
                         title: t('common.deleteTitle', { resource: t('clients.resource') }),
-                        message: t('common.deleteMessage', {
-                            name: client.related_company_name ?? String(client.id),
-                        }),
+                        message: t('common.deleteMessage', { name }),
                         confirmLabel: t('common.delete'),
                         tone: 'danger',
                     });
@@ -182,6 +213,16 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                     deps={[i18n.language]}
                 />
             </div>
+
+            {establishmentsModal ? (
+                <ClientEstablishmentsModal
+                    open
+                    relationshipId={establishmentsModal.relationshipId}
+                    clientName={establishmentsModal.clientName}
+                    canEdit={canEditEstablishments}
+                    onClose={() => setEstablishmentsModal(null)}
+                />
+            ) : null}
         </AppLayout>
     );
 }

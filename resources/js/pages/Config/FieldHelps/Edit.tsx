@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { fieldHelpsService } from '@/services';
-import type { FieldHelpFormData } from '@/support/types/domain';
+import type { FieldHelpFormData } from '@/support/types/domain/field-help';
 
 type EditFieldHelpProps = {
     fieldHelp: FieldHelpFormData;

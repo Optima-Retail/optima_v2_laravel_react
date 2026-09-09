@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Web\Companies;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Services\CompanyRelationshipService;
 use App\Domain\Companies\Services\CompanyService;
+use App\Domain\Companies\Services\EstablishmentService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Companies\StoreCompanyRelationshipRequest;
@@ -37,6 +38,7 @@ final class CompanyRelationshipController extends Controller
     public function __construct(
         private readonly CompanyRelationshipService $relationships,
         private readonly CompanyService $companies,
+        private readonly EstablishmentService $establishments,
     ) {}
 
     public function indexClients(Request $request): Response
@@ -199,6 +201,18 @@ final class CompanyRelationshipController extends Controller
         return redirect()
             ->route('suppliers.index')
             ->with('success', 'supplier_deleted_successfully');
+    }
+
+    public function establishments(CompanyRelationship $relationship): JsonResponse
+    {
+        $this->assertKind($relationship, self::CLIENT_KINDS);
+        $this->authorize('view', $relationship);
+
+        abort_if($relationship->related_company_id === null, 404);
+
+        return response()->json([
+            'data' => $this->establishments->forClientCompany((int) $relationship->related_company_id),
+        ]);
     }
 
     /**

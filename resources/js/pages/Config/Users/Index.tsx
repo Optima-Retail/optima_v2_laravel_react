@@ -17,8 +17,9 @@ import {
     tabulatorActionsCell,
     tabulatorDeleteButton,
     tabulatorEditLink,
+    tabulatorStatusBadge,
 } from '@/support/tabulator';
-import type { UserListItem } from '@/support/types/domain';
+import type { UserListItem } from '@/support/types/domain/user';
 
 type UsersIndexProps = {
     filters: {
@@ -87,6 +88,15 @@ export default function UsersIndex({ filters, roleOptions, can }: UsersIndexProp
                         )
                         .join('')}</div>`;
                 },
+            },
+            {
+                title: t('common.status'),
+                field: 'is_active',
+                width: 110,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.active'), t('common.inactive')),
             },
             {
                 title: t('common.actions'),

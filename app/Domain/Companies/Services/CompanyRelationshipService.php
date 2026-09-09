@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domain\Companies\Services;
 
 use App\Domain\Companies\Enums\CompanyKind;
+use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyValidation;
 use App\Models\Brand;
+use App\Models\ClientPriority;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\Delegation;
@@ -106,12 +108,22 @@ final class CompanyRelationshipService
             $payload = $this->attributes($data);
             $payload['related_company_id'] = $relatedId;
 
-            return CompanyRelationship::query()->create([
+            $relationship = CompanyRelationship::query()->create([
                 ...$payload,
                 'owner_company_id' => $owner->id,
                 'created_by' => $actor->id,
                 'updated_by' => $actor->id,
             ])->load(['relatedCompany', 'brand']);
+
+            if (($data['kind'] ?? '') === CompanyRelationshipKind::Customer->value
+                && array_key_exists('priority_ids', $data)) {
+                $this->syncCompanyPriorities(
+                    $relationship->relatedCompany ?? Company::query()->findOrFail($relatedId),
+                    $data['priority_ids'] ?? [],
+                );
+            }
+
+            return $relationship;
         });
     }
 
@@ -161,7 +173,15 @@ final class CompanyRelationshipService
                 'updated_by' => $actor->id,
             ]);
 
-            return $relationship->fresh(['relatedCompany', 'brand']) ?? $relationship;
+            $fresh = $relationship->fresh(['relatedCompany', 'brand']) ?? $relationship;
+
+            if (($data['kind'] ?? $fresh->kind->value) === CompanyRelationshipKind::Customer->value
+                && array_key_exists('priority_ids', $data)
+                && $fresh->relatedCompany !== null) {
+                $this->syncCompanyPriorities($fresh->relatedCompany, $data['priority_ids'] ?? []);
+            }
+
+            return $fresh;
         });
     }
 
@@ -184,7 +204,8 @@ final class CompanyRelationshipService
      *     seriesOptions: list<array{id: int, label: string}>,
      *     ratingTypeOptions: list<array{id: int, label: string}>,
      *     integrationOptions: list<array{id: int, label: string}>,
-     *     userOptions: list<array{id: int, label: string}>
+     *     userOptions: list<array{id: int, label: string}>,
+     *     priorityOptions: list<array{id: int, label: string, color: string|null}>
      * }
      */
     public function formOptions(): array
@@ -253,6 +274,19 @@ final class CompanyRelationshipService
                 ])
                 ->values()
                 ->all(),
+            'priorityOptions' => ClientPriority::query()
+                ->orderBy('level')
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'level', 'color'])
+                ->map(fn (ClientPriority $priority): array => [
+                    'id' => $priority->id,
+                    'label' => $priority->code
+                        ? "{$priority->name} ({$priority->code})"
+                        : $priority->name,
+                    'color' => $priority->color,
+                ])
+                ->values()
+                ->all(),
         ];
     }
 
@@ -261,7 +295,7 @@ final class CompanyRelationshipService
      */
     public function toFormData(CompanyRelationship $relationship): array
     {
-        $relationship->loadMissing(['relatedCompany', 'brand']);
+        $relationship->loadMissing(['relatedCompany', 'brand', 'relatedCompany.priorities']);
 
         $time = static function (mixed $value): ?string {
             if ($value === null || $value === '') {
@@ -278,6 +312,11 @@ final class CompanyRelationshipService
             'owner_company_id' => $relationship->owner_company_id,
             'related_company_id' => $relationship->related_company_id,
             'related_company_name' => $relationship->relatedCompany?->name,
+            'priority_ids' => $relationship->relatedCompany?->priorities
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->values()
+                ->all() ?? [],
             'kind' => $relationship->kind->value,
             'status' => $relationship->status->value,
             'classification' => $relationship->classification->value,
@@ -377,7 +416,7 @@ final class CompanyRelationshipService
      */
     private function attributes(array $data): array
     {
-        unset($data['related_mode'], $data['related_company'], $data['owner_company_id']);
+        unset($data['related_mode'], $data['related_company'], $data['owner_company_id'], $data['priority_ids']);
 
         foreach (CompanyValidation::relationshipNullableKeys() as $key) {
             if (array_key_exists($key, $data) && $data[$key] === '') {
@@ -385,6 +424,71 @@ final class CompanyRelationshipService
             }
         }
 
+        // DB columns are NOT NULL DEFAULT 0; empty form values become null via ConvertEmptyStringsToNull.
+        foreach (['optima_score_count', 'customer_score_count'] as $key) {
+            if (! array_key_exists($key, $data) || $data[$key] === null || $data[$key] === '') {
+                $data[$key] = 0;
+            }
+        }
+
         return $data;
+    }
+
+    /**
+     * Soft-sync priorities for a client company (legacy clientes_prioridades).
+     *
+     * @param  list<int|string>|mixed  $priorityIds
+     */
+    private function syncCompanyPriorities(Company $company, mixed $priorityIds): void
+    {
+        $ids = is_array($priorityIds)
+            ? array_values(array_unique(array_map(
+                static fn ($id): int => (int) $id,
+                array_filter($priorityIds, static fn ($id): bool => $id !== null && $id !== ''),
+            )))
+            : [];
+
+        $current = DB::table('company_priority')
+            ->where('company_id', $company->id)
+            ->whereNull('deleted_at')
+            ->pluck('client_priority_id')
+            ->map(static fn ($id): int => (int) $id)
+            ->all();
+
+        $toDetach = array_values(array_diff($current, $ids));
+        $toAttach = array_values(array_diff($ids, $current));
+
+        if ($toDetach !== []) {
+            DB::table('company_priority')
+                ->where('company_id', $company->id)
+                ->whereIn('client_priority_id', $toDetach)
+                ->whereNull('deleted_at')
+                ->update([
+                    'deleted_at' => now(),
+                    'updated_at' => now(),
+                ]);
+        }
+
+        foreach ($toAttach as $priorityId) {
+            $restored = DB::table('company_priority')
+                ->where('company_id', $company->id)
+                ->where('client_priority_id', $priorityId)
+                ->whereNotNull('deleted_at')
+                ->update([
+                    'deleted_at' => null,
+                    'updated_at' => now(),
+                ]);
+
+            if ($restored > 0) {
+                continue;
+            }
+
+            DB::table('company_priority')->insert([
+                'company_id' => $company->id,
+                'client_priority_id' => $priorityId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
     }
 }

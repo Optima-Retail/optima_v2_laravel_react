@@ -18,7 +18,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { RoleListItem } from '@/support/types/domain';
+import type { RoleListItem } from '@/support/types/domain/role';
 
 type RolesIndexProps = {
     filters: {

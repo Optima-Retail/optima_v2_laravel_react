@@ -22,7 +22,7 @@ import {
     tabulatorEditLink,
     tabulatorProvincesButton,
 } from '@/support/tabulator';
-import type { CountryListItem } from '@/support/types/domain';
+import type { CountryListItem } from '@/support/types/domain/country';
 
 type CountriesIndexProps = {
     filters: {

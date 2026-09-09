@@ -3,6 +3,13 @@ import { cleanQuery, type InertiaFormPoster, type ListQuery, type SearchOptions,
 
 const base = '/brands';
 
+export type BrandClientRow = {
+    id: number;
+    related_company_name: string | null;
+    status: string;
+    owner_company_name: string | null;
+};
+
 export const brandsService = {
     index(filters: ListQuery = {}, options: SearchOptions = {}) {
         router.get(
@@ -42,6 +49,25 @@ export const brandsService = {
             forceFormData: true,
             preserveScroll: true,
         });
+    },
+
+    async clients(brandId: number): Promise<BrandClientRow[]> {
+        const response = await fetch(`${base}/${brandId}/clients`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Request failed (${response.status})`);
+        }
+
+        const payload = (await response.json()) as { data: BrandClientRow[] };
+
+        return payload.data ?? [];
     },
 
     visitPage,

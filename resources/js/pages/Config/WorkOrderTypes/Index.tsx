@@ -19,7 +19,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { WorkOrderTypeListItem } from '@/support/types/domain';
+import type { WorkOrderTypeListItem } from '@/support/types/domain/work-order-type';
 
 type WorkOrderTypesIndexProps = {
     filters: {

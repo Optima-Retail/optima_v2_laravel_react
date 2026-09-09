@@ -6,6 +6,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 
 export type FieldHelpTranslationRow = {
     locale: string;
@@ -237,14 +238,11 @@ export function FieldHelpForm({
                                             />
                                         </td>
                                         <td className="px-3 py-2">
-                                            <textarea
-                                                aria-label={t('fieldHelps.helpDescription')}
-                                                rows={2}
+                                            <RichTextEditor
                                                 value={row.description}
-                                                onChange={(event) =>
-                                                    updateRow(index, { description: event.target.value })
-                                                }
-                                                className="w-full min-w-[14rem] rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                                                invalid={Boolean(errors[`translations.${index}.description`])}
+                                                minHeightClassName="min-h-16"
+                                                onChange={(html) => updateRow(index, { description: html })}
                                             />
                                         </td>
                                         <td className="px-3 py-2">

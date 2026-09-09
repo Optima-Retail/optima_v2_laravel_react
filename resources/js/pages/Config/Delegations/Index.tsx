@@ -18,7 +18,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { DelegationListItem } from '@/support/types/domain';
+import type { DelegationListItem } from '@/support/types/domain/delegation';
 
 type DelegationsIndexProps = {
     filters: {

@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { establishmentsService } from '@/services';
-import type { EstablishmentFormData, ProvinceOption, UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
+import type { EstablishmentFormData } from '@/support/types/domain/establishment';
+import type { ProvinceOption } from '@/support/types/domain/province';
 
 type EditEstablishmentProps = {
     establishment: EstablishmentFormData;

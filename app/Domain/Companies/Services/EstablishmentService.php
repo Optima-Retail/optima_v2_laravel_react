@@ -68,7 +68,7 @@ final class EstablishmentService
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
-        [$sort, $direction] = ListQuery::sort($filters, ['id', 'name', 'code', 'city', 'created_at'], 'name');
+        [$sort, $direction] = ListQuery::sort($filters, ['id', 'name', 'code', 'city', 'is_active', 'created_at'], 'name');
 
         return Establishment::query()
             ->with(['company', 'country', 'timezone', 'billingCompany', 'delegation'])
@@ -275,6 +275,26 @@ final class EstablishmentService
             'internal_notes_alert' => $establishment->internal_notes_alert,
             'voicebot_time_slots' => $establishment->voicebot_time_slots,
         ];
+    }
+
+    /**
+     * @return list<array{id: int, name: string, code: string|null, city: string|null, is_active: bool}>
+     */
+    public function forClientCompany(int $companyId): array
+    {
+        return Establishment::query()
+            ->where('company_id', $companyId)
+            ->orderBy('name')
+            ->get(['id', 'name', 'code', 'city', 'is_active'])
+            ->map(fn (Establishment $establishment): array => [
+                'id' => $establishment->id,
+                'name' => $establishment->name,
+                'code' => $establishment->code,
+                'city' => $establishment->city,
+                'is_active' => (bool) $establishment->is_active,
+            ])
+            ->values()
+            ->all();
     }
 
     /**

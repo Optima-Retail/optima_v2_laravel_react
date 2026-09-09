@@ -20,7 +20,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { RatingTypeListItem } from '@/support/types/domain';
+import type { RatingTypeListItem } from '@/support/types/domain/rating-type';
 
 type RatingTypesIndexProps = {
     filters: {

@@ -27,7 +27,7 @@ final class UserService
         $search = trim((string) ($filters['search'] ?? ''));
         $role = trim((string) ($filters['role'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
-        [$sort, $direction] = ListQuery::sort($filters, ['id', 'name', 'email'], 'name');
+        [$sort, $direction] = ListQuery::sort($filters, ['id', 'name', 'email', 'is_active'], 'name');
 
         return User::query()
             ->with('roles')
@@ -309,7 +309,7 @@ final class UserService
     }
 
     /**
-     * @return array{id: int, name: string, email: string, roles: list<string>, created_at: string|null}
+     * @return array{id: int, name: string, email: string, roles: list<string>, is_active: bool, created_at: string|null}
      */
     public function toListItem(User $user): array
     {
@@ -318,6 +318,7 @@ final class UserService
             'name' => $user->name,
             'email' => $user->email,
             'roles' => $user->getRoleNames()->values()->all(),
+            'is_active' => (bool) $user->is_active,
             'created_at' => $user->created_at?->toIso8601String(),
         ];
     }

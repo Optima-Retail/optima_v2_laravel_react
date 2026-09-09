@@ -18,7 +18,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { LanguageListItem } from '@/support/types/domain';
+import type { LanguageListItem } from '@/support/types/domain/language';
 
 type LanguagesIndexProps = {
     filters: {

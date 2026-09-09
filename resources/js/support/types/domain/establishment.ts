@@ -1,0 +1,63 @@
+export type EstablishmentOption = {
+    id: number;
+    label: string;
+    company_id: number;
+};
+
+export type EstablishmentListItem = {
+    id: number;
+    name: string;
+    code: string | null;
+    city: string | null;
+    company_name: string | null;
+    delegation_name: string | null;
+    is_active: boolean;
+    created_at: string | null;
+};
+
+export type EstablishmentFormData = {
+    id: number;
+    company_id: number;
+    name: string;
+    code: string | null;
+    store_code: string | null;
+    alternate_store_code: string | null;
+    phone: string | null;
+    email: string | null;
+    emails: string | null;
+    recipient_emails: string | null;
+    address_line_1: string | null;
+    address_line_2: string | null;
+    city: string | null;
+    province_id: number | null;
+    province_name?: string | null;
+    postal_code: string | null;
+    country_id: number | null;
+    timezone_id: number | null;
+    language_id: number | null;
+    establishment_type_id: number | null;
+    delegation_id: number | null;
+    series_id: number | null;
+    billing_company_id: number | null;
+    responsible_user_id: number | null;
+    is_active: boolean;
+    is_client_priority: boolean | null;
+    is_reviewed: boolean | null;
+    is_email_reviewed: boolean | null;
+    has_site_health_and_safety: boolean | null;
+    has_customer_health_and_safety: boolean | null;
+    is_quality_control_contactable: boolean | null;
+    has_parking: boolean | null;
+    is_ulez_zone: boolean | null;
+    latitude: string | null;
+    longitude: string | null;
+    tax_rate: number | string | null;
+    tax_included: boolean | null;
+    legacy_erp_id: number | null;
+    integration_external_id: string | null;
+    notes: string | null;
+    notes_alert: boolean | null;
+    internal_notes: string | null;
+    internal_notes_alert: boolean | null;
+    voicebot_time_slots: unknown[] | null;
+};

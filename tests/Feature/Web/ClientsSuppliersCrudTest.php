@@ -6,6 +6,7 @@ namespace Tests\Feature\Web;
 
 use App\Domain\Auth\Enums\RoleEnum;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Models\ClientPriority;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\User;
@@ -45,6 +46,18 @@ final class ClientsSuppliersCrudTest extends TestCase
                 ->missing('clients'));
 
         $related = Company::factory()->create(['name' => 'Client Co']);
+        $priorityA = ClientPriority::query()->create([
+            'name' => 'Urgency',
+            'code' => 'P2',
+            'color' => '#FF6B6B',
+            'level' => 1,
+        ]);
+        $priorityB = ClientPriority::query()->create([
+            'name' => 'Low',
+            'code' => 'P5',
+            'color' => '#95DBA1',
+            'level' => 5,
+        ]);
 
         $this->actingAs($admin)
             ->post('/clients', [
@@ -53,6 +66,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'kind' => CompanyRelationshipKind::Customer->value,
                 'classification' => 'commercial',
                 'status' => 'active',
+                'priority_ids' => [$priorityA->id, $priorityB->id],
             ])
             ->assertRedirect(route('clients.index'))
             ->assertSessionHas('success', 'client_created_successfully');
@@ -63,6 +77,10 @@ final class ClientsSuppliersCrudTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame(CompanyRelationshipKind::Customer->value, $relationship->kind->value);
+        $this->assertEqualsCanonicalizing(
+            [$priorityA->id, $priorityB->id],
+            $related->fresh()->priorities()->pluck('client_priorities.id')->all(),
+        );
 
         $this->actingAs($admin)
             ->put("/clients/{$relationship->id}", [
@@ -70,6 +88,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'kind' => CompanyRelationshipKind::Customer->value,
                 'classification' => 'commercial',
                 'status' => 'inactive',
+                'priority_ids' => [$priorityA->id],
             ])
             ->assertRedirect(route('clients.index'))
             ->assertSessionHas('success', 'client_updated_successfully');
@@ -78,6 +97,22 @@ final class ClientsSuppliersCrudTest extends TestCase
             'id' => $relationship->id,
             'status' => 'inactive',
         ]);
+        $this->assertEqualsCanonicalizing(
+            [$priorityA->id],
+            $related->fresh()->priorities()->pluck('client_priorities.id')->all(),
+        );
+        $this->assertSoftDeleted('company_priority', [
+            'company_id' => $related->id,
+            'client_priority_id' => $priorityB->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/clients/{$relationship->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Clients/Edit')
+                ->where('relationship.priority_ids', [$priorityA->id])
+                ->has('formOptions.priorityOptions'));
 
         $this->actingAs($admin)
             ->delete("/clients/{$relationship->id}")

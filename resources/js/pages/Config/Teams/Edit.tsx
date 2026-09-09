@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { teamsService } from '@/services';
-import type { TeamFormData } from '@/support/types/domain';
+import type { TeamFormData } from '@/support/types/domain/team';
 
 type EditTeamProps = {
     team: TeamFormData;

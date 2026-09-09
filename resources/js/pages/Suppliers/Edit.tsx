@@ -9,7 +9,8 @@ import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { suppliersService } from '@/services';
 import { relationshipFormValuesFromData } from '@/support/relationshipForm';
-import type { CompanyRelationshipFormData, RelationshipFormOptions, UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
+import type { CompanyRelationshipFormData, RelationshipFormOptions } from '@/support/types/domain/company-relationship';
 
 type EditSupplierProps = {
     relationship: CompanyRelationshipFormData;

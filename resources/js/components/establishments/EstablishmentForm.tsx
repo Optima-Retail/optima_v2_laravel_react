@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/Input';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { EstablishmentFormData, ProvinceOption, UserOption } from '@/support/types/domain';
-
-const textareaClassName =
-    'min-h-20 w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20';
+import type { UserOption } from '@/support/types/domain/common';
+import type { EstablishmentFormData } from '@/support/types/domain/establishment';
+import type { ProvinceOption } from '@/support/types/domain/province';
 
 export type EstablishmentFormValues = {
     company_id: string;
@@ -547,20 +547,20 @@ export function EstablishmentForm({
                 <TabPanel id="notes">
                     <div className="grid gap-5 sm:grid-cols-2">
                     <Field label={t('establishments.notes')} htmlFor="notes" error={errors.notes} className="sm:col-span-2">
-                        <textarea
+                        <RichTextEditor
                             id="notes"
-                            className={textareaClassName}
                             value={values.notes}
-                            onChange={(event) => onChange('notes', event.target.value)}
+                            invalid={Boolean(errors.notes)}
+                            onChange={(html) => onChange('notes', html)}
                         />
                     </Field>
 
                     <Field label={t('establishments.internalNotes')} htmlFor="internal_notes" error={errors.internal_notes} className="sm:col-span-2">
-                        <textarea
+                        <RichTextEditor
                             id="internal_notes"
-                            className={textareaClassName}
                             value={values.internal_notes}
-                            onChange={(event) => onChange('internal_notes', event.target.value)}
+                            invalid={Boolean(errors.internal_notes)}
+                            onChange={(html) => onChange('internal_notes', html)}
                         />
                     </Field>
 

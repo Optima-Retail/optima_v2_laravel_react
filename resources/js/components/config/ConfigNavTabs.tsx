@@ -11,11 +11,13 @@ type ConfigNavTabsProps = {
     tabs: ConfigNavTab[];
     activeId: string;
     className?: string;
+    /** Show even when only one tab (useful for hubs that will grow). */
+    alwaysShow?: boolean;
 };
 
 /** Inertia link tabs — frontend-only section switcher between existing config routes. */
-export function ConfigNavTabs({ tabs, activeId, className }: ConfigNavTabsProps) {
-    if (tabs.length <= 1) {
+export function ConfigNavTabs({ tabs, activeId, className, alwaysShow = false }: ConfigNavTabsProps) {
+    if (tabs.length === 0 || (!alwaysShow && tabs.length <= 1)) {
         return null;
     }
 

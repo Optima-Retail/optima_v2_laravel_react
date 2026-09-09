@@ -8,7 +8,7 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
-import type { UserFormOptions } from '@/support/types/domain';
+import type { UserFormOptions } from '@/support/types/domain/user';
 import type { SharedPageProps } from '@/types';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 

@@ -26,7 +26,7 @@ final class CompanyService
         $search = trim((string) ($filters['search'] ?? ''));
         $kind = trim((string) ($filters['kind'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
-        [$sort, $direction] = ListQuery::sort($filters, ['id', 'name', 'tax_id', 'kind', 'created_at'], 'name');
+        [$sort, $direction] = ListQuery::sort($filters, ['id', 'name', 'tax_id', 'kind', 'is_active', 'created_at'], 'name');
         $page = max(1, (int) ($filters['page'] ?? request()->integer('page', 1)));
 
         return Company::query()

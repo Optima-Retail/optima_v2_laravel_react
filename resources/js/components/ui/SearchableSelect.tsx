@@ -2,10 +2,13 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { Check, ChevronDown, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/support/cn';
+import { optionColorStyle } from '@/support/color';
 
 export type SelectOption = {
     value: string;
     label: string;
+    /** Catalog color (statuses, priorities, types, …) — paints the option row. */
+    color?: string | null;
 };
 
 type SearchableSelectProps = {
@@ -60,7 +63,7 @@ export function SearchableSelect({
             return filtered;
         }
 
-        const emptyItem = { value: '', label: emptyLabel };
+        const emptyItem: SelectOption = { value: '', label: emptyLabel };
         const needle = query.trim().toLowerCase();
 
         if (needle && !emptyLabel.toLowerCase().includes(needle)) {
@@ -155,16 +158,19 @@ export function SearchableSelect({
     const activeOption = items[activeIndex];
     const displayValue = open ? query : (selected?.label ?? '');
     const canClear = Boolean(emptyLabel) && value !== '' && !disabled;
+    const triggerColorStyle = !open ? optionColorStyle(selected?.color) : undefined;
 
     return (
         <div ref={rootRef} className={cn('relative', className)}>
             <div
                 className={cn(
-                    'flex h-8 w-full items-center gap-1.5 rounded-lg border bg-surface px-2.5 text-sm shadow-sm transition',
+                    'flex h-8 w-full items-center gap-1.5 rounded-lg border px-2.5 text-sm shadow-sm transition',
                     'focus-within:border-brand focus-within:outline-none focus-within:ring-2 focus-within:ring-brand/20',
+                    !triggerColorStyle && 'bg-surface',
                     disabled && 'cursor-not-allowed opacity-60',
                     invalid ? 'border-danger focus-within:border-danger focus-within:ring-danger/20' : 'border-line',
                 )}
+                style={triggerColorStyle}
                 onClick={() => openList()}
             >
                 <input
@@ -180,7 +186,11 @@ export function SearchableSelect({
                     aria-activedescendant={open && activeOption ? `${listId}-${activeOption.value || 'empty'}` : undefined}
                     role="combobox"
                     autoComplete="off"
-                    className="min-w-0 flex-1 bg-transparent py-0.5 text-sm text-ink outline-none placeholder:text-ink-muted/70"
+                    className={cn(
+                        'min-w-0 flex-1 bg-transparent py-0.5 text-sm outline-none placeholder:opacity-70',
+                        !triggerColorStyle && 'text-ink placeholder:text-ink-muted/70',
+                    )}
+                    style={triggerColorStyle ? { color: 'inherit' } : undefined}
                     onChange={(event) => {
                         setQuery(event.target.value);
                         setOpen(true);
@@ -193,7 +203,7 @@ export function SearchableSelect({
                     <button
                         type="button"
                         aria-label={t('common.remove', { label: selected?.label ?? value })}
-                        className="rounded text-ink-muted transition-colors hover:text-ink"
+                        className="rounded opacity-70 transition-opacity hover:opacity-100"
                         onClick={(event) => {
                             event.stopPropagation();
                             clear();
@@ -204,7 +214,7 @@ export function SearchableSelect({
                 ) : null}
 
                 <ChevronDown
-                    className={cn('size-4 shrink-0 text-ink-muted transition-transform', open && 'rotate-180')}
+                    className={cn('size-4 shrink-0 opacity-70 transition-transform', open && 'rotate-180')}
                     aria-hidden
                 />
             </div>
@@ -221,6 +231,7 @@ export function SearchableSelect({
                         items.map((option, index) => {
                             const active = option.value === value;
                             const highlighted = index === activeIndex;
+                            const colorStyle = optionColorStyle(option.color);
 
                             return (
                                 <li
@@ -233,10 +244,17 @@ export function SearchableSelect({
                                         type="button"
                                         onMouseEnter={() => setActiveIndex(index)}
                                         onClick={() => select(option.value)}
+                                        style={colorStyle}
                                         className={cn(
                                             'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
-                                            highlighted ? 'bg-canvas' : '',
-                                            active ? 'text-brand' : 'text-ink hover:bg-canvas',
+                                            colorStyle
+                                                ? highlighted
+                                                    ? 'ring-2 ring-inset ring-brand/50'
+                                                    : ''
+                                                : cn(
+                                                      highlighted ? 'bg-canvas' : '',
+                                                      active ? 'text-brand' : 'text-ink hover:bg-canvas',
+                                                  ),
                                         )}
                                     >
                                         <span
@@ -244,7 +262,9 @@ export function SearchableSelect({
                                                 'inline-flex size-4 items-center justify-center rounded border',
                                                 active
                                                     ? 'border-brand bg-brand text-white'
-                                                    : 'border-line bg-surface',
+                                                    : colorStyle
+                                                      ? 'border-black/20 bg-white/70'
+                                                      : 'border-line bg-surface',
                                             )}
                                         >
                                             {active ? <Check className="size-3" aria-hidden /> : null}

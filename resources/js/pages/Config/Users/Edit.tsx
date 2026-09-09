@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { usersService } from '@/services';
-import type { UserFormData, UserFormOptions } from '@/support/types/domain';
+import type { UserFormData, UserFormOptions } from '@/support/types/domain/user';
 
 type EditUserProps = {
     user: UserFormData;

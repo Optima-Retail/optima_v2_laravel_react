@@ -18,7 +18,7 @@ import {
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { TimezoneListItem } from '@/support/types/domain';
+import type { TimezoneListItem } from '@/support/types/domain/timezone';
 
 type TimezonesIndexProps = {
     filters: {

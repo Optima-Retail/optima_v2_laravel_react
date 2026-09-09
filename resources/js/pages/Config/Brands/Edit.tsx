@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { brandsService } from '@/services';
-import type { BrandFormData, BrandMessageItem, UserOption } from '@/support/types/domain';
+import type { BrandFormData, BrandMessageItem } from '@/support/types/domain/brand';
+import type { UserOption } from '@/support/types/domain/common';
 
 type EditBrandProps = {
     brand: BrandFormData;

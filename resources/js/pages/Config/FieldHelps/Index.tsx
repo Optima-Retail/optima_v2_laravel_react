@@ -18,8 +18,9 @@ import {
     tabulatorActionsCell,
     tabulatorDeleteButton,
     tabulatorEditLink,
+    tabulatorStatusBadge,
 } from '@/support/tabulator';
-import type { FieldHelpListItem } from '@/support/types/domain';
+import type { FieldHelpListItem } from '@/support/types/domain/field-help';
 
 type FieldHelpsIndexProps = {
     filters: {
@@ -74,7 +75,7 @@ export default function FieldHelpsIndex({ filters, can }: FieldHelpsIndexProps) 
                 headerSort: true,
                 titleFormatter,
                 formatter: (cell: CellComponent) =>
-                    cell.getValue() ? t('common.active') : t('common.inactive'),
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.active'), t('common.inactive')),
             },
             {
                 title: t('common.actions'),

@@ -103,7 +103,7 @@ export function BaseModal({
                     </button>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+                <div className="app-scroll min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
 
                 {footer ? (
                     <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-4">

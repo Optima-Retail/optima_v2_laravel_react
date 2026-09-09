@@ -7,7 +7,8 @@ import { RelationshipForm } from '@/components/relationships/RelationshipForm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { clientsService } from '@/services';
 import { defaultRelationshipProfileValues, emptyRelatedCompany } from '@/support/relationshipForm';
-import type { RelationshipFormOptions, UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
+import type { RelationshipFormOptions } from '@/support/types/domain/company-relationship';
 
 type CreateClientProps = {
     companyOptions: UserOption[];

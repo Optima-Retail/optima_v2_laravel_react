@@ -6,7 +6,7 @@ import { BankForm } from '@/components/config/banks/BankForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { banksService } from '@/services';
-import type { CountryOption } from '@/support/types/domain';
+import type { CountryOption } from '@/support/types/domain/country';
 
 type CreateBankProps = {
     countryOptions: CountryOption[];

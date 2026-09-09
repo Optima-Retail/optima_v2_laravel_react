@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { workOrderTypesService } from '@/services';
-import type { WorkOrderTypeFormData } from '@/support/types/domain';
+import type { WorkOrderTypeFormData } from '@/support/types/domain/work-order-type';
 
 type EditWorkOrderTypeProps = {
     workOrderType: WorkOrderTypeFormData;

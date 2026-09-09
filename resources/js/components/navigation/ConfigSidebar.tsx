@@ -3,8 +3,10 @@ import {
     Building2,
     Cable,
     CircleHelp,
+    CircleDot,
     Clock,
     Coins,
+    Flag,
     Globe2,
     Hash,
     Landmark,
@@ -80,6 +82,13 @@ const configItems: ConfigItem[] = [
         permission: 'languages.view',
     },
     {
+        href: '/config/client-priorities',
+        labelKey: 'nav.priorities',
+        matches: ['/config/client-priorities', '/config/incident-priorities'],
+        icon: Flag,
+        anyPermissions: ['client_priorities.view', 'incident_priorities.view'],
+    },
+    {
         href: '/config/roles',
         labelKey: 'nav.roles',
         matches: ['/config/roles'],
@@ -92,6 +101,20 @@ const configItems: ConfigItem[] = [
         matches: ['/config/series'],
         icon: Hash,
         permission: 'series.view',
+    },
+    {
+        href: '/config/numbering-patterns',
+        labelKey: 'nav.numberingPatterns',
+        matches: ['/config/numbering-patterns'],
+        icon: Hash,
+        permission: 'numbering_patterns.view',
+    },
+    {
+        href: '/config/work-order-statuses',
+        labelKey: 'nav.statuses',
+        matches: ['/config/contract-statuses', '/config/evaluation-statuses', '/config/incident-statuses', '/config/work-order-statuses'],
+        icon: CircleDot,
+        anyPermissions: ['contract_statuses.view', 'evaluation_statuses.view', 'incident_statuses.view', 'work_order_statuses.view'],
     },
     {
         href: '/config/teams',
@@ -110,9 +133,19 @@ const configItems: ConfigItem[] = [
     {
         href: '/config/rating-types',
         labelKey: 'nav.types',
-        matches: ['/config/rating-types', '/config/establishment-types', '/config/work-order-types'],
+        matches: [
+            '/config/rating-types',
+            '/config/establishment-types',
+            '/config/work-order-types',
+            '/config/incident-types',
+        ],
         icon: Layers,
-        anyPermissions: ['rating_types.view', 'establishment_types.view', 'work_order_types.view'],
+        anyPermissions: [
+            'rating_types.view',
+            'establishment_types.view',
+            'work_order_types.view',
+            'incident_types.view',
+        ],
     },
     {
         href: '/config/users',
@@ -127,12 +160,26 @@ const matchPermission: Record<string, string> = {
     '/config/rating-types': 'rating_types.view',
     '/config/establishment-types': 'establishment_types.view',
     '/config/work-order-types': 'work_order_types.view',
+    '/config/incident-types': 'incident_types.view',
+    '/config/contract-statuses': 'contract_statuses.view',
+    '/config/evaluation-statuses': 'evaluation_statuses.view',
+    '/config/incident-statuses': 'incident_statuses.view',
+    '/config/work-order-statuses': 'work_order_statuses.view',
+    '/config/client-priorities': 'client_priorities.view',
+    '/config/incident-priorities': 'incident_priorities.view',
 };
 
 const matchLabelKey: Record<string, string> = {
     '/config/rating-types': 'ratingTypes.resourcePlural',
     '/config/establishment-types': 'establishmentTypes.resourcePlural',
     '/config/work-order-types': 'workOrderTypes.resourcePlural',
+    '/config/incident-types': 'incidentTypes.resourcePlural',
+    '/config/contract-statuses': 'contractStatuses.resourcePlural',
+    '/config/evaluation-statuses': 'evaluationStatuses.resourcePlural',
+    '/config/incident-statuses': 'incidentStatuses.resourcePlural',
+    '/config/work-order-statuses': 'workOrderStatuses.resourcePlural',
+    '/config/client-priorities': 'clientPriorities.resourcePlural',
+    '/config/incident-priorities': 'incidentPriorities.resourcePlural',
 };
 
 function itemIsVisible(item: ConfigItem, permissions: Record<string, boolean>): boolean {
@@ -174,6 +221,9 @@ export function useConfigPermissions(): Record<string, boolean> {
         'work_order_types.view': useCan('work_order_types.view'),
         'teams.view': useCan('teams.view'),
         'languages.view': useCan('languages.view'),
+        'client_priorities.view': useCan('client_priorities.view'),
+        'incident_priorities.view': useCan('incident_priorities.view'),
+        'incident_types.view': useCan('incident_types.view'),
         'integrations.view': useCan('integrations.view'),
         'rating_types.view': useCan('rating_types.view'),
         'field_helps.view': useCan('field_helps.view'),
@@ -183,6 +233,11 @@ export function useConfigPermissions(): Record<string, boolean> {
         'countries.view': useCan('countries.view'),
         'provinces.view': useCan('provinces.view'),
         'series.view': useCan('series.view'),
+        'numbering_patterns.view': useCan('numbering_patterns.view'),
+        'work_order_statuses.view': useCan('work_order_statuses.view'),
+        'contract_statuses.view': useCan('contract_statuses.view'),
+        'evaluation_statuses.view': useCan('evaluation_statuses.view'),
+        'incident_statuses.view': useCan('incident_statuses.view'),
         'currencies.view': useCan('currencies.view'),
         'delegations.view': useCan('delegations.view'),
     };
@@ -221,12 +276,12 @@ export function ConfigSidebar() {
     }
 
     return (
-        <aside className="w-48 shrink-0 border-r border-line bg-surface">
-            <div className="border-b border-line px-3 py-2.5">
+        <aside className="flex h-full w-48 shrink-0 flex-col border-r border-line bg-surface">
+            <div className="shrink-0 border-b border-line px-3 py-2.5">
                 <p className="truncate text-sm font-semibold text-ink">{t('nav.configuration')}</p>
             </div>
 
-            <nav className="flex flex-col gap-0.5 p-2">
+            <nav className="app-scroll flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto p-2">
                 {items.map((item) => {
                     const active = item.matches.some((match) => url.startsWith(match));
                     const Icon = item.icon;

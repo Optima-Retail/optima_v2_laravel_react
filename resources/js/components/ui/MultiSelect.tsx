@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { Check, ChevronDown, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/support/cn';
+import { optionColorStyle } from '@/support/color';
 import type { SelectOption } from '@/components/ui/SearchableSelect';
 
 export type MultiSelectOption = SelectOption;
@@ -153,26 +154,37 @@ export function MultiSelect({
                 )}
                 onClick={() => openList()}
             >
-                {selected.map((option) => (
-                    <span
-                        key={option.value}
-                        className="inline-flex items-center gap-1 rounded-md bg-brand-soft px-2 py-0.5 text-xs font-semibold text-brand"
-                    >
-                        {option.label}
-                        <button
-                            type="button"
-                            disabled={disabled}
-                            aria-label={t('common.remove', { label: option.label })}
-                            className="rounded text-brand transition-colors hover:text-brand-strong"
-                            onClick={(event) => {
-                                event.stopPropagation();
-                                remove(option.value);
-                            }}
+                {selected.map((option) => {
+                    const colorStyle = optionColorStyle(option.color);
+
+                    return (
+                        <span
+                            key={option.value}
+                            style={colorStyle}
+                            className={cn(
+                                'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold',
+                                !colorStyle && 'bg-brand-soft text-brand',
+                            )}
                         >
-                            <X className="size-3" aria-hidden />
-                        </button>
-                    </span>
-                ))}
+                            {option.label}
+                            <button
+                                type="button"
+                                disabled={disabled}
+                                aria-label={t('common.remove', { label: option.label })}
+                                className={cn(
+                                    'rounded transition-opacity hover:opacity-80',
+                                    !colorStyle && 'text-brand hover:text-brand-strong',
+                                )}
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    remove(option.value);
+                                }}
+                            >
+                                <X className="size-3" aria-hidden />
+                            </button>
+                        </span>
+                    );
+                })}
 
                 <input
                     ref={inputRef}
@@ -215,6 +227,7 @@ export function MultiSelect({
                         filtered.map((option, index) => {
                             const active = value.includes(option.value);
                             const highlighted = index === activeIndex;
+                            const colorStyle = optionColorStyle(option.color);
 
                             return (
                                 <li
@@ -227,10 +240,17 @@ export function MultiSelect({
                                         type="button"
                                         onMouseEnter={() => setActiveIndex(index)}
                                         onClick={() => toggle(option.value)}
+                                        style={colorStyle}
                                         className={cn(
                                             'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
-                                            highlighted ? 'bg-canvas' : '',
-                                            active ? 'text-brand' : 'text-ink hover:bg-canvas',
+                                            colorStyle
+                                                ? highlighted
+                                                    ? 'ring-2 ring-inset ring-brand/50'
+                                                    : ''
+                                                : cn(
+                                                      highlighted ? 'bg-canvas' : '',
+                                                      active ? 'text-brand' : 'text-ink hover:bg-canvas',
+                                                  ),
                                         )}
                                     >
                                         <span
@@ -238,7 +258,9 @@ export function MultiSelect({
                                                 'inline-flex size-4 items-center justify-center rounded border',
                                                 active
                                                     ? 'border-brand bg-brand text-white'
-                                                    : 'border-line bg-surface',
+                                                    : colorStyle
+                                                      ? 'border-black/20 bg-white/70'
+                                                      : 'border-line bg-surface',
                                             )}
                                         >
                                             {active ? <Check className="size-3" aria-hidden /> : null}

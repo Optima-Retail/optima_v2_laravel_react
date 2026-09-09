@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Building2, LayoutDashboard, Settings, Tags, Truck, UserRound, Warehouse } from 'lucide-react';
+import { Building2, ClipboardCheck, FileText, LayoutDashboard, Settings, Tags, TriangleAlert, Truck, UserRound, Warehouse } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { firstConfigHref, isConfigRoute, useConfigPermissions } from '@/components/navigation/ConfigSidebar';
 import { useCan } from '@/hooks/useAuth';
@@ -26,6 +26,9 @@ const nav: NavItem[] = [
     { key: 'clients', href: '/clients', labelKey: 'nav.clients', match: '/clients', icon: UserRound },
     { key: 'suppliers', href: '/suppliers', labelKey: 'nav.suppliers', match: '/suppliers', icon: Truck },
     { key: 'establishments', href: '/establishments', labelKey: 'nav.establishments', match: '/establishments', icon: Warehouse },
+    { key: 'contracts', href: '/contracts', labelKey: 'nav.contracts', match: '/contracts', icon: FileText },
+    { key: 'evaluations', href: '/evaluations', labelKey: 'nav.evaluations', match: '/evaluations', icon: ClipboardCheck },
+    { key: 'incidents', href: '/incidents', labelKey: 'nav.incidents', match: '/incidents', icon: TriangleAlert },
     { key: 'brands', href: '/brands', labelKey: 'nav.brands', match: '/brands', icon: Tags },
     { key: 'config', labelKey: 'nav.configuration', icon: Settings, action: 'config' },
 ];
@@ -38,6 +41,9 @@ export function Sidebar() {
     const canViewCompanies = useCan('companies.view');
     const canViewRelationships = useCan('company_relationships.view');
     const canViewEstablishments = useCan('establishments.view');
+    const canViewContracts = useCan('contracts.view');
+    const canViewEvaluations = useCan('evaluations.view');
+    const canViewIncidents = useCan('incidents.view');
     const hasCompanyContext = Boolean(props.auth.company);
     const sidebarOpen = useUiStore((state) => state.sidebarOpen);
     const setSidebarOpen = useUiStore((state) => state.setSidebarOpen);
@@ -86,7 +92,7 @@ export function Sidebar() {
                     </Link>
                 </div>
 
-                <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
+                <nav className="app-scroll flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
                     {nav.map((item) => {
                         if (item.key === 'brands' && !canViewBrands) {
                             return null;
@@ -105,6 +111,18 @@ export function Sidebar() {
                         }
 
                         if (item.key === 'establishments' && (!canViewEstablishments || !hasCompanyContext)) {
+                            return null;
+                        }
+
+                        if (item.key === 'contracts' && (!canViewContracts || !hasCompanyContext)) {
+                            return null;
+                        }
+
+                        if (item.key === 'evaluations' && (!canViewEvaluations || !hasCompanyContext)) {
+                            return null;
+                        }
+
+                        if (item.key === 'incidents' && (!canViewIncidents || !hasCompanyContext)) {
                             return null;
                         }
 

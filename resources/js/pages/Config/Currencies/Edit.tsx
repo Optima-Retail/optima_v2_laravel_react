@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { currenciesService } from '@/services';
-import type { CurrencyFormData } from '@/support/types/domain';
+import type { CurrencyFormData } from '@/support/types/domain/currency';
 
 type EditCurrencyProps = {
     currency: CurrencyFormData;

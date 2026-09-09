@@ -6,7 +6,7 @@ import { BrandForm } from '@/components/config/brands/BrandForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { brandsService } from '@/services';
-import type { UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
 
 type CreateBrandProps = {
     userOptions: UserOption[];

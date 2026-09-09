@@ -26,6 +26,8 @@ class CompanyRelationship extends Model
      */
     protected $attributes = [
         'deleted_token' => '',
+        'optima_score_count' => 0,
+        'customer_score_count' => 0,
     ];
 
     /**

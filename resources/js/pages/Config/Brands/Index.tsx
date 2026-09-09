@@ -1,8 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { Plus, Tags } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CellComponent, ColumnDefinition } from 'tabulator-tables';
+import { BrandClientsModal } from '@/components/config/brands/BrandClientsModal';
 import { PageHeader } from '@/components/page/PageHeader';
 import {
     RemoteDataTable,
@@ -14,12 +15,14 @@ import { useCan } from '@/hooks/useAuth';
 import { AppLayout } from '@/layouts/AppLayout';
 import { brandsService } from '@/services';
 import {
+    isActionClick,
     isDeleteActionClick,
     tabulatorActionsCell,
+    tabulatorClientsButton,
     tabulatorDeleteButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
-import type { BrandListItem } from '@/support/types/domain';
+import type { BrandListItem } from '@/support/types/domain/brand';
 
 type BrandsIndexProps = {
     filters: {
@@ -33,11 +36,18 @@ type BrandsIndexProps = {
     };
 };
 
+type ClientsModalState = {
+    brandId: number;
+    brandName: string;
+} | null;
+
 export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
     const { t, i18n } = useTranslation();
     const tableRef = useRef<RemoteDataTableHandle>(null);
     const canUpdate = useCan('brands.update');
     const canDelete = useCan('brands.delete');
+    const canEditClients = useCan('company_relationships.update');
+    const [clientsModal, setClientsModal] = useState<ClientsModalState>(null);
 
     function buildColumns({ titleFormatter, getTable }: RemoteDataColumnHelpers): ColumnDefinition[] {
         return [
@@ -124,13 +134,15 @@ export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
             {
                 title: t('common.actions'),
                 field: 'actions',
-                width: 104,
+                width: 140,
                 hozAlign: 'right',
                 headerHozAlign: 'right',
                 headerSort: false,
                 formatter: (cell: CellComponent) => {
                     const brand = cell.getRow().getData() as BrandListItem;
-                    const parts: string[] = [];
+                    const parts: string[] = [
+                        tabulatorClientsButton(t('brands.viewClients', { name: brand.name })),
+                    ];
 
                     if (canUpdate) {
                         parts.push(
@@ -148,12 +160,23 @@ export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
                     return tabulatorActionsCell(parts);
                 },
                 cellClick: async (event: UIEvent, cell: CellComponent) => {
+                    const brand = cell.getRow().getData() as BrandListItem;
+
+                    if (isActionClick(event, 'clients')) {
+                        event.preventDefault();
+                        setClientsModal({
+                            brandId: brand.id,
+                            brandName: brand.name,
+                        });
+
+                        return;
+                    }
+
                     if (!isDeleteActionClick(event)) {
                         return;
                     }
 
                     event.preventDefault();
-                    const brand = cell.getRow().getData() as BrandListItem;
                     const confirmed = await confirmAction({
                         title: t('common.deleteTitle', { resource: t('brands.resource') }),
                         message: t('common.deleteMessage', { name: brand.name }),
@@ -215,9 +238,19 @@ export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
                     syncUrlBase={brandsService.indexPath}
                     emptyIcon={<Tags className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('brands.resourcePlural') })}
-                    deps={[i18n.language]}
+                    deps={[i18n.language, canUpdate, canDelete]}
                 />
             </div>
+
+            {clientsModal ? (
+                <BrandClientsModal
+                    open
+                    brandId={clientsModal.brandId}
+                    brandName={clientsModal.brandName}
+                    canEdit={canEditClients}
+                    onClose={() => setClientsModal(null)}
+                />
+            ) : null}
         </AppLayout>
     );
 }

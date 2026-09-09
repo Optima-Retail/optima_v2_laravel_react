@@ -5,7 +5,7 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
-import type { CountryOption } from '@/support/types/domain';
+import type { CountryOption } from '@/support/types/domain/country';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type BankFormValues = {

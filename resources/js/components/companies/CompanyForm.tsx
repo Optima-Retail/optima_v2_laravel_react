@@ -8,7 +8,8 @@ import { Select } from '@/components/ui/Select';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { ProvinceOption, UserOption } from '@/support/types/domain';
+import type { UserOption } from '@/support/types/domain/common';
+import type { ProvinceOption } from '@/support/types/domain/province';
 
 export type CompanyFormValues = {
     name: string;

@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { banksService } from '@/services';
-import type { BankFormData, CountryOption } from '@/support/types/domain';
+import type { BankFormData } from '@/support/types/domain/bank';
+import type { CountryOption } from '@/support/types/domain/country';
 
 type EditBankProps = {
     bank: BankFormData;

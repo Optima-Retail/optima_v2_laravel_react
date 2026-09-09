@@ -2,9 +2,11 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Paperclip, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
+import { RichTextEditor, RichTextHtml } from '@/components/ui/RichTextEditor';
 import { brandsService } from '@/services';
 import { cn } from '@/support/cn';
-import type { BrandMessageItem } from '@/support/types/domain';
+import { isEmptyRichText, normalizeRichText } from '@/support/richText';
+import type { BrandMessageItem } from '@/support/types/domain/brand';
 
 export type BrandMessagesCapabilities = {
     send_messages: boolean;
@@ -68,14 +70,14 @@ export function BrandMessagesPanel({ brandId, messages, can }: BrandMessagesPane
 
     function submitText(event: FormEvent) {
         event.preventDefault();
-        const plain = body.trim();
+        const html = normalizeRichText(body);
 
-        if (!can.send_messages || !plain || sending) {
+        if (!can.send_messages || isEmptyRichText(html) || sending) {
             return;
         }
 
         setSending(true);
-        brandsService.storeMessage(brandId, { body: plain });
+        brandsService.storeMessage(brandId, { body: html });
         setBody('');
         setSending(false);
     }
@@ -173,7 +175,7 @@ export function BrandMessagesPanel({ brandId, messages, can }: BrandMessagesPane
                                         ) : null}
 
                                         {message.type === 'text' ? (
-                                            <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                                            <RichTextHtml html={message.body} />
                                         ) : (
                                             renderAttachment(message)
                                         )}
@@ -190,12 +192,11 @@ export function BrandMessagesPanel({ brandId, messages, can }: BrandMessagesPane
             {canCompose ? (
                 <form onSubmit={submitText} className="space-y-2 border-t border-line p-4">
                     {can.send_messages ? (
-                        <textarea
+                        <RichTextEditor
                             value={body}
-                            onChange={(event) => setBody(event.target.value)}
+                            onChange={setBody}
                             placeholder={t('brands.messagesPlaceholder')}
-                            rows={3}
-                            className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20"
+                            minHeightClassName="min-h-20"
                         />
                     ) : null}
 
@@ -223,7 +224,7 @@ export function BrandMessagesPanel({ brandId, messages, can }: BrandMessagesPane
                         </div>
 
                         {can.send_messages ? (
-                            <Button type="submit" disabled={sending || body.trim() === ''}>
+                            <Button type="submit" disabled={sending || isEmptyRichText(body)}>
                                 <Send className="size-3.5" aria-hidden />
                                 {t('brands.messagesSend')}
                             </Button>
