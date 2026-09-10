@@ -46,6 +46,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 ->missing('clients'));
 
         $related = Company::factory()->create(['name' => 'Client Co']);
+        $collaborator = User::factory()->create();
         $priorityA = ClientPriority::query()->create([
             'name' => 'Urgency',
             'code' => 'P2',
@@ -67,6 +68,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'classification' => 'commercial',
                 'status' => 'active',
                 'priority_ids' => [$priorityA->id, $priorityB->id],
+                'collaborator_ids' => [$collaborator->id],
             ])
             ->assertRedirect(route('clients.index'))
             ->assertSessionHas('success', 'client_created_successfully');
@@ -77,6 +79,10 @@ final class ClientsSuppliersCrudTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame(CompanyRelationshipKind::Customer->value, $relationship->kind->value);
+        $this->assertDatabaseHas('company_relationship_collaborators', [
+            'company_relationship_id' => $relationship->id,
+            'user_id' => $collaborator->id,
+        ]);
         $this->assertEqualsCanonicalizing(
             [$priorityA->id, $priorityB->id],
             $related->fresh()->priorities()->pluck('client_priorities.id')->all(),
@@ -89,6 +95,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'classification' => 'commercial',
                 'status' => 'inactive',
                 'priority_ids' => [$priorityA->id],
+                'collaborator_ids' => [],
             ])
             ->assertRedirect(route('clients.index'))
             ->assertSessionHas('success', 'client_updated_successfully');
@@ -96,6 +103,10 @@ final class ClientsSuppliersCrudTest extends TestCase
         $this->assertDatabaseHas('company_relationships', [
             'id' => $relationship->id,
             'status' => 'inactive',
+        ]);
+        $this->assertDatabaseMissing('company_relationship_collaborators', [
+            'company_relationship_id' => $relationship->id,
+            'user_id' => $collaborator->id,
         ]);
         $this->assertEqualsCanonicalizing(
             [$priorityA->id],
@@ -112,7 +123,9 @@ final class ClientsSuppliersCrudTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Clients/Edit')
                 ->where('relationship.priority_ids', [$priorityA->id])
-                ->has('formOptions.priorityOptions'));
+                ->where('relationship.collaborator_ids', [])
+                ->has('formOptions.priorityOptions')
+                ->has('formOptions.userOptions'));
 
         $this->actingAs($admin)
             ->delete("/clients/{$relationship->id}")

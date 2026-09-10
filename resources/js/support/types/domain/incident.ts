@@ -18,6 +18,7 @@ export type IncidentFormData = {
     id: number;
     subject: string;
     comment: string | null;
+    collaborator_ids: number[];
     establishment_id: number | null;
     evaluation_id: number | null;
     incident_status_id: number | null;
@@ -60,3 +61,18 @@ export type IncidentTypeWorkflowConfig = {
 };
 
 export type IncidentTypeWorkflowMap = Record<string, IncidentTypeWorkflowConfig>;
+
+export type IncidentLineItem = {
+    id: number;
+    incident_id: number;
+    comment: string;
+    incident_status_id: number;
+    status_name: string | null;
+    status_color: string | null;
+    user_id: number;
+    user_name: string | null;
+    started_at: string | null;
+    ended_at: string | null;
+    duration_minutes: number;
+    created_at: string | null;
+};

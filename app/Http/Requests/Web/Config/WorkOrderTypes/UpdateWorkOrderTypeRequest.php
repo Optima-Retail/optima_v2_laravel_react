@@ -23,6 +23,10 @@ final class UpdateWorkOrderTypeRequest extends FormRequest
         $this->merge([
             'code' => filled($this->input('code')) ? $this->input('code') : null,
             'color' => filled($this->input('color')) ? $this->input('color') : null,
+            'service_type_ids' => array_values(array_filter(
+                (array) $this->input('service_type_ids', []),
+                fn (mixed $id): bool => $id !== '' && $id !== null,
+            )),
         ]);
     }
 
@@ -46,6 +50,12 @@ final class UpdateWorkOrderTypeRequest extends FormRequest
                     ->ignore($workOrderType->id),
             ],
             'color' => ['nullable', 'string', 'max:32', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
+            'service_type_ids' => ['nullable', 'array'],
+            'service_type_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('service_types', 'id')->whereNull('deleted_at'),
+            ],
         ];
     }
 }

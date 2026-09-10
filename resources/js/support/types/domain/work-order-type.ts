@@ -11,4 +11,5 @@ export type WorkOrderTypeFormData = {
     name: string;
     code: string | null;
     color: string | null;
+    service_type_ids: number[];
 };

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Config\IncidentStatuses\Services;
 
 use App\Models\IncidentStatus;
+use App\Models\IncidentType;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -42,22 +43,43 @@ final class IncidentStatusService
     }
 
     /**
-     * @param  array{name: string, color?: string|null, lifecycle?: int|null, is_open: bool}  $data
+     * @return list<array{id: int, label: string, color: string|null}>
+     */
+    public function incidentTypeOptions(): array
+    {
+        return IncidentType::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'color'])
+            ->map(fn (IncidentType $type): array => [
+                'id' => $type->id,
+                'label' => $type->name,
+                'color' => $type->color,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array{name: string, color?: string|null, lifecycle?: int|null, is_open: bool, excluded_type_ids?: list<int>}  $data
      */
     public function create(array $data): IncidentStatus
     {
         return DB::transaction(function () use ($data): IncidentStatus {
-            return IncidentStatus::query()->create([
+            $status = IncidentStatus::query()->create([
                 'name' => $data['name'],
                 'color' => $data['color'] ?: null,
                 'lifecycle' => $data['lifecycle'] ?? null,
                 'is_open' => (bool) $data['is_open'],
             ]);
+
+            $status->excludedTypes()->sync($data['excluded_type_ids'] ?? []);
+
+            return $status->fresh(['excludedTypes']) ?? $status;
         });
     }
 
     /**
-     * @param  array{name: string, color?: string|null, lifecycle?: int|null, is_open: bool}  $data
+     * @param  array{name: string, color?: string|null, lifecycle?: int|null, is_open: bool, excluded_type_ids?: list<int>}  $data
      */
     public function update(IncidentStatus $status, array $data): IncidentStatus
     {
@@ -69,7 +91,9 @@ final class IncidentStatusService
                 'is_open' => (bool) $data['is_open'],
             ]);
 
-            return $status->fresh();
+            $status->excludedTypes()->sync($data['excluded_type_ids'] ?? []);
+
+            return $status->fresh(['excludedTypes']) ?? $status;
         });
     }
 
@@ -80,21 +104,29 @@ final class IncidentStatusService
         }
 
         DB::transaction(function () use ($status): void {
+            $status->excludedTypes()->detach();
             $status->delete();
         });
     }
 
     /**
-     * @return array{id: int, name: string, color: string|null, lifecycle: int|null, is_open: bool}
+     * @return array{id: int, name: string, color: string|null, lifecycle: int|null, is_open: bool, excluded_type_ids: list<int>}
      */
     public function toFormData(IncidentStatus $status): array
     {
+        $status->loadMissing('excludedTypes');
+
         return [
             'id' => $status->id,
             'name' => $status->name,
             'color' => $status->color,
             'lifecycle' => $status->lifecycle,
             'is_open' => $status->is_open,
+            'excluded_type_ids' => $status->excludedTypes
+                ->pluck('id')
+                ->map(static fn ($id): int => (int) $id)
+                ->values()
+                ->all(),
         ];
     }
 

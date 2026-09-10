@@ -12,6 +12,8 @@ use Database\Factories\CompanyRelationshipFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CompanyRelationship extends Model
@@ -51,7 +53,6 @@ class CompanyRelationship extends Model
         'delegation_id',
         'billing_language_id',
         'series_id',
-        'rating_type_id',
         'integration_id',
         'integration_external_id',
         'reported_customer_relationship_id',
@@ -232,14 +233,6 @@ class CompanyRelationship extends Model
     }
 
     /**
-     * @return BelongsTo<RatingType, $this>
-     */
-    public function ratingType(): BelongsTo
-    {
-        return $this->belongsTo(RatingType::class);
-    }
-
-    /**
      * @return BelongsTo<Integration, $this>
      */
     public function integration(): BelongsTo
@@ -301,6 +294,22 @@ class CompanyRelationship extends Model
     public function sourcedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sourced_by_user_id');
+    }
+
+    /**
+     * @return BelongsToMany<User, $this>
+     */
+    public function collaborators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'company_relationship_collaborators')->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<Vehicle, $this>
+     */
+    public function vehicles(): HasMany
+    {
+        return $this->hasMany(Vehicle::class);
     }
 
     public function softDeleteSafely(): bool

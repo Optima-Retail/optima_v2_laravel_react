@@ -8,26 +8,37 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { incidentStatusesService } from '@/services';
+import type { UserOption } from '@/support/types/domain/common';
 import type { IncidentStatusFormData } from '@/support/types/domain/incident-status';
 
 type EditIncidentStatusProps = {
     incidentStatus: IncidentStatusFormData;
+    incidentTypeOptions: UserOption[];
     can: {
         delete: boolean;
     };
 };
 
-export default function EditIncidentStatus({ incidentStatus, can }: EditIncidentStatusProps) {
+export default function EditIncidentStatus({
+    incidentStatus,
+    incidentTypeOptions,
+    can,
+}: EditIncidentStatusProps) {
     const { t } = useTranslation();
     const form = useForm({
         name: incidentStatus.name,
         color: incidentStatus.color ?? '#a9cef0',
         lifecycle: incidentStatus.lifecycle ?? '',
         is_open: incidentStatus.is_open,
+        excluded_type_ids: (incidentStatus.excluded_type_ids ?? []).map(String),
     });
 
     function submit(event: FormEvent) {
         event.preventDefault();
+        form.transform((data) => ({
+            ...data,
+            excluded_type_ids: data.excluded_type_ids.map(Number),
+        }));
         incidentStatusesService.update(incidentStatus.id, form);
     }
 
@@ -63,6 +74,7 @@ export default function EditIncidentStatus({ incidentStatus, can }: EditIncident
                     values={form.data}
                     errors={form.errors}
                     processing={form.processing}
+                    incidentTypeOptions={incidentTypeOptions}
                     onChange={(key, value) =>
                         form.setData((data) => ({
                             ...data,

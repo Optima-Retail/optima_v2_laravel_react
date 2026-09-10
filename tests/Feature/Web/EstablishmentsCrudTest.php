@@ -59,18 +59,24 @@ final class EstablishmentsCrudTest extends TestCase
                 'company_id' => $client->id,
                 'name' => 'Main Warehouse',
                 'code' => 'EST-001',
+                'collaborator_ids' => [$admin->id],
             ])
             ->assertRedirect(route('establishments.index'))
             ->assertSessionHas('success', 'establishment_created_successfully');
 
         $establishment = Establishment::query()->where('code', 'EST-001')->firstOrFail();
         $this->assertSame($client->id, $establishment->company_id);
+        $this->assertDatabaseHas('establishment_collaborators', [
+            'establishment_id' => $establishment->id,
+            'user_id' => $admin->id,
+        ]);
 
         $this->actingAs($admin)
             ->put("/establishments/{$establishment->id}", [
                 'company_id' => $client->id,
                 'name' => 'Main Warehouse Updated',
                 'code' => 'EST-001',
+                'collaborator_ids' => [],
             ])
             ->assertRedirect(route('establishments.index'))
             ->assertSessionHas('success', 'establishment_updated_successfully');
@@ -78,6 +84,10 @@ final class EstablishmentsCrudTest extends TestCase
         $this->assertDatabaseHas('establishments', [
             'id' => $establishment->id,
             'name' => 'Main Warehouse Updated',
+        ]);
+        $this->assertDatabaseMissing('establishment_collaborators', [
+            'establishment_id' => $establishment->id,
+            'user_id' => $admin->id,
         ]);
 
         $this->actingAs($admin)

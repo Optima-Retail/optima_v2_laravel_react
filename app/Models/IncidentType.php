@@ -6,6 +6,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -84,5 +85,18 @@ class IncidentType extends Model
     public function subtypes(): HasMany
     {
         return $this->hasMany(IncidentSubtype::class);
+    }
+
+    /**
+     * Statuses that cannot be selected in Acciones for this type.
+     *
+     * @return BelongsToMany<IncidentStatus, $this>
+     */
+    public function excludedStatuses(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            IncidentStatus::class,
+            'incident_status_type_exclusions',
+        )->withTimestamps();
     }
 }

@@ -65,6 +65,7 @@ export default function EditSupplier({ relationship, companyOptions, formOptions
                     companyOptions={companyOptions}
                     formOptions={formOptions}
                     profileMode="supplier"
+                    relationshipId={relationship.id}
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.save')}

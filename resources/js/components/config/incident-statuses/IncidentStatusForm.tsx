@@ -3,14 +3,17 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Toggle } from '@/components/ui/Toggle';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
+import type { UserOption } from '@/support/types/domain/common';
 
 export type IncidentStatusFormValues = {
     name: string;
     color: string;
     lifecycle: number | string;
     is_open: boolean;
+    excluded_type_ids: string[];
 };
 
 type IncidentStatusFormProps = {
@@ -18,7 +21,8 @@ type IncidentStatusFormProps = {
     values: IncidentStatusFormValues;
     errors: Partial<Record<keyof IncidentStatusFormValues, string>>;
     processing: boolean;
-    onChange: (key: keyof IncidentStatusFormValues, value: string | boolean) => void;
+    incidentTypeOptions: UserOption[];
+    onChange: (key: keyof IncidentStatusFormValues, value: string | boolean | string[]) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
     submitIcon?: ReactNode;
@@ -29,6 +33,7 @@ export function IncidentStatusForm({
     values,
     errors,
     processing,
+    incidentTypeOptions,
     onChange,
     onSubmit,
     submitLabel,
@@ -93,6 +98,26 @@ export function IncidentStatusForm({
                     />
                     {errors.is_open ? <p className="text-sm text-danger">{errors.is_open}</p> : null}
                 </div>
+
+                <Field
+                    label={t('incidentStatuses.excludedTypes')}
+                    htmlFor="excluded_type_ids"
+                    error={errors.excluded_type_ids}
+                >
+                    <MultiSelect
+                        id="excluded_type_ids"
+                        value={values.excluded_type_ids}
+                        invalid={Boolean(errors.excluded_type_ids)}
+                        onChange={(next) => onChange('excluded_type_ids', next)}
+                        placeholder={t('incidentStatuses.excludedTypesPlaceholder')}
+                        options={incidentTypeOptions.map((option) => ({
+                            value: String(option.id),
+                            label: option.label,
+                            color: option.color ?? null,
+                        }))}
+                    />
+                    <p className="mt-1 text-xs text-ink-muted">{t('incidentStatuses.excludedTypesHint')}</p>
+                </Field>
 
                 <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
                     {actions}

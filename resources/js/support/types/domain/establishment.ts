@@ -40,6 +40,7 @@ export type EstablishmentFormData = {
     series_id: number | null;
     billing_company_id: number | null;
     responsible_user_id: number | null;
+    collaborator_ids: number[];
     is_active: boolean;
     is_client_priority: boolean | null;
     is_reviewed: boolean | null;

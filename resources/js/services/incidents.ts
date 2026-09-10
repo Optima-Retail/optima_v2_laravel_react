@@ -29,6 +29,10 @@ export const incidentsService = {
         router.delete(`${base}/${id}`, options);
     },
 
+    storeLine(id: number, form: InertiaFormPoster, options: Record<string, unknown> = {}) {
+        form.post(`${base}/${id}/lines`, options);
+    },
+
     visitPage,
 
     createPath: `${base}/create`,

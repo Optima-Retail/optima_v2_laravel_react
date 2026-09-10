@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class IncidentStatus extends Model
@@ -30,5 +31,18 @@ class IncidentStatus extends Model
             'lifecycle' => 'integer',
             'is_open' => 'boolean',
         ];
+    }
+
+    /**
+     * Incident types for which this status cannot be selected in Acciones.
+     *
+     * @return BelongsToMany<IncidentType, $this>
+     */
+    public function excludedTypes(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            IncidentType::class,
+            'incident_status_type_exclusions',
+        )->withTimestamps();
     }
 }

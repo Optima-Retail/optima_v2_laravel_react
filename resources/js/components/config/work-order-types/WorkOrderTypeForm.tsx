@@ -1,14 +1,22 @@
 import type { FormEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
-import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 
 export type WorkOrderTypeFormValues = {
     name: string;
     code: string;
     color: string;
+    service_type_ids?: string[];
+};
+
+export type WorkOrderTypeServiceTypeOption = {
+    id: number;
+    label: string;
+    color?: string | null;
 };
 
 type WorkOrderTypeFormProps = {
@@ -16,14 +24,16 @@ type WorkOrderTypeFormProps = {
     values: WorkOrderTypeFormValues;
     errors: Partial<Record<keyof WorkOrderTypeFormValues, string>>;
     processing: boolean;
-    onChange: (key: keyof WorkOrderTypeFormValues, value: string) => void;
+    onChange: (key: keyof WorkOrderTypeFormValues, value: string | string[]) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
     submitIcon?: ReactNode;
     actions?: ReactNode;
+    serviceTypeOptions?: WorkOrderTypeServiceTypeOption[];
 };
 
 export function WorkOrderTypeForm({
+    mode,
     values,
     errors,
     processing,
@@ -32,58 +42,80 @@ export function WorkOrderTypeForm({
     submitLabel,
     submitIcon,
     actions,
+    serviceTypeOptions = [],
 }: WorkOrderTypeFormProps) {
     const { t } = useTranslation();
 
     return (
         <FieldHelpScope table="work_order_types">
-        <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
-            <Field label={t('common.name')} htmlFor="name" error={errors.name} required>
-                <Input
-                    id="name"
-                    value={values.name}
-                    invalid={Boolean(errors.name)}
-                    onChange={(event) => onChange('name', event.target.value)}
-                />
-            </Field>
-
-            <Field label={t('common.code')} htmlFor="code" error={errors.code}>
-                <Input
-                    id="code"
-                    value={values.code}
-                    placeholder={t('workOrderTypes.codePlaceholder')}
-                    invalid={Boolean(errors.code)}
-                    onChange={(event) => onChange('code', event.target.value)}
-                />
-            </Field>
-
-            <Field label={t('common.color')} htmlFor="color" error={errors.color}>
-                <div className="flex items-center gap-3">
-                    <input
-                        id="color"
-                        type="color"
-                        value={values.color || '#2563eb'}
-                        onChange={(event) => onChange('color', event.target.value)}
-                        className="size-8 cursor-pointer rounded-lg border border-line bg-surface p-0.5"
-                    />
+            <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
+                <Field label={t('common.name')} htmlFor="name" error={errors.name} required>
                     <Input
-                        value={values.color}
-                        placeholder={t('workOrderTypes.colorPlaceholder')}
-                        invalid={Boolean(errors.color)}
-                        onChange={(event) => onChange('color', event.target.value)}
-                        className="flex-1"
+                        id="name"
+                        value={values.name}
+                        invalid={Boolean(errors.name)}
+                        onChange={(event) => onChange('name', event.target.value)}
                     />
-                </div>
-            </Field>
+                </Field>
 
-            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
-                {actions}
-                <Button type="submit" loading={processing}>
-                    {submitIcon}
-                    {submitLabel}
-                </Button>
-            </div>
-        </form>
+                <Field label={t('common.code')} htmlFor="code" error={errors.code}>
+                    <Input
+                        id="code"
+                        value={values.code}
+                        placeholder={t('workOrderTypes.codePlaceholder')}
+                        invalid={Boolean(errors.code)}
+                        onChange={(event) => onChange('code', event.target.value)}
+                    />
+                </Field>
+
+                <Field label={t('common.color')} htmlFor="color" error={errors.color}>
+                    <div className="flex items-center gap-3">
+                        <input
+                            id="color"
+                            type="color"
+                            value={values.color || '#2563eb'}
+                            onChange={(event) => onChange('color', event.target.value)}
+                            className="size-8 cursor-pointer rounded-lg border border-line bg-surface p-0.5"
+                        />
+                        <Input
+                            value={values.color}
+                            placeholder={t('workOrderTypes.colorPlaceholder')}
+                            invalid={Boolean(errors.color)}
+                            onChange={(event) => onChange('color', event.target.value)}
+                            className="flex-1"
+                        />
+                    </div>
+                </Field>
+
+                {mode === 'edit' ? (
+                    <Field
+                        label={t('workOrderTypes.serviceTypesLabel')}
+                        htmlFor="service_type_ids"
+                        error={errors.service_type_ids}
+                    >
+                        <MultiSelect
+                            id="service_type_ids"
+                            value={values.service_type_ids ?? []}
+                            onChange={(serviceTypeIds) => onChange('service_type_ids', serviceTypeIds)}
+                            options={serviceTypeOptions.map((option) => ({
+                                value: String(option.id),
+                                label: option.label,
+                                color: option.color ?? null,
+                            }))}
+                            placeholder={t('workOrderTypes.serviceTypesPlaceholder')}
+                            invalid={Boolean(errors.service_type_ids)}
+                        />
+                    </Field>
+                ) : null}
+
+                <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
+                    {actions}
+                    <Button type="submit" loading={processing}>
+                        {submitIcon}
+                        {submitLabel}
+                    </Button>
+                </div>
+            </form>
         </FieldHelpScope>
     );
 }

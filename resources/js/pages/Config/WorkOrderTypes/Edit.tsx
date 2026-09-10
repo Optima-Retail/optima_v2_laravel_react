@@ -2,7 +2,10 @@ import { FormEvent } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { WorkOrderTypeForm } from '@/components/config/work-order-types/WorkOrderTypeForm';
+import {
+    WorkOrderTypeForm,
+    type WorkOrderTypeServiceTypeOption,
+} from '@/components/config/work-order-types/WorkOrderTypeForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
@@ -12,17 +15,23 @@ import type { WorkOrderTypeFormData } from '@/support/types/domain/work-order-ty
 
 type EditWorkOrderTypeProps = {
     workOrderType: WorkOrderTypeFormData;
+    serviceTypeOptions: WorkOrderTypeServiceTypeOption[];
     can: {
         delete: boolean;
     };
 };
 
-export default function EditWorkOrderType({ workOrderType, can }: EditWorkOrderTypeProps) {
+export default function EditWorkOrderType({
+    workOrderType,
+    serviceTypeOptions,
+    can,
+}: EditWorkOrderTypeProps) {
     const { t } = useTranslation();
     const form = useForm({
         name: workOrderType.name,
         code: workOrderType.code ?? '',
         color: workOrderType.color ?? '#2563eb',
+        service_type_ids: (workOrderType.service_type_ids ?? []).map(String),
     });
 
     function submit(event: FormEvent) {
@@ -62,6 +71,7 @@ export default function EditWorkOrderType({ workOrderType, can }: EditWorkOrderT
                     values={form.data}
                     errors={form.errors}
                     processing={form.processing}
+                    serviceTypeOptions={serviceTypeOptions}
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.save')}

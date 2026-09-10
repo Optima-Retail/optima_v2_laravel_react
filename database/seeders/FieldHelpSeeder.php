@@ -170,21 +170,6 @@ final class FieldHelpSeeder extends Seeder
                 ],
             ],
             [
-                'key' => 'company_relationships.rating_type_id',
-                'context' => 'company_relationships',
-                'sort_order' => 40,
-                'translations' => [
-                    'en' => [
-                        'title' => 'Rating type',
-                        'description' => 'Scorecard or rating scheme applied to this relationship (quality, service level, or commercial rating). Determines which metrics feed Optima score and customer score.',
-                    ],
-                    'es' => [
-                        'title' => 'Tipo de valoración',
-                        'description' => 'Esquema de puntuación o rating aplicado a esta relación (calidad, nivel de servicio o valoración comercial). Define qué métricas alimentan la puntuación Optima y la del cliente.',
-                    ],
-                ],
-            ],
-            [
                 'key' => 'company_relationships.integration_external_id',
                 'context' => 'company_relationships',
                 'sort_order' => 50,

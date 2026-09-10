@@ -14,7 +14,6 @@ export const fieldHelpKeys = {
         ownerReference: 'company_relationships.owner_reference',
         relatedReference: 'company_relationships.related_reference',
         classification: 'company_relationships.classification',
-        ratingType: 'company_relationships.rating_type_id',
         integrationExternalId: 'company_relationships.integration_external_id',
         reportedCustomerRelationship: 'company_relationships.reported_customer_relationship_id',
         archetype: 'company_relationships.archetype',

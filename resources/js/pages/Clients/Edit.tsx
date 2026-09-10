@@ -2,6 +2,7 @@ import { FormEvent } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { type CompanyScheduleValues } from '@/components/clients/CompanySchedulePanel';
 import { PageHeader } from '@/components/page/PageHeader';
 import { RelationshipForm } from '@/components/relationships/RelationshipForm';
 import { Button } from '@/components/ui/Button';
@@ -14,6 +15,7 @@ import type { CompanyRelationshipFormData, RelationshipFormOptions } from '@/sup
 
 type EditClientProps = {
     relationship: CompanyRelationshipFormData;
+    schedule: CompanyScheduleValues;
     companyOptions: UserOption[];
     formOptions: RelationshipFormOptions;
     can: {
@@ -21,7 +23,13 @@ type EditClientProps = {
     };
 };
 
-export default function EditClient({ relationship, companyOptions, formOptions, can }: EditClientProps) {
+export default function EditClient({
+    relationship,
+    schedule,
+    companyOptions,
+    formOptions,
+    can,
+}: EditClientProps) {
     const { t } = useTranslation();
     const form = useForm(relationshipFormValuesFromData(relationship));
     const displayName = relationship.related_company_name ?? String(relationship.id);
@@ -65,6 +73,8 @@ export default function EditClient({ relationship, companyOptions, formOptions, 
                     companyOptions={companyOptions}
                     formOptions={formOptions}
                     profileMode="customer"
+                    relationshipId={relationship.id}
+                    schedule={schedule}
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.save')}
@@ -73,7 +83,7 @@ export default function EditClient({ relationship, companyOptions, formOptions, 
                     kindLocked
                     actions={
                         can.delete ? (
-                            <Button type="button" variant="danger" onClick={destroyClient}>
+                            <Button type="button" variant="danger" onClick={() => void destroyClient()}>
                                 <Trash2 className="size-4" aria-hidden />
                                 {t('common.delete')}
                             </Button>

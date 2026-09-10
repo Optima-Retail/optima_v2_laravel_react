@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class WorkOrderType extends Model
@@ -19,6 +21,27 @@ class WorkOrderType extends Model
         'code',
         'color',
     ];
+
+    /**
+     * @return HasMany<WorkOrderTypeServiceType, $this>
+     */
+    public function workOrderTypeServiceTypes(): HasMany
+    {
+        return $this->hasMany(WorkOrderTypeServiceType::class);
+    }
+
+    /**
+     * @return BelongsToMany<ServiceType, $this>
+     */
+    public function serviceTypes(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            ServiceType::class,
+            'work_order_type_service_types',
+            'work_order_type_id',
+            'service_type_id',
+        )->withTimestamps();
+    }
 
     /**
      * Soft-delete the type after releasing its unique code.

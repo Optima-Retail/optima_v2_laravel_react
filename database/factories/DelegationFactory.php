@@ -21,7 +21,9 @@ class DelegationFactory extends Factory
     {
         return [
             'name' => fake()->unique()->city().' ('.fake()->currencyCode().')',
-            'tax_id' => strtoupper(fake()->optional()->bothify('??########')),
+            'tax_id' => ($taxId = fake()->optional()->bothify('??########')) !== null
+                ? strtoupper($taxId)
+                : null,
             'address' => fake()->optional()->streetAddress(),
             'cost_includes_vat' => false,
             'recovers_vat' => true,

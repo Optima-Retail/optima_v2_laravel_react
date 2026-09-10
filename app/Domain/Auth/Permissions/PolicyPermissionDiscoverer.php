@@ -28,6 +28,15 @@ final class PolicyPermissionDiscoverer
     ];
 
     /**
+     * Irregular resource keys (match table / product naming, not English pluralization).
+     *
+     * @var array<string, string>
+     */
+    private const RESOURCE_KEY_OVERRIDES = [
+        'TaskToPerformPolicy' => 'tasks_to_perform',
+    ];
+
+    /**
      * @return list<string>
      */
     public function discover(): array
@@ -105,7 +114,13 @@ final class PolicyPermissionDiscoverer
      */
     public function resourceKey(string $policyClass): string
     {
-        return (string) Str::of(class_basename($policyClass))
+        $basename = class_basename($policyClass);
+
+        if (isset(self::RESOURCE_KEY_OVERRIDES[$basename])) {
+            return self::RESOURCE_KEY_OVERRIDES[$basename];
+        }
+
+        return (string) Str::of($basename)
             ->beforeLast('Policy')
             ->snake()
             ->plural();

@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ClientArticlesPanel } from '@/components/clients/ClientArticlesPanel';
+import { ClientEstablishmentsPanel } from '@/components/clients/ClientEstablishmentsPanel';
+import { ClientRatesPanel } from '@/components/clients/ClientRatesPanel';
+import {
+    CompanySchedulePanel,
+    type CompanyScheduleValues,
+} from '@/components/clients/CompanySchedulePanel';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -13,6 +20,7 @@ import type { RelationshipProfileValues } from '@/support/relationshipForm';
 import type { UserOption } from '@/support/types/domain/common';
 import type { RelationshipFormOptions } from '@/support/types/domain/company-relationship';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
+import { useCan } from '@/hooks/useAuth';
 
 export type RelationshipFormValues = {
     related_mode: 'existing' | 'new';
@@ -55,6 +63,9 @@ type RelationshipFormProps = {
     kindLabelsNamespace?: string;
     allowCreateRelated?: boolean;
     showBrand?: boolean;
+    /** Customer/supplier edit extras (articles / rates / technician services / opening hours). */
+    relationshipId?: number;
+    schedule?: CompanyScheduleValues;
 };
 
 const defaultKinds = ['customer', 'supplier', 'technician', 'partner'] as const;
@@ -67,10 +78,11 @@ const emptyFormOptions: RelationshipFormOptions = {
     delegationOptions: [],
     languageOptions: [],
     seriesOptions: [],
-    ratingTypeOptions: [],
     integrationOptions: [],
     userOptions: [],
     priorityOptions: [],
+    serviceTypeOptions: [],
+    globalServiceTypeOptions: [],
 };
 
 function toSelectOptions(options: UserOption[]) {
@@ -100,6 +112,8 @@ export function RelationshipForm({
     kindLabelsNamespace = 'relationships',
     allowCreateRelated = false,
     showBrand = false,
+    relationshipId,
+    schedule,
 }: RelationshipFormProps) {
     const { t } = useTranslation();
     const showBrandField = showBrand || profileMode === 'customer';
@@ -110,6 +124,32 @@ export function RelationshipForm({
     const isSupplierProfile = profileMode === 'supplier';
     const resolvedBrandOptions = formOptions.brandOptions.length > 0 ? formOptions.brandOptions : brandOptions;
     const [activeTab, setActiveTab] = useState('general');
+
+    const canViewArticles = useCan('articles.view');
+    const canEditArticles =
+        useCan('company_relationships.update') &&
+        (useCan('articles.create') || useCan('articles.update') || useCan('articles.delete'));
+    const canViewRates = useCan('client_rates.view');
+    const canEditRates =
+        useCan('company_relationships.update') &&
+        (useCan('client_rates.create') ||
+            useCan('client_rates.update') ||
+            useCan('client_rates.delete'));
+    const canViewEstablishments = useCan('establishments.view');
+    const canEditEstablishments = useCan('establishments.update');
+    const canCreateEstablishments = useCan('establishments.create');
+    const canEditSchedule = useCan('company_relationships.update');
+
+    const showCustomerExtras = isCustomerProfile && relationshipId != null;
+    const showEstablishmentsTab = showCustomerExtras && canViewEstablishments;
+    const showArticlesTab = showCustomerExtras && canViewArticles;
+    const showRatesTab = showCustomerExtras && canViewRates;
+    const showOpeningHoursTab = showCustomerExtras && schedule != null;
+    const showTechnicianServices = isSupplierProfile && values.kind === 'technician';
+
+    const relatedCompanyId = values.related_company_id
+        ? Number(values.related_company_id)
+        : null;
 
     const tabItems = useMemo(() => {
         const items: TabItem[] = [
@@ -124,6 +164,22 @@ export function RelationshipForm({
                 { id: 'owners', label: t('relationships.tabs.owners') },
                 { id: 'operations', label: t('relationships.tabs.operations') },
             );
+
+            if (showEstablishmentsTab) {
+                items.push({ id: 'establishments', label: t('relationships.tabs.establishments') });
+            }
+
+            if (showArticlesTab) {
+                items.push({ id: 'articles', label: t('relationships.tabs.articles') });
+            }
+
+            if (showRatesTab) {
+                items.push({ id: 'rates', label: t('relationships.tabs.rates') });
+            }
+
+            if (showOpeningHoursTab) {
+                items.push({ id: 'opening_hours', label: t('relationships.tabs.openingHours') });
+            }
         }
 
         if (isSupplierProfile) {
@@ -135,18 +191,42 @@ export function RelationshipForm({
         }
 
         return items;
-    }, [isCustomerProfile, isSupplierProfile, t, values.kind]);
+    }, [
+        isCustomerProfile,
+        isSupplierProfile,
+        showArticlesTab,
+        showEstablishmentsTab,
+        showOpeningHoursTab,
+        showRatesTab,
+        t,
+        values.kind,
+    ]);
+
+    const extraTabIds = useMemo(
+        () => new Set(['establishments', 'articles', 'rates', 'opening_hours']),
+        [],
+    );
+    const isExtraTab = extraTabIds.has(activeTab);
 
     useEffect(() => {
         if (activeTab === 'technician' && values.kind !== 'technician') {
             setActiveTab('general');
         }
-    }, [activeTab, values.kind]);
+
+        if (!tabItems.some((item) => item.id === activeTab)) {
+            setActiveTab('general');
+        }
+    }, [activeTab, tabItems, values.kind]);
 
     return (
         <FieldHelpScope table="company_relationships">
-        <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
+        <div className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
             <Tabs items={tabItems} value={activeTab} onValueChange={setActiveTab} defaultValue="general">
+                <form
+                    onSubmit={onSubmit}
+                    className={isExtraTab ? 'hidden' : 'space-y-5'}
+                    aria-hidden={isExtraTab}
+                >
                 <TabPanel id="general">
                     <div className="grid gap-5 sm:grid-cols-2">
                 {allowCreateRelated ? (
@@ -304,6 +384,78 @@ export function RelationshipForm({
                     </Field>
                 ) : null}
 
+                <Field
+                    label={t('relationships.collaborators')}
+                    htmlFor="collaborator_ids"
+                    error={errors.collaborator_ids}
+                    className="sm:col-span-2"
+                >
+                    <MultiSelect
+                        id="collaborator_ids"
+                        value={values.collaborator_ids}
+                        onChange={(collaboratorIds) => onChange('collaborator_ids', collaboratorIds)}
+                        options={toSelectOptions(formOptions.userOptions)}
+                        placeholder={t('relationships.collaboratorsPlaceholder')}
+                        invalid={Boolean(errors.collaborator_ids)}
+                    />
+                </Field>
+
+                {showTechnicianServices ? (
+                    <>
+                        <Field
+                            label={t('suppliers.serviceTypesLabel')}
+                            htmlFor="service_type_ids"
+                            error={errors.service_type_ids}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="service_type_ids"
+                                value={values.service_type_ids}
+                                onChange={(serviceTypeIds) => onChange('service_type_ids', serviceTypeIds)}
+                                options={toSelectOptions(formOptions.serviceTypeOptions ?? [])}
+                                placeholder={t('suppliers.serviceTypesPlaceholder')}
+                                invalid={Boolean(errors.service_type_ids)}
+                            />
+                        </Field>
+
+                        <Field
+                            label={t('suppliers.globalServiceTypesLabel')}
+                            htmlFor="global_service_type_ids"
+                            error={errors.global_service_type_ids}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="global_service_type_ids"
+                                value={values.global_service_type_ids}
+                                onChange={(globalServiceTypeIds) =>
+                                    onChange('global_service_type_ids', globalServiceTypeIds)
+                                }
+                                options={toSelectOptions(formOptions.globalServiceTypeOptions ?? [])}
+                                placeholder={t('suppliers.globalServiceTypesPlaceholder')}
+                                invalid={Boolean(errors.global_service_type_ids)}
+                            />
+                        </Field>
+
+                        <Field
+                            label={t('suppliers.alternativeDelegationsLabel')}
+                            htmlFor="alternative_delegation_ids"
+                            error={errors.alternative_delegation_ids}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="alternative_delegation_ids"
+                                value={values.alternative_delegation_ids}
+                                onChange={(delegationIds) =>
+                                    onChange('alternative_delegation_ids', delegationIds)
+                                }
+                                options={toSelectOptions(formOptions.delegationOptions ?? [])}
+                                placeholder={t('suppliers.alternativeDelegationsPlaceholder')}
+                                invalid={Boolean(errors.alternative_delegation_ids)}
+                            />
+                        </Field>
+                    </>
+                ) : null}
+
                 <Field label={t('relationships.ownerReference')} htmlFor="owner_reference" error={errors.owner_reference}>
                     <Input
                         id="owner_reference"
@@ -394,17 +546,6 @@ export function RelationshipForm({
                             onChange={(value) => onChange('series_id', value)}
                             emptyLabel={t('common.none')}
                             options={toSelectOptions(formOptions.seriesOptions)}
-                        />
-                    </Field>
-
-                    <Field label={t('relationships.ratingType')} htmlFor="rating_type_id" error={errors.rating_type_id}>
-                        <SearchableSelect
-                            id="rating_type_id"
-                            value={values.rating_type_id}
-                            invalid={Boolean(errors.rating_type_id)}
-                            onChange={(value) => onChange('rating_type_id', value)}
-                            emptyLabel={t('common.none')}
-                            options={toSelectOptions(formOptions.ratingTypeOptions)}
                         />
                     </Field>
 
@@ -996,16 +1137,66 @@ export function RelationshipForm({
                         </div>
                     </TabPanel>
                 ) : null}
-            </Tabs>
 
-            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
-                {actions}
-                <Button type="submit" loading={processing}>
-                    {submitIcon}
-                    {submitLabel}
-                </Button>
-            </div>
-        </form>
+                    {!isExtraTab ? (
+                        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
+                            {actions}
+                            <Button type="submit" loading={processing}>
+                                {submitIcon}
+                                {submitLabel}
+                            </Button>
+                        </div>
+                    ) : null}
+                </form>
+
+                {showEstablishmentsTab && relationshipId != null ? (
+                    <TabPanel id="establishments">
+                        <ClientEstablishmentsPanel
+                            relationshipId={relationshipId}
+                            relatedCompanyId={
+                                relatedCompanyId != null && Number.isFinite(relatedCompanyId)
+                                    ? relatedCompanyId
+                                    : null
+                            }
+                            canEdit={canEditEstablishments}
+                            canCreate={canCreateEstablishments}
+                            embedded
+                        />
+                    </TabPanel>
+                ) : null}
+
+                {showArticlesTab && relationshipId != null ? (
+                    <TabPanel id="articles">
+                        <ClientArticlesPanel
+                            relationshipId={relationshipId}
+                            canEdit={canEditArticles}
+                            embedded
+                        />
+                    </TabPanel>
+                ) : null}
+
+                {showRatesTab && relationshipId != null ? (
+                    <TabPanel id="rates">
+                        <ClientRatesPanel
+                            relationshipId={relationshipId}
+                            canEdit={canEditRates}
+                            embedded
+                        />
+                    </TabPanel>
+                ) : null}
+
+                {showOpeningHoursTab && relationshipId != null && schedule != null ? (
+                    <TabPanel id="opening_hours">
+                        <CompanySchedulePanel
+                            relationshipId={relationshipId}
+                            schedule={schedule}
+                            canEdit={canEditSchedule}
+                            embedded
+                        />
+                    </TabPanel>
+                ) : null}
+            </Tabs>
+        </div>
         </FieldHelpScope>
     );
 }

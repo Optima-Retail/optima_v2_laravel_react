@@ -6,6 +6,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Incident extends Model
@@ -122,5 +124,21 @@ class Incident extends Model
     public function qcResponsibleUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'qc_responsible_user_id');
+    }
+
+    /**
+     * @return BelongsToMany<User, $this>
+     */
+    public function collaborators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'incident_collaborators')->withTimestamps();
+    }
+
+    /**
+     * @return HasMany<IncidentLine, $this>
+     */
+    public function lines(): HasMany
+    {
+        return $this->hasMany(IncidentLine::class);
     }
 }

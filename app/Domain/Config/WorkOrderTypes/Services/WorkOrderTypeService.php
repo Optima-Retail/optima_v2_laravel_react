@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Config\WorkOrderTypes\Services;
 
+use App\Domain\Config\WorkOrderTypeServiceTypes\Services\WorkOrderTypeServiceTypeService;
 use App\Models\WorkOrderType;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -45,21 +46,29 @@ final class WorkOrderTypeService
     }
 
     /**
-     * @param  array{name: string, code?: string|null, color?: string|null}  $data
+     * @param  array{name: string, code?: string|null, color?: string|null, service_type_ids?: list<int>|null}  $data
      */
     public function create(array $data): WorkOrderType
     {
         return DB::transaction(function () use ($data): WorkOrderType {
-            return WorkOrderType::query()->create([
+            $type = WorkOrderType::query()->create([
                 'name' => $data['name'],
                 'code' => $data['code'] ?: null,
                 'color' => $data['color'] ?: null,
             ]);
+
+            if (array_key_exists('service_type_ids', $data)) {
+                /** @var list<int> $serviceTypeIds */
+                $serviceTypeIds = array_map('intval', $data['service_type_ids'] ?? []);
+                app(WorkOrderTypeServiceTypeService::class)->syncForWorkOrderType($type, $serviceTypeIds);
+            }
+
+            return $type;
         });
     }
 
     /**
-     * @param  array{name: string, code?: string|null, color?: string|null}  $data
+     * @param  array{name: string, code?: string|null, color?: string|null, service_type_ids?: list<int>|null}  $data
      */
     public function update(WorkOrderType $type, array $data): WorkOrderType
     {
@@ -70,7 +79,13 @@ final class WorkOrderTypeService
                 'color' => $data['color'] ?: null,
             ]);
 
-            return $type->fresh();
+            if (array_key_exists('service_type_ids', $data)) {
+                /** @var list<int> $serviceTypeIds */
+                $serviceTypeIds = array_map('intval', $data['service_type_ids'] ?? []);
+                app(WorkOrderTypeServiceTypeService::class)->syncForWorkOrderType($type, $serviceTypeIds);
+            }
+
+            return $type->fresh() ?? $type;
         });
     }
 
@@ -89,7 +104,7 @@ final class WorkOrderTypeService
     }
 
     /**
-     * @return array{id: int, name: string, code: string|null, color: string|null}
+     * @return array{id: int, name: string, code: string|null, color: string|null, service_type_ids: list<int>}
      */
     public function toFormData(WorkOrderType $type): array
     {
@@ -98,7 +113,19 @@ final class WorkOrderTypeService
             'name' => $type->name,
             'code' => $type->code,
             'color' => $type->color,
+            'service_type_ids' => array_map(
+                static fn (array $row): int => (int) $row['service_type_id'],
+                app(WorkOrderTypeServiceTypeService::class)->forWorkOrderType($type),
+            ),
         ];
+    }
+
+    /**
+     * @return list<array{id: int, label: string, color: string|null}>
+     */
+    public function serviceTypeOptions(): array
+    {
+        return app(WorkOrderTypeServiceTypeService::class)->serviceTypeOptions();
     }
 
     /**

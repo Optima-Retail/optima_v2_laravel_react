@@ -24,7 +24,6 @@ return new class extends Migration
             $table->foreignId('delegation_id')->nullable()->constrained('delegations')->nullOnDelete();
             $table->foreignId('billing_language_id')->nullable()->constrained('languages')->nullOnDelete();
             $table->foreignId('series_id')->nullable()->constrained('series')->nullOnDelete();
-            $table->foreignId('rating_type_id')->nullable()->constrained('rating_types')->nullOnDelete();
             $table->foreignId('integration_id')->nullable()->constrained('integrations')->nullOnDelete();
             $table->string('integration_external_id', 80)->nullable();
             $table->foreignId('reported_customer_relationship_id')->nullable()->constrained('company_relationships')->nullOnDelete();

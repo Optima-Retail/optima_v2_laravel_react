@@ -7,15 +7,19 @@ namespace App\Domain\Companies\Services;
 use App\Domain\Companies\Enums\CompanyKind;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyValidation;
+use App\Domain\Config\TechnicianAlternativeDelegations\Services\TechnicianAlternativeDelegationService;
+use App\Domain\Config\TechnicianGlobalServiceTypes\Services\TechnicianGlobalServiceTypeService;
+use App\Domain\Config\TechnicianServiceTypes\Services\TechnicianServiceTypeService;
 use App\Models\Brand;
 use App\Models\ClientPriority;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\Delegation;
+use App\Models\GlobalServiceType;
 use App\Models\Integration;
 use App\Models\Language;
-use App\Models\RatingType;
 use App\Models\Series;
+use App\Models\ServiceType;
 use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -113,7 +117,30 @@ final class CompanyRelationshipService
                 'owner_company_id' => $owner->id,
                 'created_by' => $actor->id,
                 'updated_by' => $actor->id,
-            ])->load(['relatedCompany', 'brand']);
+            ]);
+
+            $relationship->collaborators()->sync($data['collaborator_ids'] ?? []);
+
+            if (($data['kind'] ?? '') === CompanyRelationshipKind::Technician->value
+                && array_key_exists('service_type_ids', $data)) {
+                /** @var list<int> $serviceTypeIds */
+                $serviceTypeIds = array_map('intval', $data['service_type_ids'] ?? []);
+                app(TechnicianServiceTypeService::class)->syncForTechnician($relationship, $serviceTypeIds);
+            }
+
+            if (($data['kind'] ?? '') === CompanyRelationshipKind::Technician->value
+                && array_key_exists('global_service_type_ids', $data)) {
+                /** @var list<int> $globalServiceTypeIds */
+                $globalServiceTypeIds = array_map('intval', $data['global_service_type_ids'] ?? []);
+                app(TechnicianGlobalServiceTypeService::class)->syncForTechnician($relationship, $globalServiceTypeIds);
+            }
+
+            if (($data['kind'] ?? '') === CompanyRelationshipKind::Technician->value
+                && array_key_exists('alternative_delegation_ids', $data)) {
+                /** @var list<int> $delegationIds */
+                $delegationIds = array_map('intval', $data['alternative_delegation_ids'] ?? []);
+                app(TechnicianAlternativeDelegationService::class)->syncForTechnician($relationship, $delegationIds);
+            }
 
             if (($data['kind'] ?? '') === CompanyRelationshipKind::Customer->value
                 && array_key_exists('priority_ids', $data)) {
@@ -123,7 +150,7 @@ final class CompanyRelationshipService
                 );
             }
 
-            return $relationship;
+            return $relationship->load(['relatedCompany', 'brand', 'collaborators']);
         });
     }
 
@@ -173,9 +200,33 @@ final class CompanyRelationshipService
                 'updated_by' => $actor->id,
             ]);
 
-            $fresh = $relationship->fresh(['relatedCompany', 'brand']) ?? $relationship;
+            $relationship->collaborators()->sync($data['collaborator_ids'] ?? []);
 
-            if (($data['kind'] ?? $fresh->kind->value) === CompanyRelationshipKind::Customer->value
+            $fresh = $relationship->fresh(['relatedCompany', 'brand', 'collaborators']) ?? $relationship;
+            $kind = (string) ($data['kind'] ?? $fresh->kind->value);
+
+            if ($kind === CompanyRelationshipKind::Technician->value
+                && array_key_exists('service_type_ids', $data)) {
+                /** @var list<int> $serviceTypeIds */
+                $serviceTypeIds = array_map('intval', $data['service_type_ids'] ?? []);
+                app(TechnicianServiceTypeService::class)->syncForTechnician($fresh, $serviceTypeIds);
+            }
+
+            if ($kind === CompanyRelationshipKind::Technician->value
+                && array_key_exists('global_service_type_ids', $data)) {
+                /** @var list<int> $globalServiceTypeIds */
+                $globalServiceTypeIds = array_map('intval', $data['global_service_type_ids'] ?? []);
+                app(TechnicianGlobalServiceTypeService::class)->syncForTechnician($fresh, $globalServiceTypeIds);
+            }
+
+            if ($kind === CompanyRelationshipKind::Technician->value
+                && array_key_exists('alternative_delegation_ids', $data)) {
+                /** @var list<int> $delegationIds */
+                $delegationIds = array_map('intval', $data['alternative_delegation_ids'] ?? []);
+                app(TechnicianAlternativeDelegationService::class)->syncForTechnician($fresh, $delegationIds);
+            }
+
+            if ($kind === CompanyRelationshipKind::Customer->value
                 && array_key_exists('priority_ids', $data)
                 && $fresh->relatedCompany !== null) {
                 $this->syncCompanyPriorities($fresh->relatedCompany, $data['priority_ids'] ?? []);
@@ -192,6 +243,7 @@ final class CompanyRelationshipService
         }
 
         DB::transaction(function () use ($relationship): void {
+            $relationship->collaborators()->detach();
             $relationship->softDeleteSafely();
         });
     }
@@ -202,10 +254,11 @@ final class CompanyRelationshipService
      *     delegationOptions: list<array{id: int, label: string}>,
      *     languageOptions: list<array{id: int, label: string}>,
      *     seriesOptions: list<array{id: int, label: string}>,
-     *     ratingTypeOptions: list<array{id: int, label: string}>,
      *     integrationOptions: list<array{id: int, label: string}>,
      *     userOptions: list<array{id: int, label: string}>,
-     *     priorityOptions: list<array{id: int, label: string, color: string|null}>
+     *     priorityOptions: list<array{id: int, label: string, color: string|null}>,
+     *     serviceTypeOptions: list<array{id: int, label: string, color: string|null}>,
+     *     globalServiceTypeOptions: list<array{id: int, label: string, color: string|null}>
      * }
      */
     public function formOptions(): array
@@ -247,15 +300,6 @@ final class CompanyRelationshipService
                 ])
                 ->values()
                 ->all(),
-            'ratingTypeOptions' => RatingType::query()
-                ->orderBy('name')
-                ->get(['id', 'name', 'code'])
-                ->map(fn (RatingType $ratingType): array => [
-                    'id' => $ratingType->id,
-                    'label' => "{$ratingType->name} ({$ratingType->code})",
-                ])
-                ->values()
-                ->all(),
             'integrationOptions' => Integration::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'code'])
@@ -287,6 +331,30 @@ final class CompanyRelationshipService
                 ])
                 ->values()
                 ->all(),
+            'serviceTypeOptions' => ServiceType::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'color'])
+                ->map(fn (ServiceType $type): array => [
+                    'id' => $type->id,
+                    'label' => $type->code
+                        ? "{$type->code} — {$type->name}"
+                        : $type->name,
+                    'color' => $type->color,
+                ])
+                ->values()
+                ->all(),
+            'globalServiceTypeOptions' => GlobalServiceType::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'color'])
+                ->map(fn (GlobalServiceType $type): array => [
+                    'id' => $type->id,
+                    'label' => $type->code
+                        ? "{$type->code} — {$type->name}"
+                        : $type->name,
+                    'color' => $type->color,
+                ])
+                ->values()
+                ->all(),
         ];
     }
 
@@ -295,7 +363,7 @@ final class CompanyRelationshipService
      */
     public function toFormData(CompanyRelationship $relationship): array
     {
-        $relationship->loadMissing(['relatedCompany', 'brand', 'relatedCompany.priorities']);
+        $relationship->loadMissing(['relatedCompany', 'brand', 'relatedCompany.priorities', 'collaborators']);
 
         $time = static function (mixed $value): ?string {
             if ($value === null || $value === '') {
@@ -317,6 +385,25 @@ final class CompanyRelationshipService
                 ->map(fn ($id): int => (int) $id)
                 ->values()
                 ->all() ?? [],
+            'collaborator_ids' => $relationship->collaborators->pluck('id')->values()->all(),
+            'service_type_ids' => $relationship->kind === CompanyRelationshipKind::Technician
+                ? array_map(
+                    static fn (array $row): int => (int) $row['service_type_id'],
+                    app(TechnicianServiceTypeService::class)->forTechnician($relationship),
+                )
+                : [],
+            'global_service_type_ids' => $relationship->kind === CompanyRelationshipKind::Technician
+                ? array_map(
+                    static fn (array $row): int => (int) $row['global_service_type_id'],
+                    app(TechnicianGlobalServiceTypeService::class)->forTechnician($relationship),
+                )
+                : [],
+            'alternative_delegation_ids' => $relationship->kind === CompanyRelationshipKind::Technician
+                ? array_map(
+                    static fn (array $row): int => (int) $row['delegation_id'],
+                    app(TechnicianAlternativeDelegationService::class)->forTechnician($relationship),
+                )
+                : [],
             'kind' => $relationship->kind->value,
             'status' => $relationship->status->value,
             'classification' => $relationship->classification->value,
@@ -330,7 +417,6 @@ final class CompanyRelationshipService
             'delegation_id' => $relationship->delegation_id,
             'billing_language_id' => $relationship->billing_language_id,
             'series_id' => $relationship->series_id,
-            'rating_type_id' => $relationship->rating_type_id,
             'integration_id' => $relationship->integration_id,
             'integration_external_id' => $relationship->integration_external_id,
             'reported_customer_relationship_id' => $relationship->reported_customer_relationship_id,
@@ -416,7 +502,13 @@ final class CompanyRelationshipService
      */
     private function attributes(array $data): array
     {
-        unset($data['related_mode'], $data['related_company'], $data['owner_company_id'], $data['priority_ids']);
+        unset(
+            $data['related_mode'],
+            $data['related_company'],
+            $data['owner_company_id'],
+            $data['priority_ids'],
+            $data['collaborator_ids'],
+        );
 
         foreach (CompanyValidation::relationshipNullableKeys() as $key) {
             if (array_key_exists($key, $data) && $data[$key] === '') {

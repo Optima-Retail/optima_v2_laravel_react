@@ -18,6 +18,10 @@ export type CompanyRelationshipFormData = {
     related_company_id: number;
     related_company_name: string | null;
     priority_ids: number[];
+    collaborator_ids: number[];
+    service_type_ids: number[];
+    global_service_type_ids: number[];
+    alternative_delegation_ids: number[];
     kind: string;
     status: string;
     classification: string;
@@ -31,7 +35,6 @@ export type CompanyRelationshipFormData = {
     delegation_id: number | null;
     billing_language_id: number | null;
     series_id: number | null;
-    rating_type_id: number | null;
     integration_id: number | null;
     integration_external_id: string | null;
     corrective_work_order_owner_id: number | null;
@@ -96,8 +99,9 @@ export type RelationshipFormOptions = {
     delegationOptions: UserOption[];
     languageOptions: UserOption[];
     seriesOptions: UserOption[];
-    ratingTypeOptions: UserOption[];
     integrationOptions: UserOption[];
     userOptions: UserOption[];
     priorityOptions: UserOption[];
+    serviceTypeOptions: UserOption[];
+    globalServiceTypeOptions: UserOption[];
 };

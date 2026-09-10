@@ -6,6 +6,7 @@ namespace Tests\Feature\Web;
 
 use App\Domain\Auth\Enums\RoleEnum;
 use App\Models\IncidentStatus;
+use App\Models\IncidentType;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,11 +46,22 @@ final class IncidentStatusesCrudTest extends TestCase
                 'color' => '#f6eac2',
                 'lifecycle' => 1,
                 'is_open' => true,
+                'excluded_type_ids' => [],
             ])
             ->assertRedirect(route('config.incident-statuses.index'))
             ->assertSessionHas('success', 'incident_status_created_successfully');
 
         $status = IncidentStatus::query()->where('name', 'Draft')->firstOrFail();
+
+        $type = IncidentType::query()->create([
+            'name' => 'Controllers',
+            'color' => '#FFFFFF',
+            'default_priority_id' => null,
+            'origin_selectable' => false,
+            'origin_options' => [],
+            'origin_required' => false,
+            'show_related' => false,
+        ]);
 
         $this->actingAs($admin)
             ->getJson('/config/incident-statuses/data')
@@ -60,11 +72,21 @@ final class IncidentStatusesCrudTest extends TestCase
             ->assertJsonPath('data.0.is_open', true);
 
         $this->actingAs($admin)
+            ->get("/config/incident-statuses/{$status->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Config/IncidentStatuses/Edit')
+                ->where('incidentStatus.id', $status->id)
+                ->has('incidentTypeOptions')
+                ->where('incidentStatus.excluded_type_ids', []));
+
+        $this->actingAs($admin)
             ->put("/config/incident-statuses/{$status->id}", [
                 'name' => 'Draft Updated',
                 'color' => '#f6eac2',
                 'lifecycle' => 1,
                 'is_open' => false,
+                'excluded_type_ids' => [$type->id],
             ])
             ->assertRedirect(route('config.incident-statuses.index'))
             ->assertSessionHas('success', 'incident_status_updated_successfully');
@@ -75,12 +97,20 @@ final class IncidentStatusesCrudTest extends TestCase
             'is_open' => false,
         ]);
 
+        $this->assertDatabaseHas('incident_status_type_exclusions', [
+            'incident_status_id' => $status->id,
+            'incident_type_id' => $type->id,
+        ]);
+
         $this->actingAs($admin)
             ->delete("/config/incident-statuses/{$status->id}")
             ->assertRedirect(route('config.incident-statuses.index'))
             ->assertSessionHas('success', 'incident_status_deleted_successfully');
 
         $this->assertSoftDeleted($status);
+        $this->assertDatabaseMissing('incident_status_type_exclusions', [
+            'incident_status_id' => $status->id,
+        ]);
     }
 
     public function test_user_without_permission_cannot_view_incident_statuses(): void

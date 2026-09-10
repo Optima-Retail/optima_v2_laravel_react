@@ -4,6 +4,7 @@ import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { cn } from '@/support/cn';
 import type { UserOption } from '@/support/types/domain/common';
@@ -28,6 +29,7 @@ export type IncidentFormValues = {
     requester_user_id: string;
     responsible_user_id: string;
     qc_responsible_user_id: string;
+    collaborator_ids: string[];
     control_at: string;
 };
 
@@ -53,7 +55,7 @@ type IncidentFormProps = {
     brandOptions: UserOption[];
     evaluationOptions: UserOption[];
     readonlyFields?: IncidentReadonlyFields | null;
-    onChange: (key: keyof IncidentFormValues, value: string) => void;
+    onChange: (key: keyof IncidentFormValues, value: string | string[]) => void;
     onTypeChange: (typeId: string) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
@@ -67,6 +69,16 @@ function toSelectOptions(options: UserOption[]) {
         label: option.label,
         color: option.color ?? null,
     }));
+}
+
+function toActiveStatusSelectOptions(options: UserOption[], currentValue: string) {
+    return options
+        .filter((option) => option.is_open !== false || String(option.id) === currentValue)
+        .map((option) => ({
+            value: String(option.id),
+            label: option.label,
+            color: option.color ?? null,
+        }));
 }
 
 export function defaultIncidentFormValues(overrides: Partial<IncidentFormValues> = {}): IncidentFormValues {
@@ -84,6 +96,7 @@ export function defaultIncidentFormValues(overrides: Partial<IncidentFormValues>
         requester_user_id: '',
         responsible_user_id: '',
         qc_responsible_user_id: '',
+        collaborator_ids: [],
         control_at: '',
         ...overrides,
     };
@@ -161,7 +174,8 @@ export function IncidentForm({
         ? t(`incidents.originKinds.${values.origin_type}`)
         : t('incidents.origin');
 
-    const showOriginTypePicker = Boolean(workflow?.origin_selectable);
+    const isEdit = mode === 'edit';
+    const showOriginTypePicker = Boolean(workflow?.origin_selectable) && !isEdit;
     const showOriginEntity = Boolean(workflow && (workflow.origin_options.length > 0 || workflow.origin_required));
     const showRelated = Boolean(workflow?.show_related);
     const originRequired = Boolean(workflow?.origin_required);
@@ -180,6 +194,7 @@ export function IncidentForm({
                             id="incident_type_id"
                             value={values.incident_type_id}
                             invalid={Boolean(errors.incident_type_id)}
+                            disabled={isEdit}
                             onChange={onTypeChange}
                             emptyLabel={t('common.select')}
                             options={incidentTypeOptions.map((option) => ({
@@ -343,6 +358,22 @@ export function IncidentForm({
                     </Field>
 
                     <Field
+                        label={t('incidents.collaborators')}
+                        htmlFor="collaborator_ids"
+                        error={errors.collaborator_ids}
+                        className="sm:col-span-2"
+                    >
+                        <MultiSelect
+                            id="collaborator_ids"
+                            value={values.collaborator_ids}
+                            onChange={(collaboratorIds) => onChange('collaborator_ids', collaboratorIds)}
+                            options={toSelectOptions(userOptions)}
+                            placeholder={t('incidents.collaboratorsPlaceholder')}
+                            invalid={Boolean(errors.collaborator_ids)}
+                        />
+                    </Field>
+
+                    <Field
                         label={t('incidents.subject')}
                         htmlFor="subject"
                         error={errors.subject}
@@ -390,11 +421,26 @@ export function IncidentForm({
                                     id="incident_status_id"
                                     value={values.incident_status_id}
                                     invalid={Boolean(errors.incident_status_id)}
+                                    disabled
                                     onChange={(value) => onChange('incident_status_id', value)}
                                     emptyLabel={t('common.select')}
-                                    options={toSelectOptions(incidentStatusOptions)}
+                                    options={toActiveStatusSelectOptions(
+                                        incidentStatusOptions,
+                                        values.incident_status_id,
+                                    )}
                                 />
+                                <p className="mt-1 text-xs text-ink-muted">{t('incidents.statusViaActionsHint')}</p>
                             </Field>
+
+                            {!showOriginTypePicker && values.origin_type ? (
+                                <Field label={t('incidents.originKind')} htmlFor="origin_type_readonly">
+                                    <Input
+                                        id="origin_type_readonly"
+                                        value={t(`incidents.originKinds.${values.origin_type}`)}
+                                        disabled
+                                    />
+                                </Field>
+                            ) : null}
 
                             <Field
                                 label={t('incidents.requesterUser')}

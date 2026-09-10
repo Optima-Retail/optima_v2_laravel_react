@@ -3,6 +3,7 @@ import { Head, useForm } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { defaultIncidentFormValues, IncidentForm } from '@/components/incidents/IncidentForm';
+import { IncidentLinesPanel } from '@/components/incidents/IncidentLinesPanel';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
@@ -12,6 +13,7 @@ import type { UserOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type {
     IncidentFormData,
+    IncidentLineItem,
     IncidentSubtypeOption,
     IncidentTypeOption,
     IncidentTypeWorkflowMap,
@@ -19,8 +21,10 @@ import type {
 
 type EditIncidentProps = {
     incident: IncidentFormData;
+    lines: IncidentLineItem[];
     typeWorkflow: IncidentTypeWorkflowMap;
     incidentStatusOptions: UserOption[];
+    lineStatusOptions: UserOption[];
     incidentPriorityOptions: UserOption[];
     incidentTypeOptions: IncidentTypeOption[];
     incidentSubtypeOptions: IncidentSubtypeOption[];
@@ -31,13 +35,16 @@ type EditIncidentProps = {
     evaluationOptions: UserOption[];
     can: {
         delete: boolean;
+        create_line: boolean;
     };
 };
 
 export default function EditIncident({
     incident,
+    lines,
     typeWorkflow,
     incidentStatusOptions,
+    lineStatusOptions,
     incidentPriorityOptions,
     incidentTypeOptions,
     incidentSubtypeOptions,
@@ -72,6 +79,7 @@ export default function EditIncident({
             qc_responsible_user_id: incident.qc_responsible_user_id
                 ? String(incident.qc_responsible_user_id)
                 : '',
+            collaborator_ids: (incident.collaborator_ids ?? []).map(String),
             control_at: incident.control_at ?? '',
         }),
     );
@@ -169,6 +177,14 @@ export default function EditIncident({
                             </Button>
                         ) : null
                     }
+                />
+
+                <IncidentLinesPanel
+                    incidentId={incident.id}
+                    lines={lines}
+                    incidentStatusOptions={lineStatusOptions}
+                    canCreate={can.create_line}
+                    durationSeconds={incident.duration_seconds}
                 />
             </div>
         </AppLayout>

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
@@ -35,6 +36,7 @@ export type EstablishmentFormValues = {
     series_id: string;
     billing_company_id: string;
     responsible_user_id: string;
+    collaborator_ids: string[];
     is_active: boolean;
     is_client_priority: boolean;
     is_reviewed: boolean;
@@ -69,7 +71,7 @@ type EstablishmentFormProps = {
     establishmentTypeOptions: UserOption[];
     seriesOptions: UserOption[];
     userOptions: UserOption[];
-    onChange: (key: keyof EstablishmentFormValues, value: string | boolean) => void;
+    onChange: (key: keyof EstablishmentFormValues, value: string | boolean | string[]) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
     submitIcon?: ReactNode;
@@ -112,6 +114,7 @@ export function defaultEstablishmentFormValues(overrides: Partial<EstablishmentF
         series_id: '',
         billing_company_id: '',
         responsible_user_id: '',
+        collaborator_ids: [],
         is_active: true,
         is_client_priority: false,
         is_reviewed: false,
@@ -159,6 +162,7 @@ export function establishmentFormValuesFromData(establishment: EstablishmentForm
         series_id: id(establishment.series_id),
         billing_company_id: id(establishment.billing_company_id),
         responsible_user_id: id(establishment.responsible_user_id),
+        collaborator_ids: (establishment.collaborator_ids ?? []).map(String),
         is_active: establishment.is_active,
         is_client_priority: bool(establishment.is_client_priority),
         is_reviewed: bool(establishment.is_reviewed),
@@ -472,6 +476,22 @@ export function EstablishmentForm({
                             onChange={(value) => onChange('responsible_user_id', value)}
                             emptyLabel={t('common.none')}
                             options={toSelectOptions(userOptions)}
+                        />
+                    </Field>
+
+                    <Field
+                        label={t('establishments.collaborators')}
+                        htmlFor="collaborator_ids"
+                        error={errors.collaborator_ids}
+                        className="sm:col-span-2"
+                    >
+                        <MultiSelect
+                            id="collaborator_ids"
+                            value={values.collaborator_ids}
+                            onChange={(collaboratorIds) => onChange('collaborator_ids', collaboratorIds)}
+                            options={toSelectOptions(userOptions)}
+                            placeholder={t('establishments.collaboratorsPlaceholder')}
+                            invalid={Boolean(errors.collaborator_ids)}
                         />
                     </Field>
                     </div>

@@ -13,4 +13,5 @@ export type IncidentStatusFormData = {
     color: string | null;
     lifecycle: number | null;
     is_open: boolean;
+    excluded_type_ids: number[];
 };

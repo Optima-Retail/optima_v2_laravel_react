@@ -15,6 +15,7 @@ use App\Models\Timezone;
 use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 final class EstablishmentService
@@ -102,7 +103,10 @@ final class EstablishmentService
     public function create(array $data): Establishment
     {
         return DB::transaction(function () use ($data): Establishment {
-            return Establishment::query()->create($this->attributes($data))->load(['company', 'country', 'timezone', 'delegation']);
+            $establishment = Establishment::query()->create($this->attributes($data));
+            $establishment->collaborators()->sync($data['collaborator_ids'] ?? []);
+
+            return $establishment->load(['company', 'country', 'timezone', 'delegation', 'collaborators']);
         });
     }
 
@@ -113,8 +117,9 @@ final class EstablishmentService
     {
         return DB::transaction(function () use ($establishment, $data): Establishment {
             $establishment->update($this->attributes($data));
+            $establishment->collaborators()->sync($data['collaborator_ids'] ?? []);
 
-            return $establishment->fresh(['company', 'country', 'timezone', 'billingCompany', 'delegation']) ?? $establishment;
+            return $establishment->fresh(['company', 'country', 'timezone', 'billingCompany', 'delegation', 'collaborators']) ?? $establishment;
         });
     }
 
@@ -125,6 +130,7 @@ final class EstablishmentService
         }
 
         DB::transaction(function () use ($establishment): void {
+            $establishment->collaborators()->detach();
             $establishment->softDeleteSafely();
         });
     }
@@ -230,10 +236,13 @@ final class EstablishmentService
      */
     public function toFormData(Establishment $establishment): array
     {
+        $establishment->loadMissing('collaborators');
+
         return [
             'id' => $establishment->id,
             'company_id' => $establishment->company_id,
             'name' => $establishment->name,
+            'collaborator_ids' => $establishment->collaborators->pluck('id')->values()->all(),
             'code' => $establishment->code,
             'store_code' => $establishment->store_code,
             'alternate_store_code' => $establishment->alternate_store_code,
@@ -320,6 +329,8 @@ final class EstablishmentService
      */
     private function attributes(array $data): array
     {
+        $data = Arr::except($data, ['collaborator_ids']);
+
         foreach ([
             'code', 'store_code', 'alternate_store_code', 'phone', 'email', 'emails', 'recipient_emails',
             'address_line_1', 'address_line_2', 'city', 'province_id', 'postal_code',

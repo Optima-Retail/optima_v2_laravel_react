@@ -6,18 +6,28 @@ import { IncidentStatusForm } from '@/components/config/incident-statuses/Incide
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { incidentStatusesService } from '@/services';
+import type { UserOption } from '@/support/types/domain/common';
 
-export default function CreateIncidentStatus() {
+type CreateIncidentStatusProps = {
+    incidentTypeOptions: UserOption[];
+};
+
+export default function CreateIncidentStatus({ incidentTypeOptions }: CreateIncidentStatusProps) {
     const { t } = useTranslation();
     const form = useForm({
         name: '',
         color: '#a9cef0',
         lifecycle: 1,
         is_open: true,
+        excluded_type_ids: [] as string[],
     });
 
     function submit(event: FormEvent) {
         event.preventDefault();
+        form.transform((data) => ({
+            ...data,
+            excluded_type_ids: data.excluded_type_ids.map(Number),
+        }));
         incidentStatusesService.store(form);
     }
 
@@ -38,6 +48,7 @@ export default function CreateIncidentStatus() {
                     values={form.data}
                     errors={form.errors}
                     processing={form.processing}
+                    incidentTypeOptions={incidentTypeOptions}
                     onChange={(key, value) =>
                         form.setData((data) => ({
                             ...data,

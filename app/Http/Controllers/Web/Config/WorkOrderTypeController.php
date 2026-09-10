@@ -90,6 +90,7 @@ final class WorkOrderTypeController extends Controller
 
         return Inertia::render('Config/WorkOrderTypes/Edit', [
             'workOrderType' => $this->workOrderTypes->toFormData($workOrderType),
+            'serviceTypeOptions' => $this->workOrderTypes->serviceTypeOptions(),
             'can' => [
                 'delete' => $request->user()?->can('delete', $workOrderType) ?? false,
             ],
@@ -98,10 +99,14 @@ final class WorkOrderTypeController extends Controller
 
     public function update(UpdateWorkOrderTypeRequest $request, WorkOrderType $workOrderType): RedirectResponse
     {
+        /** @var list<int> $serviceTypeIds */
+        $serviceTypeIds = array_map('intval', $request->validated('service_type_ids') ?? []);
+
         $this->workOrderTypes->update($workOrderType, [
             'name' => $request->string('name')->toString(),
             'code' => $request->input('code'),
             'color' => $request->input('color'),
+            'service_type_ids' => $serviceTypeIds,
         ]);
 
         return redirect()

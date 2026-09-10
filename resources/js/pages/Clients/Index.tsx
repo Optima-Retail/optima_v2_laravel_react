@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import { Handshake, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CellComponent, ColumnDefinition } from 'tabulator-tables';
+import { ClientArticlesModal } from '@/components/clients/ClientArticlesModal';
 import { ClientEstablishmentsModal } from '@/components/clients/ClientEstablishmentsModal';
 import { badgeVariantForRelationshipStatus } from '@/components/ui/Badge';
 import { PageHeader } from '@/components/page/PageHeader';
@@ -19,6 +20,7 @@ import {
     isActionClick,
     isDeleteActionClick,
     tabulatorActionsCell,
+    tabulatorArticlesButton,
     tabulatorBadge,
     tabulatorDeleteButton,
     tabulatorEditLink,
@@ -44,18 +46,36 @@ type EstablishmentsModalState = {
     clientName: string;
 } | null;
 
+type ArticlesModalState = {
+    relationshipId: number;
+    clientName: string;
+} | null;
+
 export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
     const { t, i18n } = useTranslation();
     const canUpdate = useCan('company_relationships.update');
     const canDelete = useCan('company_relationships.delete');
     const canEditEstablishments = useCan('establishments.update');
+    const canViewArticles = useCan('articles.view');
+    const canEditArticles =
+        canUpdate &&
+        (useCan('articles.create') || useCan('articles.update') || useCan('articles.delete'));
     const tableRef = useRef<RemoteDataTableHandle>(null);
-    const canRef = useRef({ update: canUpdate, delete: canDelete });
+    const canRef = useRef({
+        update: canUpdate,
+        delete: canDelete,
+        viewArticles: canViewArticles,
+    });
     const [establishmentsModal, setEstablishmentsModal] = useState<EstablishmentsModalState>(null);
+    const [articlesModal, setArticlesModal] = useState<ArticlesModalState>(null);
 
     useEffect(() => {
-        canRef.current = { update: canUpdate, delete: canDelete };
-    }, [canUpdate, canDelete]);
+        canRef.current = {
+            update: canUpdate,
+            delete: canDelete,
+            viewArticles: canViewArticles,
+        };
+    }, [canUpdate, canDelete, canViewArticles]);
 
     function buildColumns({ titleFormatter, getTable }: RemoteDataColumnHelpers): ColumnDefinition[] {
         return [
@@ -103,7 +123,7 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
             {
                 title: t('common.actions'),
                 field: 'actions',
-                width: 140,
+                width: 140 + (canViewArticles ? 36 : 0),
                 hozAlign: 'right',
                 headerHozAlign: 'right',
                 headerSort: false,
@@ -113,6 +133,10 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                     const parts: string[] = [
                         tabulatorEstablishmentsButton(t('clients.viewEstablishments', { name })),
                     ];
+
+                    if (canRef.current.viewArticles) {
+                        parts.push(tabulatorArticlesButton(t('clients.viewArticles', { name })));
+                    }
 
                     if (canRef.current.update) {
                         parts.push(
@@ -133,6 +157,16 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                     if (isActionClick(event, 'establishments')) {
                         event.preventDefault();
                         setEstablishmentsModal({
+                            relationshipId: client.id,
+                            clientName: name,
+                        });
+
+                        return;
+                    }
+
+                    if (isActionClick(event, 'articles')) {
+                        event.preventDefault();
+                        setArticlesModal({
                             relationshipId: client.id,
                             clientName: name,
                         });
@@ -210,7 +244,7 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                     syncUrlBase={clientsService.indexPath}
                     emptyIcon={<Handshake className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('clients.resourcePlural') })}
-                    deps={[i18n.language]}
+                    deps={[i18n.language, canViewArticles]}
                 />
             </div>
 
@@ -221,6 +255,16 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                     clientName={establishmentsModal.clientName}
                     canEdit={canEditEstablishments}
                     onClose={() => setEstablishmentsModal(null)}
+                />
+            ) : null}
+
+            {articlesModal ? (
+                <ClientArticlesModal
+                    open
+                    relationshipId={articlesModal.relationshipId}
+                    clientName={articlesModal.clientName}
+                    canEdit={canEditArticles}
+                    onClose={() => setArticlesModal(null)}
                 />
             ) : null}
         </AppLayout>

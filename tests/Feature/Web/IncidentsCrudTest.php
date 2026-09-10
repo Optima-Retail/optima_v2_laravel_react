@@ -112,6 +112,7 @@ final class IncidentsCrudTest extends TestCase
                 'incident_priority_id' => $priority->id,
                 'incident_status_id' => $status->id,
                 'responsible_user_id' => $admin->id,
+                'collaborator_ids' => [$admin->id],
                 'origin_type' => 'establishment',
                 'origin_id' => $establishment->id,
                 'related_type' => null,
@@ -130,6 +131,10 @@ final class IncidentsCrudTest extends TestCase
             'origin_id' => $establishment->id,
             'establishment_id' => $establishment->id,
         ]);
+        $this->assertDatabaseHas('incident_collaborators', [
+            'incident_id' => $incident->id,
+            'user_id' => $admin->id,
+        ]);
 
         $this->actingAs($admin)
             ->getJson('/incidents/data')
@@ -147,7 +152,50 @@ final class IncidentsCrudTest extends TestCase
                 ->component('Incidents/Edit')
                 ->where('incident.subject', 'QC incident follow-up')
                 ->where('incident.origin_type', 'establishment')
-                ->where('incident.origin_id', $establishment->id));
+                ->where('incident.origin_id', $establishment->id)
+                ->where('incident.collaborator_ids', [$admin->id])
+                ->has('lines')
+                ->has('can.create_line'));
+
+        $review = IncidentStatus::query()->create([
+            'name' => 'En revisión',
+            'color' => '#c7dbda',
+            'lifecycle' => 2,
+            'is_open' => true,
+        ]);
+
+        $closed = IncidentStatus::query()->create([
+            'name' => 'Finalizada',
+            'color' => '#c7c7c7',
+            'lifecycle' => 4,
+            'is_open' => false,
+        ]);
+
+        $this->actingAs($admin)
+            ->post("/incidents/{$incident->id}/lines", [
+                'comment' => 'Closed statuses are not allowed in Acciones',
+                'incident_status_id' => $closed->id,
+            ])
+            ->assertSessionHasErrors('incident_status_id');
+
+        $this->actingAs($admin)
+            ->post("/incidents/{$incident->id}/lines", [
+                'comment' => 'Moved to review after follow-up',
+                'incident_status_id' => $review->id,
+            ])
+            ->assertRedirect(route('incidents.edit', $incident))
+            ->assertSessionHas('success', 'incident_line_created_successfully');
+
+        $this->assertDatabaseHas('incident_lines', [
+            'incident_id' => $incident->id,
+            'comment' => 'Moved to review after follow-up',
+            'incident_status_id' => $review->id,
+            'user_id' => $admin->id,
+        ]);
+
+        $incident->refresh();
+        $this->assertSame($review->id, $incident->incident_status_id);
+        $this->assertNull($incident->closed_at);
 
         $this->actingAs($admin)
             ->put("/incidents/{$incident->id}", [
@@ -158,6 +206,7 @@ final class IncidentsCrudTest extends TestCase
                 'incident_priority_id' => $priority->id,
                 'incident_status_id' => $status->id,
                 'responsible_user_id' => $admin->id,
+                'collaborator_ids' => [],
                 'origin_type' => 'establishment',
                 'origin_id' => $establishment->id,
                 'control_at' => '2026-02-02T11:00',
@@ -172,6 +221,15 @@ final class IncidentsCrudTest extends TestCase
             'origin_type' => 'establishment',
             'origin_id' => $establishment->id,
         ]);
+        $this->assertDatabaseMissing('incident_collaborators', [
+            'incident_id' => $incident->id,
+            'user_id' => $admin->id,
+        ]);
+
+        $incident->refresh();
+        // Header save must not change status/type (same as Optima show — status only via Acciones).
+        $this->assertSame($review->id, $incident->incident_status_id);
+        $this->assertSame($type->id, $incident->incident_type_id);
 
         $this->actingAs($admin)
             ->delete("/incidents/{$incident->id}")

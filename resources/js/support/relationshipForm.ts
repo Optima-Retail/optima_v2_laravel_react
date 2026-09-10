@@ -4,8 +4,11 @@ export type RelationshipProfileValues = {
     delegation_id: string;
     billing_language_id: string;
     series_id: string;
-    rating_type_id: string;
     priority_ids: string[];
+    collaborator_ids: string[];
+    service_type_ids: string[];
+    global_service_type_ids: string[];
+    alternative_delegation_ids: string[];
     integration_id: string;
     integration_external_id: string;
     corrective_work_order_owner_id: string;
@@ -77,8 +80,11 @@ export const defaultRelationshipProfileValues = (): RelationshipProfileValues =>
     delegation_id: '',
     billing_language_id: '',
     series_id: '',
-    rating_type_id: '',
     priority_ids: [],
+    collaborator_ids: [],
+    service_type_ids: [],
+    global_service_type_ids: [],
+    alternative_delegation_ids: [],
     integration_id: '',
     integration_external_id: '',
     corrective_work_order_owner_id: '',
@@ -171,8 +177,11 @@ export function relationshipFormValuesFromData(
         delegation_id: id(relationship.delegation_id),
         billing_language_id: id(relationship.billing_language_id),
         series_id: id(relationship.series_id),
-        rating_type_id: id(relationship.rating_type_id),
         priority_ids: (relationship.priority_ids ?? []).map(String),
+        collaborator_ids: (relationship.collaborator_ids ?? []).map(String),
+        service_type_ids: (relationship.service_type_ids ?? []).map(String),
+        global_service_type_ids: (relationship.global_service_type_ids ?? []).map(String),
+        alternative_delegation_ids: (relationship.alternative_delegation_ids ?? []).map(String),
         integration_id: id(relationship.integration_id),
         integration_external_id: relationship.integration_external_id ?? '',
         corrective_work_order_owner_id: id(relationship.corrective_work_order_owner_id),

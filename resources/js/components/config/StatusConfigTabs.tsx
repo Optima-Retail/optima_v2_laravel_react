@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ConfigNavTabs, type ConfigNavTab } from '@/components/config/ConfigNavTabs';
 import { useCan } from '@/hooks/useAuth';
 
-export type StatusConfigTabId = 'work-order' | 'contract' | 'evaluation' | 'incident';
+export type StatusConfigTabId = 'work-order' | 'contract' | 'evaluation' | 'incident' | 'form';
 
 type StatusConfigTabsProps = {
     activeId: StatusConfigTabId;
@@ -16,6 +16,7 @@ export function StatusConfigTabs({ activeId }: StatusConfigTabsProps) {
     const canContract = useCan('contract_statuses.view');
     const canEvaluation = useCan('evaluation_statuses.view');
     const canIncident = useCan('incident_statuses.view');
+    const canForm = useCan('form_statuses.view');
 
     const tabs = useMemo(() => {
         const items: ConfigNavTab[] = [];
@@ -52,8 +53,16 @@ export function StatusConfigTabs({ activeId }: StatusConfigTabsProps) {
             });
         }
 
+        if (canForm) {
+            items.push({
+                id: 'form',
+                href: '/config/form-statuses',
+                label: t('formStatuses.resourcePlural'),
+            });
+        }
+
         return items.sort((a, b) => a.label.localeCompare(b.label, i18n.language, { sensitivity: 'base' }));
-    }, [canContract, canEvaluation, canIncident, canWorkOrder, i18n.language, t]);
+    }, [canContract, canEvaluation, canForm, canIncident, canWorkOrder, i18n.language, t]);
 
     return <ConfigNavTabs tabs={tabs} activeId={activeId} alwaysShow />;
 }

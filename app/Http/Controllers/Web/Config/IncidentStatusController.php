@@ -68,7 +68,9 @@ final class IncidentStatusController extends Controller
     {
         $this->authorize('create', IncidentStatus::class);
 
-        return Inertia::render('Config/IncidentStatuses/Create');
+        return Inertia::render('Config/IncidentStatuses/Create', [
+            'incidentTypeOptions' => $this->incidentStatuses->incidentTypeOptions(),
+        ]);
     }
 
     public function store(StoreIncidentStatusRequest $request): RedirectResponse
@@ -78,6 +80,7 @@ final class IncidentStatusController extends Controller
             'color' => $request->input('color'),
             'lifecycle' => $request->input('lifecycle'),
             'is_open' => $request->boolean('is_open'),
+            'excluded_type_ids' => $request->input('excluded_type_ids', []),
         ]);
 
         return redirect()
@@ -91,6 +94,7 @@ final class IncidentStatusController extends Controller
 
         return Inertia::render('Config/IncidentStatuses/Edit', [
             'incidentStatus' => $this->incidentStatuses->toFormData($incidentStatus),
+            'incidentTypeOptions' => $this->incidentStatuses->incidentTypeOptions(),
             'can' => [
                 'delete' => $request->user()?->can('delete', $incidentStatus) ?? false,
             ],
@@ -104,6 +108,7 @@ final class IncidentStatusController extends Controller
             'color' => $request->input('color'),
             'lifecycle' => $request->input('lifecycle'),
             'is_open' => $request->boolean('is_open'),
+            'excluded_type_ids' => $request->input('excluded_type_ids', []),
         ]);
 
         return redirect()

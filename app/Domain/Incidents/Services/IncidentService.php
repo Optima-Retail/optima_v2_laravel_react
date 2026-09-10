@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Incidents\Services;
 
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Domain\Incidents\Support\IncidentLineStatusRules;
 use App\Models\Brand;
 use App\Models\Company;
 use App\Models\Establishment;
@@ -17,10 +18,15 @@ use App\Models\IncidentType;
 use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 final class IncidentService
 {
+    public function __construct(
+        private readonly IncidentLineStatusRules $lineStatusRules,
+    ) {}
+
     /**
      * Client company IDs linked to the owner (kind = customer).
      *
@@ -95,10 +101,10 @@ final class IncidentService
     }
 
     /**
-     * Active (`is_open`) statuses for incident forms.
+     * Active (`is_open`) statuses for create / header display.
      * Optionally keep a current inactive status so edit still shows the saved value.
      *
-     * @return list<array{id: int, label: string, color: string|null}>
+     * @return list<array{id: int, label: string, color: string|null, is_open: bool}>
      */
     public function incidentStatusOptions(?int $includeId = null): array
     {
@@ -112,14 +118,43 @@ final class IncidentService
             })
             ->orderBy('lifecycle')
             ->orderBy('name')
-            ->get(['id', 'name', 'color'])
+            ->get(['id', 'name', 'color', 'is_open'])
             ->map(fn (IncidentStatus $status): array => [
                 'id' => $status->id,
                 'label' => $status->name,
                 'color' => $status->color,
+                'is_open' => (bool) $status->is_open,
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Statuses available when adding an Acciones line: open statuses only (`is_open`).
+     * Type exclusions come from `incident_status_type_exclusions`.
+     *
+     * @return list<array{id: int, label: string, color: string|null, is_open: bool}>
+     */
+    public function selectableIncidentStatusOptions(?Incident $incident = null): array
+    {
+        $options = IncidentStatus::query()
+            ->where('is_open', true)
+            ->orderBy('lifecycle')
+            ->orderBy('name')
+            ->get(['id', 'name', 'color', 'is_open'])
+            ->map(fn (IncidentStatus $status): array => [
+                'id' => $status->id,
+                'label' => $status->name,
+                'color' => $status->color,
+                'is_open' => (bool) $status->is_open,
+            ])
+            ->values()
+            ->all();
+
+        return $this->lineStatusRules->filterStatusOptions(
+            $incident?->incident_type_id !== null ? (int) $incident->incident_type_id : null,
+            $options,
+        );
     }
 
     /**
@@ -419,6 +454,7 @@ final class IncidentService
             }
 
             $incident = Incident::query()->create($attributes);
+            $incident->collaborators()->sync($data['collaborator_ids'] ?? []);
 
             return $incident->load([
                 'establishment',
@@ -430,6 +466,7 @@ final class IncidentService
                 'requesterUser',
                 'responsibleUser',
                 'qcResponsibleUser',
+                'collaborators',
             ]);
         });
     }
@@ -440,7 +477,18 @@ final class IncidentService
     public function update(Incident $incident, array $data): Incident
     {
         return DB::transaction(function () use ($incident, $data): Incident {
-            $incident->update($this->attributes($data));
+            // Match prod show: tipo / estado / origen_modelo / relacion_modelo are not changed via header save.
+            $attributes = $this->attributes($data);
+            $attributes['incident_type_id'] = $incident->incident_type_id;
+            $attributes['incident_status_id'] = $incident->incident_status_id;
+            $attributes['origin_type'] = $incident->origin_type;
+            $attributes['related_type'] = $incident->related_type;
+            $attributes['closed_at'] = $incident->closed_at;
+            $attributes['duration_seconds'] = $incident->duration_seconds;
+            $attributes['qc_duration_seconds'] = $incident->qc_duration_seconds;
+
+            $incident->update($attributes);
+            $incident->collaborators()->sync($data['collaborator_ids'] ?? []);
 
             return $incident->fresh([
                 'establishment',
@@ -452,6 +500,7 @@ final class IncidentService
                 'requesterUser',
                 'responsibleUser',
                 'qcResponsibleUser',
+                'collaborators',
             ]) ?? $incident;
         });
     }
@@ -462,7 +511,10 @@ final class IncidentService
             return;
         }
 
-        $incident->delete();
+        DB::transaction(function () use ($incident): void {
+            $incident->collaborators()->detach();
+            $incident->delete();
+        });
     }
 
     /**
@@ -470,10 +522,13 @@ final class IncidentService
      */
     public function toFormData(Incident $incident): array
     {
+        $incident->loadMissing('collaborators');
+
         return [
             'id' => $incident->id,
             'subject' => $incident->subject,
             'comment' => $incident->comment,
+            'collaborator_ids' => $incident->collaborators->pluck('id')->values()->all(),
             'establishment_id' => $incident->establishment_id,
             'evaluation_id' => $incident->evaluation_id,
             'incident_status_id' => $incident->incident_status_id,
@@ -544,7 +599,7 @@ final class IncidentService
         $establishmentId = $originType === 'establishment' ? $originId : null;
         $evaluationId = $relatedType === 'evaluation' ? $relatedId : null;
 
-        return [
+        return Arr::except([
             'subject' => $data['subject'] ?? null,
             'comment' => $data['comment'] ?? null,
             'establishment_id' => $establishmentId,
@@ -561,6 +616,6 @@ final class IncidentService
             'origin_id' => $originId,
             'related_type' => $relatedType,
             'related_id' => $relatedId,
-        ];
+        ], ['collaborator_ids']);
     }
 }
