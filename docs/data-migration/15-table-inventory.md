@@ -8,7 +8,7 @@ Quick reference in three parts:
 
 **Important:** most areas have **schema + CRUD** only. Production **rows** are generally **not** copied yet.
 
-See also: [01-table-mapping.md](01-table-mapping.md), [09](09-work-orders.md)–[14](14-contract-iterations.md).
+See also: [01-table-mapping.md](01-table-mapping.md), [09](09-work-orders.md)–[14](14-contract-iterations.md), [16](16-technician-requests.md).
 
 ---
 
@@ -94,6 +94,11 @@ See also: [01-table-mapping.md](01-table-mapping.md), [09](09-work-orders.md)–
 | `felicitaciones` | `compliments` |
 | `felicitacion_usuario` | `compliment_user` |
 | `archivos` (felicitacion) | `compliment_attachments` |
+| `peticiones` | `technician_requests` |
+| `peticiones_tipos_servicios` | `technician_request_service_type` |
+| `peticion_tecnico` | `technician_request_technician` |
+| `tecnicos_prioridades` | `technician_request_priorities` |
+| `estados` (peticiones / filtraje) | `technician_request_statuses` |
 | `formularios_tipos` | `form_types` |
 | `formularios_estados` | `form_statuses` |
 | `biblias` | `form_bibles` |
@@ -154,7 +159,6 @@ Also “new as a table shape” (legacy was polymorphic or two tables):
 | `chats` / `lineas_chats` | Messaging |
 | `historial_cambios_estados` | Status audit |
 | `ot_visita` | OT visits |
-| `peticiones` | Requests |
 | `prl_tickets` | PRL |
 | `avisos_app` | App notices |
 | OOH / nora / graph-email OT tables | Ops side-channels |
@@ -215,3 +219,4 @@ These appear in [01-table-mapping.md](01-table-mapping.md) as intended targets; 
 | [12-saved-filters.md](12-saved-filters.md) | Filtros |
 | [13-forms-and-templates.md](13-forms-and-templates.md) | Plantillas / formularios |
 | [14-contract-iterations.md](14-contract-iterations.md) | Iteraciones |
+| [16-technician-requests.md](16-technician-requests.md) | Peticiones / filtraje |

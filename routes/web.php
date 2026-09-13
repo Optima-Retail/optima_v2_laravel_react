@@ -47,6 +47,8 @@ use App\Http\Controllers\Web\Config\TeamController;
 use App\Http\Controllers\Web\Config\TechnicianAttendanceConfirmationTypeController;
 use App\Http\Controllers\Web\Config\TechnicianIncidentStatusController;
 use App\Http\Controllers\Web\Config\TechnicianIncidentTypeController;
+use App\Http\Controllers\Web\Config\TechnicianRequestPriorityController;
+use App\Http\Controllers\Web\Config\TechnicianRequestStatusController;
 use App\Http\Controllers\Web\Config\TimezoneController;
 use App\Http\Controllers\Web\Config\UserController;
 use App\Http\Controllers\Web\Config\VehicleController;
@@ -64,6 +66,7 @@ use App\Http\Controllers\Web\Incidents\IncidentController;
 use App\Http\Controllers\Web\LocaleController;
 use App\Http\Controllers\Web\SavedFilters\SavedFilterController;
 use App\Http\Controllers\Web\SwitchCompany\SwitchCompanyController;
+use App\Http\Controllers\Web\TechnicianRequests\TechnicianRequestController;
 use App\Http\Controllers\Web\Technicians\TechnicianIncidentController;
 use App\Http\Controllers\Web\WorkOrders\WorkOrderController;
 use Illuminate\Support\Facades\Route;
@@ -200,6 +203,47 @@ Route::middleware('auth')->group(function (): void {
                 ->name('technician-incidents.status.update');
             Route::post('/technician-incidents/{technician_incident}/verify', [TechnicianIncidentController::class, 'verify'])
                 ->name('technician-incidents.verify');
+        });
+
+        Route::middleware('permission:technician_requests.view')->group(function (): void {
+            Route::get('/technician-requests', [TechnicianRequestController::class, 'index'])->name('technician-requests.index');
+            Route::get('/technician-requests/data', [TechnicianRequestController::class, 'data'])->name('technician-requests.data');
+        });
+
+        Route::middleware('permission:technician_requests.create')->group(function (): void {
+            Route::get('/technician-requests/create', [TechnicianRequestController::class, 'create'])->name('technician-requests.create');
+            Route::post('/technician-requests', [TechnicianRequestController::class, 'store'])->name('technician-requests.store');
+        });
+
+        Route::middleware('permission:technician_requests.update')->group(function (): void {
+            Route::get('/technician-requests/{technician_request}/edit', [TechnicianRequestController::class, 'edit'])
+                ->whereNumber('technician_request')
+                ->name('technician-requests.edit');
+            Route::put('/technician-requests/{technician_request}', [TechnicianRequestController::class, 'update'])
+                ->whereNumber('technician_request')
+                ->name('technician-requests.update');
+            Route::post('/technician-requests/{technician_request}/screenings', [TechnicianRequestController::class, 'createScreening'])
+                ->whereNumber('technician_request')
+                ->name('technician-requests.screenings.store');
+            Route::post('/technician-requests/{technician_request}/cancel', [TechnicianRequestController::class, 'cancel'])
+                ->whereNumber('technician_request')
+                ->name('technician-requests.cancel');
+            Route::post('/technician-requests/{technician_request}/technicians', [TechnicianRequestController::class, 'attachTechnician'])
+                ->whereNumber('technician_request')
+                ->name('technician-requests.technicians.attach');
+            Route::delete(
+                '/technician-requests/{technician_request}/technicians/{company_relationship}',
+                [TechnicianRequestController::class, 'detachTechnician'],
+            )
+                ->whereNumber('technician_request')
+                ->whereNumber('company_relationship')
+                ->name('technician-requests.technicians.detach');
+        });
+
+        Route::middleware('permission:technician_requests.delete')->group(function (): void {
+            Route::delete('/technician-requests/{technician_request}', [TechnicianRequestController::class, 'destroy'])
+                ->whereNumber('technician_request')
+                ->name('technician-requests.destroy');
         });
 
         Route::middleware('permission:establishments.view')->group(function (): void {
@@ -749,6 +793,28 @@ Route::middleware('auth')->group(function (): void {
             Route::delete('/incident-priorities/{incident_priority}', [IncidentPriorityController::class, 'destroy'])->name('incident-priorities.destroy');
         });
 
+        Route::middleware('permission:technician_request_priorities.view')->group(function (): void {
+            Route::get('/technician-request-priorities', [TechnicianRequestPriorityController::class, 'index'])->name('technician-request-priorities.index');
+            Route::get('/technician-request-priorities/data', [TechnicianRequestPriorityController::class, 'data'])->name('technician-request-priorities.data');
+        });
+
+        Route::middleware('permission:technician_request_priorities.create')->group(function (): void {
+            Route::get('/technician-request-priorities/create', [TechnicianRequestPriorityController::class, 'create'])->name('technician-request-priorities.create');
+            Route::post('/technician-request-priorities', [TechnicianRequestPriorityController::class, 'store'])->name('technician-request-priorities.store');
+        });
+
+        Route::middleware('permission:technician_request_priorities.update')->group(function (): void {
+            Route::get('/technician-request-priorities/{technician_request_priority}/edit', [TechnicianRequestPriorityController::class, 'edit'])
+                ->name('technician-request-priorities.edit');
+            Route::put('/technician-request-priorities/{technician_request_priority}', [TechnicianRequestPriorityController::class, 'update'])
+                ->name('technician-request-priorities.update');
+        });
+
+        Route::middleware('permission:technician_request_priorities.delete')->group(function (): void {
+            Route::delete('/technician-request-priorities/{technician_request_priority}', [TechnicianRequestPriorityController::class, 'destroy'])
+                ->name('technician-request-priorities.destroy');
+        });
+
         Route::middleware('permission:incident_types.view')->group(function (): void {
             Route::get('/incident-types', [IncidentTypeController::class, 'index'])->name('incident-types.index');
             Route::get('/incident-types/data', [IncidentTypeController::class, 'data'])->name('incident-types.data');
@@ -818,6 +884,28 @@ Route::middleware('auth')->group(function (): void {
 
         Route::middleware('permission:technician_incident_statuses.delete')->group(function (): void {
             Route::delete('/technician-incident-statuses/{technician_incident_status}', [TechnicianIncidentStatusController::class, 'destroy'])->name('technician-incident-statuses.destroy');
+        });
+
+        Route::middleware('permission:technician_request_statuses.view')->group(function (): void {
+            Route::get('/technician-request-statuses', [TechnicianRequestStatusController::class, 'index'])->name('technician-request-statuses.index');
+            Route::get('/technician-request-statuses/data', [TechnicianRequestStatusController::class, 'data'])->name('technician-request-statuses.data');
+        });
+
+        Route::middleware('permission:technician_request_statuses.create')->group(function (): void {
+            Route::get('/technician-request-statuses/create', [TechnicianRequestStatusController::class, 'create'])->name('technician-request-statuses.create');
+            Route::post('/technician-request-statuses', [TechnicianRequestStatusController::class, 'store'])->name('technician-request-statuses.store');
+        });
+
+        Route::middleware('permission:technician_request_statuses.update')->group(function (): void {
+            Route::get('/technician-request-statuses/{technician_request_status}/edit', [TechnicianRequestStatusController::class, 'edit'])
+                ->name('technician-request-statuses.edit');
+            Route::put('/technician-request-statuses/{technician_request_status}', [TechnicianRequestStatusController::class, 'update'])
+                ->name('technician-request-statuses.update');
+        });
+
+        Route::middleware('permission:technician_request_statuses.delete')->group(function (): void {
+            Route::delete('/technician-request-statuses/{technician_request_status}', [TechnicianRequestStatusController::class, 'destroy'])
+                ->name('technician-request-statuses.destroy');
         });
 
         Route::middleware('permission:checklists.view')->group(function (): void {

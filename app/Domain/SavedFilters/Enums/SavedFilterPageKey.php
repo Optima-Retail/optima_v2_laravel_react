@@ -25,6 +25,7 @@ enum SavedFilterPageKey: string
     case Incidents = 'incidents';
     case Brands = 'brands';
     case TechnicianIncidents = 'technician_incidents';
+    case TechnicianRequests = 'technician_requests';
 
     /**
      * @return list<string>

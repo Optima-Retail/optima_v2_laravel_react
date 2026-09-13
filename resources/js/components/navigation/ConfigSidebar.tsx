@@ -156,9 +156,9 @@ const configItems: ConfigItem[] = [
     {
         href: '/config/client-priorities',
         labelKey: 'nav.priorities',
-        matches: ['/config/client-priorities', '/config/incident-priorities'],
+        matches: ['/config/client-priorities', '/config/incident-priorities', '/config/technician-request-priorities'],
         icon: Flag,
-        anyPermissions: ['client_priorities.view', 'incident_priorities.view'],
+        anyPermissions: ['client_priorities.view', 'incident_priorities.view', 'technician_request_priorities.view'],
     },
     {
         href: '/config/roles',
@@ -204,6 +204,7 @@ const configItems: ConfigItem[] = [
             '/config/form-statuses',
             '/config/incident-statuses',
             '/config/technician-incident-statuses',
+            '/config/technician-request-statuses',
             '/config/work-order-statuses',
         ],
         icon: CircleDot,
@@ -213,6 +214,7 @@ const configItems: ConfigItem[] = [
             'form_statuses.view',
             'incident_statuses.view',
             'technician_incident_statuses.view',
+            'technician_request_statuses.view',
             'work_order_statuses.view',
         ],
     },
@@ -290,9 +292,11 @@ const matchPermission: Record<string, string> = {
     '/config/form-statuses': 'form_statuses.view',
     '/config/incident-statuses': 'incident_statuses.view',
     '/config/technician-incident-statuses': 'technician_incident_statuses.view',
+    '/config/technician-request-statuses': 'technician_request_statuses.view',
     '/config/work-order-statuses': 'work_order_statuses.view',
     '/config/client-priorities': 'client_priorities.view',
     '/config/incident-priorities': 'incident_priorities.view',
+    '/config/technician-request-priorities': 'technician_request_priorities.view',
     '/config/checklists': 'checklists.view',
 };
 
@@ -315,9 +319,11 @@ const matchLabelKey: Record<string, string> = {
     '/config/form-statuses': 'formStatuses.resourcePlural',
     '/config/incident-statuses': 'incidentStatuses.resourcePlural',
     '/config/technician-incident-statuses': 'technicianIncidentStatuses.resourcePlural',
+    '/config/technician-request-statuses': 'technicianRequestStatuses.resourcePlural',
     '/config/work-order-statuses': 'workOrderStatuses.resourcePlural',
     '/config/client-priorities': 'clientPriorities.resourcePlural',
     '/config/incident-priorities': 'incidentPriorities.resourcePlural',
+    '/config/technician-request-priorities': 'technicianRequestPriorities.resourcePlural',
     '/config/checklists': 'checklists.resourcePlural',
 };
 
@@ -378,6 +384,7 @@ export function useConfigPermissions(): Record<string, boolean> {
         'checklists.view': useCan('checklists.view'),
         'client_priorities.view': useCan('client_priorities.view'),
         'incident_priorities.view': useCan('incident_priorities.view'),
+        'technician_request_priorities.view': useCan('technician_request_priorities.view'),
         'incident_types.view': useCan('incident_types.view'),
         'technician_incident_types.view': useCan('technician_incident_types.view'),
         'integrations.view': useCan('integrations.view'),
@@ -398,6 +405,7 @@ export function useConfigPermissions(): Record<string, boolean> {
         'form_statuses.view': useCan('form_statuses.view'),
         'incident_statuses.view': useCan('incident_statuses.view'),
         'technician_incident_statuses.view': useCan('technician_incident_statuses.view'),
+        'technician_request_statuses.view': useCan('technician_request_statuses.view'),
         'currencies.view': useCan('currencies.view'),
         'delegations.view': useCan('delegations.view'),
     };

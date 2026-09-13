@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ConfigNavTabs, type ConfigNavTab } from '@/components/config/ConfigNavTabs';
 import { useCan } from '@/hooks/useAuth';
 
-export type PriorityConfigTabId = 'client' | 'incident';
+export type PriorityConfigTabId = 'client' | 'incident' | 'technician-request';
 
 type PriorityConfigTabsProps = {
     activeId: PriorityConfigTabId;
@@ -14,6 +14,7 @@ export function PriorityConfigTabs({ activeId }: PriorityConfigTabsProps) {
     const { t, i18n } = useTranslation();
     const canClient = useCan('client_priorities.view');
     const canIncident = useCan('incident_priorities.view');
+    const canTechnicianRequest = useCan('technician_request_priorities.view');
 
     const tabs = useMemo(() => {
         const items: ConfigNavTab[] = [];
@@ -34,8 +35,16 @@ export function PriorityConfigTabs({ activeId }: PriorityConfigTabsProps) {
             });
         }
 
+        if (canTechnicianRequest) {
+            items.push({
+                id: 'technician-request',
+                href: '/config/technician-request-priorities',
+                label: t('technicianRequestPriorities.resourcePlural'),
+            });
+        }
+
         return items.sort((a, b) => a.label.localeCompare(b.label, i18n.language, { sensitivity: 'base' }));
-    }, [canClient, canIncident, i18n.language, t]);
+    }, [canClient, canIncident, canTechnicianRequest, i18n.language, t]);
 
     return <ConfigNavTabs tabs={tabs} activeId={activeId} alwaysShow />;
 }

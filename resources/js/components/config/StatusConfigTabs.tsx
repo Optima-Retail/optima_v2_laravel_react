@@ -9,6 +9,7 @@ export type StatusConfigTabId =
     | 'evaluation'
     | 'incident'
     | 'technician-incident'
+    | 'technician-request'
     | 'form';
 
 type StatusConfigTabsProps = {
@@ -23,6 +24,7 @@ export function StatusConfigTabs({ activeId }: StatusConfigTabsProps) {
     const canEvaluation = useCan('evaluation_statuses.view');
     const canIncident = useCan('incident_statuses.view');
     const canTechnicianIncident = useCan('technician_incident_statuses.view');
+    const canTechnicianRequest = useCan('technician_request_statuses.view');
     const canForm = useCan('form_statuses.view');
 
     const tabs = useMemo(() => {
@@ -68,6 +70,14 @@ export function StatusConfigTabs({ activeId }: StatusConfigTabsProps) {
             });
         }
 
+        if (canTechnicianRequest) {
+            items.push({
+                id: 'technician-request',
+                href: '/config/technician-request-statuses',
+                label: t('technicianRequestStatuses.resourcePlural'),
+            });
+        }
+
         if (canForm) {
             items.push({
                 id: 'form',
@@ -83,6 +93,7 @@ export function StatusConfigTabs({ activeId }: StatusConfigTabsProps) {
         canForm,
         canIncident,
         canTechnicianIncident,
+        canTechnicianRequest,
         canWorkOrder,
         i18n.language,
         t,

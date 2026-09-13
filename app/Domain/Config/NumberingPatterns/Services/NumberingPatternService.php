@@ -386,6 +386,15 @@ final class NumberingPatternService
             ];
         }
 
+        if ($resource === NumberingResource::TechnicianRequests->value) {
+            return [
+                ['type' => NumberingSegmentType::Letters->value, 'value' => 'PET'],
+                ['type' => NumberingSegmentType::Year->value, 'digit_length' => 2],
+                ['type' => NumberingSegmentType::Letters->value, 'value' => '/'],
+                ['type' => NumberingSegmentType::Sequence->value, 'digit_length' => 5],
+            ];
+        }
+
         $prefix = mb_strtoupper(mb_substr(trim($resource), 0, 1));
 
         if ($prefix === '') {

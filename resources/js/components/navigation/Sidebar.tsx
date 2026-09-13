@@ -26,6 +26,7 @@ const nav: NavItem[] = [
     { key: 'clients', href: '/clients', labelKey: 'nav.clients', match: '/clients', icon: UserRound },
     { key: 'suppliers', href: '/suppliers', labelKey: 'nav.suppliers', match: '/suppliers', icon: Truck },
     { key: 'technicians', href: '/technicians', labelKey: 'nav.technicians', match: '/technicians', icon: Wrench },
+    { key: 'technicianRequests', href: '/technician-requests', labelKey: 'nav.technicianRequests', match: '/technician-requests', icon: ClipboardPen },
     { key: 'establishments', href: '/establishments', labelKey: 'nav.establishments', match: '/establishments', icon: Warehouse },
     { key: 'contracts', href: '/contracts', labelKey: 'nav.contracts', match: '/contracts', icon: FileText },
     { key: 'estimates', href: '/estimates', labelKey: 'nav.estimates', match: '/estimates', icon: FileSpreadsheet },
@@ -46,6 +47,7 @@ export function Sidebar() {
     const canViewBrands = useCan('brands.view');
     const canViewCompanies = useCan('companies.view');
     const canViewRelationships = useCan('company_relationships.view');
+    const canViewTechnicianRequests = useCan('technician_requests.view');
     const canViewEstablishments = useCan('establishments.view');
     const canViewContracts = useCan('contracts.view');
     const canViewEstimates = useCan('estimates.view');
@@ -122,6 +124,10 @@ export function Sidebar() {
                         }
 
                         if (item.key === 'technicians' && (!canViewRelationships || !hasCompanyContext)) {
+                            return null;
+                        }
+
+                        if (item.key === 'technicianRequests' && (!canViewTechnicianRequests || !hasCompanyContext)) {
                             return null;
                         }
 

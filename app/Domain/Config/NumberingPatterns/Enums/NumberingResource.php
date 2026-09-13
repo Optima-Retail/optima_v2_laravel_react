@@ -10,6 +10,7 @@ enum NumberingResource: string
     case Invoices = 'invoices';
     case Estimates = 'estimates';
     case WorkOrders = 'work_orders';
+    case TechnicianRequests = 'technician_requests';
 
     /**
      * @return list<string>

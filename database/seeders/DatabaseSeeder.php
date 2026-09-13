@@ -33,6 +33,8 @@ class DatabaseSeeder extends Seeder
             IncidentSubtypeSeeder::class,
             IncidentStatusSeeder::class,
             TechnicianIncidentStatusSeeder::class,
+            TechnicianRequestStatusSeeder::class,
+            TechnicianRequestPrioritySeeder::class,
             WorkOrderStatusSeeder::class,
             WorkOrderTechnicianStatusSeeder::class,
             ActionSeeder::class,
