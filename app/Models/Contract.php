@@ -93,4 +93,20 @@ class Contract extends Model
     {
         return $this->hasMany(ContractAttachment::class)->latest();
     }
+
+    /**
+     * @return HasMany<ContractIteration, $this>
+     */
+    public function iterations(): HasMany
+    {
+        return $this->hasMany(ContractIteration::class);
+    }
+
+    /**
+     * @return HasMany<ContractInvoicingAggregation, $this>
+     */
+    public function invoicingAggregations(): HasMany
+    {
+        return $this->hasMany(ContractInvoicingAggregation::class);
+    }
 }

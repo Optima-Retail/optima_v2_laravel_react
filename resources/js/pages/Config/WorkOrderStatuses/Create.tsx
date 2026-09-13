@@ -11,6 +11,7 @@ export default function CreateWorkOrderStatus() {
     const { t } = useTranslation();
     const form = useForm({
         name: '',
+        kind: 'work_order',
         color: '#a9cef0',
         lifecycle: 1,
         is_open: true,

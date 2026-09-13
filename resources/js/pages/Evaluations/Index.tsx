@@ -24,17 +24,21 @@ import type { EvaluationListItem } from '@/support/types/domain/evaluation';
 type EvaluationsIndexProps = {
     filters: {
         search: string;
+        evaluation_status_id: string;
+        created_from: string;
+        created_to: string;
         sort: string;
         direction: string;
         per_page: string;
     };
+    evaluationStatusOptions: Array<{ id: number; label: string }>;
     can: {
         update: boolean;
         delete: boolean;
     };
 };
 
-export default function EvaluationsIndex({ filters, can }: EvaluationsIndexProps) {
+export default function EvaluationsIndex({ filters, evaluationStatusOptions, can }: EvaluationsIndexProps) {
     const { t, i18n } = useTranslation();
     const tableRef = useRef<RemoteDataTableHandle>(null);
     const canRef = useRef(can);
@@ -213,6 +217,9 @@ export default function EvaluationsIndex({ filters, can }: EvaluationsIndexProps
                     pageSize={Number(filters.per_page) || 12}
                     initialFilters={{
                         search: filters.search,
+                        evaluation_status_id: filters.evaluation_status_id,
+                        created_from: filters.created_from,
+                        created_to: filters.created_to,
                     }}
                     filterFields={[
                         {
@@ -221,7 +228,28 @@ export default function EvaluationsIndex({ filters, can }: EvaluationsIndexProps
                             label: t('common.search'),
                             placeholder: t('evaluations.searchPlaceholder'),
                         },
+                        {
+                            type: 'select',
+                            name: 'evaluation_status_id',
+                            label: t('filters.status'),
+                            emptyLabel: t('common.all'),
+                            options: evaluationStatusOptions.map((option) => ({
+                                value: String(option.id),
+                                label: option.label,
+                            })),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_from',
+                            label: t('filters.createdFrom'),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_to',
+                            label: t('filters.createdTo'),
+                        },
                     ]}
+                    savedFiltersPageKey="evaluations"
                     syncUrlBase={evaluationsService.indexPath}
                     emptyIcon={<ClipboardCheck className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('evaluations.resourcePlural') })}

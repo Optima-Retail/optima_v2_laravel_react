@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { Building2, ClipboardCheck, FileText, LayoutDashboard, Settings, Tags, TriangleAlert, Truck, UserRound, Warehouse } from 'lucide-react';
+import { Building2, ClipboardCheck, ClipboardList, ClipboardPen, FileSpreadsheet, FileStack, FileText, LayoutDashboard, Settings, Sparkles, Tags, TriangleAlert, Truck, UserRound, Warehouse, Wrench } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { firstConfigHref, isConfigRoute, useConfigPermissions } from '@/components/navigation/ConfigSidebar';
 import { useCan } from '@/hooks/useAuth';
@@ -25,9 +25,15 @@ const nav: NavItem[] = [
     { key: 'companies', href: '/companies', labelKey: 'nav.companies', match: '/companies', icon: Building2 },
     { key: 'clients', href: '/clients', labelKey: 'nav.clients', match: '/clients', icon: UserRound },
     { key: 'suppliers', href: '/suppliers', labelKey: 'nav.suppliers', match: '/suppliers', icon: Truck },
+    { key: 'technicians', href: '/technicians', labelKey: 'nav.technicians', match: '/technicians', icon: Wrench },
     { key: 'establishments', href: '/establishments', labelKey: 'nav.establishments', match: '/establishments', icon: Warehouse },
     { key: 'contracts', href: '/contracts', labelKey: 'nav.contracts', match: '/contracts', icon: FileText },
+    { key: 'estimates', href: '/estimates', labelKey: 'nav.estimates', match: '/estimates', icon: FileSpreadsheet },
+    { key: 'workOrders', href: '/work-orders', labelKey: 'nav.workOrders', match: '/work-orders', icon: ClipboardList },
     { key: 'evaluations', href: '/evaluations', labelKey: 'nav.evaluations', match: '/evaluations', icon: ClipboardCheck },
+    { key: 'compliments', href: '/compliments', labelKey: 'nav.compliments', match: '/compliments', icon: Sparkles },
+    { key: 'forms', href: '/forms', labelKey: 'nav.forms', match: '/forms', icon: ClipboardPen },
+    { key: 'formTemplates', href: '/form-templates', labelKey: 'nav.formTemplates', match: '/form-templates', icon: FileStack },
     { key: 'incidents', href: '/incidents', labelKey: 'nav.incidents', match: '/incidents', icon: TriangleAlert },
     { key: 'brands', href: '/brands', labelKey: 'nav.brands', match: '/brands', icon: Tags },
     { key: 'config', labelKey: 'nav.configuration', icon: Settings, action: 'config' },
@@ -42,7 +48,12 @@ export function Sidebar() {
     const canViewRelationships = useCan('company_relationships.view');
     const canViewEstablishments = useCan('establishments.view');
     const canViewContracts = useCan('contracts.view');
+    const canViewEstimates = useCan('estimates.view');
+    const canViewWorkOrders = useCan('work_orders.view');
     const canViewEvaluations = useCan('evaluations.view');
+    const canViewCompliments = useCan('compliments.view');
+    const canViewForms = useCan('forms.view');
+    const canViewFormTemplates = useCan('form_templates.view');
     const canViewIncidents = useCan('incidents.view');
     const hasCompanyContext = Boolean(props.auth.company);
     const sidebarOpen = useUiStore((state) => state.sidebarOpen);
@@ -110,6 +121,10 @@ export function Sidebar() {
                             return null;
                         }
 
+                        if (item.key === 'technicians' && (!canViewRelationships || !hasCompanyContext)) {
+                            return null;
+                        }
+
                         if (item.key === 'establishments' && (!canViewEstablishments || !hasCompanyContext)) {
                             return null;
                         }
@@ -118,7 +133,27 @@ export function Sidebar() {
                             return null;
                         }
 
+                        if (item.key === 'estimates' && (!canViewEstimates || !hasCompanyContext)) {
+                            return null;
+                        }
+
+                        if (item.key === 'workOrders' && (!canViewWorkOrders || !hasCompanyContext)) {
+                            return null;
+                        }
+
                         if (item.key === 'evaluations' && (!canViewEvaluations || !hasCompanyContext)) {
+                            return null;
+                        }
+
+                        if (item.key === 'compliments' && (!canViewCompliments || !hasCompanyContext)) {
+                            return null;
+                        }
+
+                        if (item.key === 'forms' && (!canViewForms || !hasCompanyContext)) {
+                            return null;
+                        }
+
+                        if (item.key === 'formTemplates' && (!canViewFormTemplates || !hasCompanyContext)) {
                             return null;
                         }
 
@@ -135,9 +170,11 @@ export function Sidebar() {
                         const active =
                             item.action === 'config'
                                 ? configActive
-                                : item.match
-                                  ? url.startsWith(item.match)
-                                  : false;
+                                : item.key === 'forms'
+                                  ? url === '/forms' || url.startsWith('/forms/')
+                                  : item.match
+                                    ? url.startsWith(item.match)
+                                    : false;
 
                         const className = cn(
                             'inline-flex items-center rounded-lg text-sm font-medium transition-colors',

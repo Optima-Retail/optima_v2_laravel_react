@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Http\Requests\Web\Contracts;
 
 use App\Domain\Companies\Support\ActiveCompany;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Contracts\Services\ContractService;
+use App\Http\Requests\Web\Contracts\Concerns\ValidatesContractSchedulePayload;
 use App\Models\Contract;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 final class StoreContractRequest extends FormRequest
 {
+    use ValidatesContractSchedulePayload;
+
     public function authorize(): bool
     {
         return $this->user()?->can('create', Contract::class) ?? false;
@@ -34,6 +38,8 @@ final class StoreContractRequest extends FormRequest
                 fn (int $id) => $id > 0,
             )),
         ]);
+
+        $this->prepareScheduleForValidation();
     }
 
     /**
@@ -58,7 +64,7 @@ final class StoreContractRequest extends FormRequest
             'description' => ['required', 'string', 'max:255'],
             'work_order_subject' => ['nullable', 'string', 'max:255'],
             'company_id' => ['required', 'integer', Rule::in($companyIds)],
-            'responsible_user_id' => ['required', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
+            'responsible_user_id' => ['required', 'integer', CompanyMemberUsers::existsRule($owner->id)],
             'contract_status_id' => [
                 'required',
                 'integer',
@@ -69,6 +75,7 @@ final class StoreContractRequest extends FormRequest
             'canceled_at' => ['nullable', 'date'],
             'establishment_ids' => ['nullable', 'array'],
             'establishment_ids.*' => ['integer', $establishmentRule],
+            ...$this->scheduleRules($owner),
         ];
     }
 }

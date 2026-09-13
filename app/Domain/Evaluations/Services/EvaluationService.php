@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Domain\Evaluations\Services;
 
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Models\Company;
 use App\Models\Establishment;
 use App\Models\Evaluation;
 use App\Models\EvaluationStatus;
-use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -90,21 +90,12 @@ final class EvaluationService
     }
 
     /**
+     * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
-    public function userOptions(): array
+    public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return User::query()
-            ->orderBy('name')
-            ->get(['id', 'name', 'email'])
-            ->map(fn (User $user): array => [
-                'id' => $user->id,
-                'label' => $user->email
-                    ? "{$user->name} ({$user->email})"
-                    : $user->name,
-            ])
-            ->values()
-            ->all();
+        return CompanyMemberUsers::options($owner, $includeUserIds);
     }
 
     /**
@@ -131,12 +122,15 @@ final class EvaluationService
     }
 
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, evaluation_status_id?: string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, Evaluation>
      */
     public function paginateForOwner(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator
     {
         $search = trim((string) ($filters['search'] ?? ''));
+        $evaluationStatusId = trim((string) ($filters['evaluation_status_id'] ?? ''));
+        $createdFrom = trim((string) ($filters['created_from'] ?? ''));
+        $createdTo = trim((string) ($filters['created_to'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
         [$sort, $direction] = ListQuery::sort(
             $filters,
@@ -163,13 +157,16 @@ final class EvaluationService
                         });
                 });
             })
+            ->when($evaluationStatusId !== '', fn ($query) => $query->where('evaluation_status_id', (int) $evaluationStatusId))
+            ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
+            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
             ->orderBy($sort, $direction)
             ->paginate($perPage)
             ->withQueryString();
     }
 
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, evaluation_status_id?: string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     public function paginateForWeb(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator

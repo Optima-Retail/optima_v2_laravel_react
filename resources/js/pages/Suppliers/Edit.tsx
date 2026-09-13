@@ -70,7 +70,8 @@ export default function EditSupplier({ relationship, companyOptions, formOptions
                     onSubmit={submit}
                     submitLabel={t('common.save')}
                     submitIcon={<Save className="size-4" aria-hidden />}
-                    allowedKinds={['supplier', 'technician']}
+                    allowedKinds={['supplier']}
+                    kindLocked
                     kindLabelsNamespace="suppliers"
                     actions={
                         can.delete ? (

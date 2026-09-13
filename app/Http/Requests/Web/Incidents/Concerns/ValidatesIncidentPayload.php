@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Web\Incidents\Concerns;
 
 use App\Domain\Companies\Support\ActiveCompany;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Incidents\Services\IncidentService;
 use App\Models\Establishment;
 use App\Models\IncidentType;
@@ -94,14 +95,14 @@ trait ValidatesIncidentPayload
             'incident_subtype_id' => ['required', 'integer', $subtypeRule],
             'incident_priority_id' => ['required', 'integer', Rule::exists('incident_priorities', 'id')->whereNull('deleted_at')],
             'incident_status_id' => ['nullable', 'integer', $statusRule],
-            'responsible_user_id' => ['required', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
-            'qc_responsible_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
-            'requester_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
+            'responsible_user_id' => ['required', 'integer', CompanyMemberUsers::existsRule($owner->id)],
+            'qc_responsible_user_id' => ['nullable', 'integer', CompanyMemberUsers::existsRule($owner->id)],
+            'requester_user_id' => ['nullable', 'integer', CompanyMemberUsers::existsRule($owner->id)],
             'collaborator_ids' => ['nullable', 'array'],
             'collaborator_ids.*' => [
                 'integer',
                 'distinct',
-                Rule::exists('users', 'id')->whereNull('deleted_at'),
+                CompanyMemberUsers::existsRule($owner->id),
             ],
             'control_at' => ['nullable', 'date'],
             'origin_type' => ['nullable', 'string', Rule::in(['establishment', 'company', 'brand'])],

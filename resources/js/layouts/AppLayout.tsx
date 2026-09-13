@@ -19,6 +19,7 @@ export function AppLayout({ children, title, breadcrumbs }: AppLayoutProps) {
     const page = usePage<SharedPageProps>();
     const crumbs = breadcrumbs ?? breadcrumbsFromUrl(page.url, title);
     const showConfigSidebar = isConfigRoute(page.url);
+    const companyKey = page.props.auth.company?.id ?? 'none';
 
     return (
         <FieldHelpProvider>
@@ -29,7 +30,9 @@ export function AppLayout({ children, title, breadcrumbs }: AppLayoutProps) {
                     <main className="flex min-h-0 flex-1 overflow-hidden">
                         {showConfigSidebar ? <ConfigSidebar /> : null}
                         <div className="app-scroll min-w-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4 lg:px-6">
-                            <div className="w-full">{children}</div>
+                            <div key={companyKey} className="w-full">
+                                {children}
+                            </div>
                         </div>
                     </main>
                 </div>

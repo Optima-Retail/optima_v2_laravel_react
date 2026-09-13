@@ -19,7 +19,7 @@ type FilterFieldBase = {
 
 export type FilterField =
     | (FilterFieldBase & {
-          type: 'search' | 'text';
+          type: 'search' | 'text' | 'date';
           placeholder?: string;
       })
     | (FilterFieldBase & {
@@ -77,7 +77,7 @@ export function FilterBar({
                     )}
                 >
                     {fields.map((field) => {
-                        if (field.type === 'search' || field.type === 'text') {
+                        if (field.type === 'search' || field.type === 'text' || field.type === 'date') {
                             return (
                                 <div key={field.name} className={cn('min-w-0', field.className)}>
                                     {field.label ? (
@@ -96,6 +96,7 @@ export function FilterBar({
                                         ) : null}
                                         <Input
                                             id={`filter-${field.name}`}
+                                            type={field.type === 'date' ? 'date' : 'text'}
                                             value={values[field.name] ?? ''}
                                             onChange={(event) => onChange(field.name, event.target.value)}
                                             placeholder={field.placeholder}

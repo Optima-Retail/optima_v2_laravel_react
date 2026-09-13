@@ -42,6 +42,7 @@ final class WorkOrderStatusesCrudTest extends TestCase
         $this->actingAs($admin)
             ->post('/config/work-order-statuses', [
                 'name' => 'In Progress',
+                'kind' => 'work_order',
                 'color' => '#a9cef0',
                 'lifecycle' => 3,
                 'is_open' => true,
@@ -56,12 +57,14 @@ final class WorkOrderStatusesCrudTest extends TestCase
             ->assertOk()
             ->assertJsonPath('last_row', 1)
             ->assertJsonPath('data.0.id', $status->id)
+            ->assertJsonPath('data.0.kind', 'work_order')
             ->assertJsonPath('data.0.lifecycle', 3)
             ->assertJsonPath('data.0.is_open', true);
 
         $this->actingAs($admin)
             ->put("/config/work-order-statuses/{$status->id}", [
                 'name' => 'In Progress Updated',
+                'kind' => 'estimate',
                 'color' => '#a9cef0',
                 'lifecycle' => 3,
                 'is_open' => false,
@@ -72,6 +75,7 @@ final class WorkOrderStatusesCrudTest extends TestCase
         $this->assertDatabaseHas('work_order_statuses', [
             'id' => $status->id,
             'name' => 'In Progress Updated',
+            'kind' => 'estimate',
             'is_open' => false,
         ]);
 

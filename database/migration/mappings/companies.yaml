@@ -1,0 +1,237 @@
+entity: companies
+notes: >
+  Identity only. Operational customer/supplier/technician fields go to
+  company_relationships (relationships.yaml). Do not merge sources by tax_id.
+
+id_map: migration_company_map
+never_assume_legacy_id_equals_new_id: true
+
+sources:
+  - table: empresas
+    identity_key: id
+    identity_key_type: string
+    target_kind: operating_company
+    notes: UNRESOLVED which rows besides OR/ORIL. Fillable only id, nombre.
+
+  - table: clientes
+    identity_key: nif
+    identity_unique_in_source: false
+    target_kind: party
+    notes: identity_key is a collision detector, not an automatic merge key.
+
+  - table: proveedores
+    identity_key: nif
+    identity_unique_in_source: false
+    target_kind: party
+
+  - table: tecnicos
+    identity_key: nif
+    identity_unique_in_source: false
+    target_kind: party
+
+target:
+  table: companies
+  unique:
+    - slug
+    - tax_id
+
+identity_resolution:
+  auto_merge_by_tax_id: false
+  on_tax_id_collision: unresolved_quarantine
+
+fields:
+  name:
+    sources:
+      - empresas.nombre
+      - clientes.razon_social
+      - proveedores.nombre_fiscal
+      - tecnicos.nombre_fiscal
+    fallbacks:
+      - clientes.nombre_comercial
+      - proveedores.nombre_comercial
+      - tecnicos.nombre_comercial
+    mapping: transform
+    transform: trim
+    required: true
+    confidence: high
+
+  tradename:
+    sources:
+      - clientes.nombre_comercial
+      - proveedores.nombre_comercial
+      - tecnicos.nombre_comercial
+    mapping: rename
+    transform: trim
+    confidence: high
+
+  slug:
+    mapping: computed
+    transform: Company::uniqueSlugFromName
+    required: true
+    confidence: high
+    exceptions:
+      - tax_id: B66409087
+        slug: or
+      - tax_id: IE4115369FH
+        slug: oril
+
+  tax_id:
+    sources:
+      - clientes.nif
+      - proveedores.nif
+      - tecnicos.nif
+    mapping: transform
+    transform:
+      - trim
+      - empty_string_to_null
+    max_length: 32
+    unique: true
+    do_not:
+      - uppercase_unless_reviewed
+      - strip_hyphens_unless_reviewed
+      - merge_duplicate_nifs
+    confidence: high
+
+  kind:
+    mapping: constant
+    values:
+      empresas: operating_company
+      clientes: party
+      proveedores: party
+      tecnicos: party
+    confidence: high
+
+  country_id:
+    sources:
+      - clientes.pais_id
+      - proveedores.pais_id
+      - tecnicos.pais_id
+    mapping: FK
+    via: migration_country_map
+    confidence: medium
+
+  residence_country_id:
+    sources:
+      - tecnicos.residence_country_id
+    mapping: FK
+    via: migration_country_map
+    confidence: high
+
+  person_type:
+    sources:
+      - tecnicos.person_type
+    mapping: direct
+    values:
+      F: F
+      J: J
+    notes: Not confirmed on clientes/proveedores.
+    confidence: high
+
+  email:
+    sources:
+      - clientes.email
+      - proveedores.correo
+      - tecnicos.correo
+    mapping: transform
+    transform: trim
+    confidence: medium
+
+  phone:
+    sources:
+      - clientes.telefono
+      - proveedores.telefono
+      - tecnicos.telefono
+    mapping: rename
+    max_length: 50
+    confidence: medium
+
+  website:
+    sources:
+      - tecnicos.pagina_web
+    mapping: rename
+    confidence: high
+
+  address_line_1:
+    sources:
+      - clientes.direccion_1
+      - proveedores.direccion_1
+      - tecnicos.direccion_1
+    mapping: rename
+    confidence: high
+
+  address_line_2:
+    sources:
+      - clientes.direccion_2
+      - proveedores.direccion_2
+      - tecnicos.direccion_2
+    mapping: rename
+    confidence: high
+
+  city:
+    sources:
+      - clientes.poblacion
+      - proveedores.poblacion
+      - tecnicos.poblacion
+    mapping: rename
+    confidence: high
+
+  province_id:
+    sources:
+      - clientes.provincia
+      - proveedores.provincia
+      - tecnicos.provincia
+    mapping: unresolved
+    notes: UNRESOLVED — REQUIRES REVIEW (column name provincia, type unknown)
+
+  postal_code:
+    sources:
+      - clientes.codigo_postal
+      - proveedores.codigo_postal
+      - tecnicos.codigo_postal
+    mapping: rename
+    max_length: 20
+    confidence: high
+
+  employee_count:
+    sources:
+      - tecnicos.numero_empleados
+    mapping: rename
+    confidence: high
+
+  is_active:
+    mapping: default
+    value: true
+    notes: Source status belongs on company_relationships.
+    confidence: medium
+
+  language_id:
+    sources:
+      - clientes.idioma_id
+      - tecnicos.idioma_id
+    mapping: FK
+    via: migration_language_map
+    confidence: medium
+
+  latitude:
+    sources:
+      - tecnicos.latitud
+    mapping: rename
+    confidence: high
+
+  longitude:
+    sources:
+      - tecnicos.longitud
+    mapping: rename
+    confidence: high
+
+  legacy_erp_id:
+    sources:
+      - tecnicos.id_fixner
+    mapping: rename
+    notes: clientes/proveedores FileMaker ids UNRESOLVED
+    confidence: high
+
+unresolved_fields:
+  - empresas extra columns beyond id,nombre
+  - companies.brand_id vs relationship.brand_id
+  - clientes person_type

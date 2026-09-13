@@ -35,7 +35,14 @@ export const companiesService = {
     },
 
     switchTo(companyId: number) {
-        router.post('/me/company/switch', { company_id: companyId }, { preserveScroll: true });
+        router.post(
+            '/me/company/switch',
+            { company_id: companyId },
+            {
+                preserveScroll: true,
+                preserveState: false,
+            },
+        );
     },
 
     assignUser(companyId: number, userId: number) {

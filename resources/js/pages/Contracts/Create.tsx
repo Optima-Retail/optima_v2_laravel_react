@@ -19,6 +19,8 @@ type CreateContractProps = {
     languageOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
+    workOrderTypeOptions: UserOption[];
+    formTemplateOptions: UserOption[];
 };
 
 export default function CreateContract({
@@ -31,6 +33,8 @@ export default function CreateContract({
     languageOptions,
     userOptions,
     establishmentOptions,
+    workOrderTypeOptions,
+    formTemplateOptions,
 }: CreateContractProps) {
     const { t } = useTranslation();
     const form = useForm(
@@ -68,6 +72,8 @@ export default function CreateContract({
                     languageOptions={languageOptions}
                     userOptions={userOptions}
                     establishmentOptions={establishmentOptions}
+                    workOrderTypeOptions={workOrderTypeOptions}
+                    formTemplateOptions={formTemplateOptions}
                     onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.createItem', { resource: t('contracts.resource') })}

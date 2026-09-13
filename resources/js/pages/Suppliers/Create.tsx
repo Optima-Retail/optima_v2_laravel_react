@@ -68,7 +68,8 @@ export default function CreateSupplier({ companyOptions, formOptions }: CreateSu
                     onSubmit={submit}
                     submitLabel={t('common.createItem', { resource: t('suppliers.resource') })}
                     submitIcon={<Plus className="size-4" aria-hidden />}
-                    allowedKinds={['supplier', 'technician']}
+                    allowedKinds={['supplier']}
+                    kindLocked
                     kindLabelsNamespace="suppliers"
                     allowCreateRelated
                 />

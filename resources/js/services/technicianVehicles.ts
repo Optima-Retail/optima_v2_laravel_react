@@ -1,4 +1,4 @@
-const base = '/suppliers';
+const base = '/technicians';
 
 export type TechnicianVehicleRow = {
     id: number;

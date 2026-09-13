@@ -12,6 +12,7 @@ use App\Http\Requests\Web\Incidents\StoreIncidentLineRequest;
 use App\Http\Requests\Web\Incidents\StoreIncidentRequest;
 use App\Http\Requests\Web\Incidents\UpdateIncidentRequest;
 use App\Models\Incident;
+use App\Models\IncidentStatus;
 use App\Support\ListQuery;
 use App\Support\TabulatorQuery;
 use App\Support\TabulatorResponse;
@@ -36,6 +37,9 @@ final class IncidentController extends Controller
 
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
+            'incident_status_id' => $request->string('incident_status_id')->trim()->toString(),
+            'created_from' => $request->string('created_from')->trim()->toString(),
+            'created_to' => $request->string('created_to')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
@@ -45,6 +49,16 @@ final class IncidentController extends Controller
 
         return Inertia::render('Incidents/Index', [
             'filters' => $filters,
+            'incidentStatusOptions' => IncidentStatus::query()
+                ->orderBy('lifecycle')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (IncidentStatus $status): array => [
+                    'id' => $status->id,
+                    'label' => $status->name,
+                ])
+                ->values()
+                ->all(),
             'can' => [
                 'create' => $request->user()?->can('create', Incident::class) ?? false,
                 'update' => $request->user()?->can('incidents.update') ?? false,
@@ -64,7 +78,7 @@ final class IncidentController extends Controller
             allowedSorts: ['id', 'subject', 'control_at', 'closed_at', 'created_at'],
             defaultSort: 'id',
             defaultDirection: 'desc',
-            filterKeys: ['search'],
+            filterKeys: ['search', 'incident_status_id', 'created_from', 'created_to'],
         );
 
         return TabulatorResponse::fromPaginator(
@@ -86,7 +100,7 @@ final class IncidentController extends Controller
             'incidentPriorityOptions' => $this->incidents->incidentPriorityOptions(),
             'incidentTypeOptions' => $this->incidents->incidentTypeOptions(),
             'incidentSubtypeOptions' => $this->incidents->incidentSubtypeOptions(),
-            'userOptions' => $this->incidents->userOptions(),
+            'userOptions' => $this->incidents->userOptions($owner),
             'establishmentOptions' => $this->incidents->establishmentOptions($owner),
             'clientOptions' => $this->incidents->clientOptions($owner),
             'brandOptions' => $this->incidents->brandOptions($owner),
@@ -96,6 +110,7 @@ final class IncidentController extends Controller
 
     public function store(StoreIncidentRequest $request): RedirectResponse
     {
+        $owner = $this->activeCompany($request);
         $data = $request->validated();
 
         if (($data['requester_user_id'] ?? null) === null) {
@@ -106,7 +121,7 @@ final class IncidentController extends Controller
             $data['control_at'] = now()->format('Y-m-d H:i:s');
         }
 
-        $this->incidents->create($data);
+        $this->incidents->create($owner, $data);
 
         return redirect()
             ->route('incidents.index')
@@ -131,7 +146,7 @@ final class IncidentController extends Controller
             'incidentPriorityOptions' => $this->incidents->incidentPriorityOptions(),
             'incidentTypeOptions' => $this->incidents->incidentTypeOptions(),
             'incidentSubtypeOptions' => $this->incidents->incidentSubtypeOptions(),
-            'userOptions' => $this->incidents->userOptions(),
+            'userOptions' => $this->incidents->userOptions($owner),
             'establishmentOptions' => $this->incidents->establishmentOptions($owner),
             'clientOptions' => $this->incidents->clientOptions($owner),
             'brandOptions' => $this->incidents->brandOptions($owner),

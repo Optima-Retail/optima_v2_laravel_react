@@ -3,11 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type WorkOrderStatusFormValues = {
     name: string;
+    kind: string;
     color: string;
     lifecycle: number | string;
     is_open: boolean;
@@ -47,6 +49,19 @@ export function WorkOrderStatusForm({
                         invalid={Boolean(errors.name)}
                         onChange={(event) => onChange('name', event.target.value)}
                     />
+                </Field>
+
+                <Field label={t('workOrderStatuses.kind')} htmlFor="kind" error={errors.kind} required>
+                    <Select
+                        id="kind"
+                        value={values.kind}
+                        invalid={Boolean(errors.kind)}
+                        onChange={(event) => onChange('kind', event.target.value)}
+                    >
+                        <option value="work_order">{t('workOrderStatuses.kinds.work_order')}</option>
+                        <option value="estimate">{t('workOrderStatuses.kinds.estimate')}</option>
+                    </Select>
+                    <p className="text-xs text-ink-muted">{t('workOrderStatuses.kindHint')}</p>
                 </Field>
 
                 <Field label={t('common.color')} htmlFor="color" error={errors.color}>

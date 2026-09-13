@@ -3,7 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { ConfigNavTabs, type ConfigNavTab } from '@/components/config/ConfigNavTabs';
 import { useCan } from '@/hooks/useAuth';
 
-export type StatusConfigTabId = 'work-order' | 'contract' | 'evaluation' | 'incident' | 'form';
+export type StatusConfigTabId =
+    | 'work-order'
+    | 'contract'
+    | 'evaluation'
+    | 'incident'
+    | 'technician-incident'
+    | 'form';
 
 type StatusConfigTabsProps = {
     activeId: StatusConfigTabId;
@@ -16,6 +22,7 @@ export function StatusConfigTabs({ activeId }: StatusConfigTabsProps) {
     const canContract = useCan('contract_statuses.view');
     const canEvaluation = useCan('evaluation_statuses.view');
     const canIncident = useCan('incident_statuses.view');
+    const canTechnicianIncident = useCan('technician_incident_statuses.view');
     const canForm = useCan('form_statuses.view');
 
     const tabs = useMemo(() => {
@@ -53,6 +60,14 @@ export function StatusConfigTabs({ activeId }: StatusConfigTabsProps) {
             });
         }
 
+        if (canTechnicianIncident) {
+            items.push({
+                id: 'technician-incident',
+                href: '/config/technician-incident-statuses',
+                label: t('technicianIncidentStatuses.resourcePlural'),
+            });
+        }
+
         if (canForm) {
             items.push({
                 id: 'form',
@@ -62,7 +77,16 @@ export function StatusConfigTabs({ activeId }: StatusConfigTabsProps) {
         }
 
         return items.sort((a, b) => a.label.localeCompare(b.label, i18n.language, { sensitivity: 'base' }));
-    }, [canContract, canEvaluation, canForm, canIncident, canWorkOrder, i18n.language, t]);
+    }, [
+        canContract,
+        canEvaluation,
+        canForm,
+        canIncident,
+        canTechnicianIncident,
+        canWorkOrder,
+        i18n.language,
+        t,
+    ]);
 
     return <ConfigNavTabs tabs={tabs} activeId={activeId} alwaysShow />;
 }

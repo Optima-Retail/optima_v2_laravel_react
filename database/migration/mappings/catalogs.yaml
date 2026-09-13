@@ -1,0 +1,81 @@
+entity: catalogs
+notes: >
+  Copy IDs only after production checksum vs v2 seeders.
+  This is the only area where legacy_id may equal new_id by design.
+
+never_assume_legacy_id_equals_new_id: false_only_after_checksum
+
+mappings:
+  - legacy: paises
+    target: countries
+    type: rename
+    confidence: medium
+
+  - legacy: provincias
+    target: provinces
+    type: rename
+    confidence: medium
+
+  - legacy: idiomas
+    target: languages
+    type: rename
+    confidence: medium
+
+  - legacy: zonas_horarias
+    target: timezones
+    type: rename
+    confidence: medium
+
+  - legacy: equipos
+    target: teams
+    type: rename
+    confidence: medium
+
+  - legacy: delegaciones
+    target: delegations
+    type: transform
+    fields:
+      name: nombre
+      company_id:
+        source: empresa_id
+        mapping: FK
+        via: migration_company_map
+        source_table: empresas
+    seeder_ids: [1, 61]
+    confidence: high
+
+  - legacy: estados
+    type: split
+    targets:
+      technician_incident_statuses: [96, 97, 98, 155, 156, 173]
+      incident_statuses: [89, 91, 92, 94, 150, 170]
+      contract_statuses: [77, 95, 78, 79, 80]
+      evaluation_statuses: [73, 74, 75, 76, 99, 117, 133, 134, 139]
+    other_estado_ids: ignore_until_domain_exists
+    confidence: high
+
+  - legacy: incidencias_tipos
+    target: incident_types
+    type: rename
+    confidence: high
+
+  - legacy: tecnicos_incidencias_tipos
+    target: technician_incident_types
+    type: rename
+    confidence: high
+
+  - legacy: puestos
+    target: job_titles
+    skip_legacy_ids: [15]
+    confidence: high
+
+  - legacy: payment documents catalog
+    target: payment_documents
+    skip_legacy_ids: [3]
+    confidence: high
+
+  - legacy: estimate statuses catalog
+    target: work_order_statuses
+    notes: merged into work_order_statuses with kind=estimate; skip legacy id 2 if still required
+    skip_legacy_ids: [2]
+    confidence: high

@@ -1,6 +1,7 @@
 export type WorkOrderStatusListItem = {
     id: number;
     name: string;
+    kind: 'estimate' | 'work_order';
     color: string | null;
     lifecycle: number | null;
     is_open: boolean;
@@ -10,6 +11,7 @@ export type WorkOrderStatusListItem = {
 export type WorkOrderStatusFormData = {
     id: number;
     name: string;
+    kind: 'estimate' | 'work_order';
     color: string | null;
     lifecycle: number | null;
     is_open: boolean;

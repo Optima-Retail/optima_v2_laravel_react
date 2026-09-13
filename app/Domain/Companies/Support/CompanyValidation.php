@@ -73,7 +73,8 @@ final class CompanyValidation
             $uniqueCode = $uniqueCode->ignore($ignoreId);
         }
 
-        $liveUser = Rule::exists('users', 'id')->whereNull('deleted_at');
+        $owner = app(ActiveCompany::class)->forUser(request()->user());
+        $memberUser = CompanyMemberUsers::existsRule($owner?->id);
 
         return [
             'company_id' => ['required', 'integer', Rule::in($companyId)],
@@ -97,9 +98,9 @@ final class CompanyValidation
             'delegation_id' => ['nullable', 'integer', Rule::exists('delegations', 'id')->whereNull('deleted_at')],
             'series_id' => ['nullable', 'integer', Rule::exists('series', 'id')->whereNull('deleted_at')],
             'billing_company_id' => ['nullable', 'integer', Rule::exists('companies', 'id')->whereNull('deleted_at')],
-            'responsible_user_id' => ['nullable', 'integer', $liveUser],
+            'responsible_user_id' => ['nullable', 'integer', $memberUser],
             'collaborator_ids' => ['nullable', 'array'],
-            'collaborator_ids.*' => ['integer', 'distinct', $liveUser],
+            'collaborator_ids.*' => ['integer', 'distinct', $memberUser],
             'is_active' => ['required', 'boolean'],
             'is_client_priority' => ['nullable', 'boolean'],
             'is_reviewed' => ['nullable', 'boolean'],
@@ -180,7 +181,7 @@ final class CompanyValidation
             'notes' => ['nullable', 'string'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
-            ...self::relationshipProfileRules(),
+            ...self::relationshipProfileRules($ownerCompanyId),
         ];
     }
 
@@ -189,9 +190,9 @@ final class CompanyValidation
      *
      * @return array<string, mixed>
      */
-    public static function relationshipProfileRules(): array
+    public static function relationshipProfileRules(int $ownerCompanyId): array
     {
-        $liveUser = Rule::exists('users', 'id')->whereNull('deleted_at');
+        $memberUser = CompanyMemberUsers::existsRule($ownerCompanyId);
 
         return [
             'delegation_id' => ['nullable', 'integer', Rule::exists('delegations', 'id')->whereNull('deleted_at')],
@@ -200,7 +201,7 @@ final class CompanyValidation
             'priority_ids' => ['nullable', 'array'],
             'priority_ids.*' => ['integer', Rule::exists('client_priorities', 'id')->whereNull('deleted_at')],
             'collaborator_ids' => ['nullable', 'array'],
-            'collaborator_ids.*' => ['integer', 'distinct', $liveUser],
+            'collaborator_ids.*' => ['integer', 'distinct', $memberUser],
             'service_type_ids' => ['nullable', 'array'],
             'service_type_ids.*' => ['integer', 'distinct', Rule::exists('service_types', 'id')->whereNull('deleted_at')],
             'global_service_type_ids' => ['nullable', 'array'],
@@ -210,12 +211,12 @@ final class CompanyValidation
             'integration_id' => ['nullable', 'integer', Rule::exists('integrations', 'id')->whereNull('deleted_at')],
             'integration_external_id' => ['nullable', 'string', 'max:80'],
             'reported_customer_relationship_id' => ['nullable', 'integer', Rule::exists('company_relationships', 'id')->whereNull('deleted_at')],
-            'corrective_work_order_owner_id' => ['nullable', 'integer', $liveUser],
-            'preventive_work_order_owner_id' => ['nullable', 'integer', $liveUser],
-            'quality_owner_id' => ['nullable', 'integer', $liveUser],
-            'account_owner_id' => ['nullable', 'integer', $liveUser],
-            'commercial_owner_id' => ['nullable', 'integer', $liveUser],
-            'sourced_by_user_id' => ['nullable', 'integer', $liveUser],
+            'corrective_work_order_owner_id' => ['nullable', 'integer', $memberUser],
+            'preventive_work_order_owner_id' => ['nullable', 'integer', $memberUser],
+            'quality_owner_id' => ['nullable', 'integer', $memberUser],
+            'account_owner_id' => ['nullable', 'integer', $memberUser],
+            'commercial_owner_id' => ['nullable', 'integer', $memberUser],
+            'sourced_by_user_id' => ['nullable', 'integer', $memberUser],
             'internal_notes' => ['nullable', 'string'],
             'notes_alert' => ['nullable', 'boolean'],
             'internal_notes_alert' => ['nullable', 'boolean'],

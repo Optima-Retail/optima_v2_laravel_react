@@ -1,5 +1,10 @@
 import { useMemo, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+    ContractSchedulePanel,
+    emptyAggregation,
+    emptyIteration,
+} from '@/components/contracts/ContractSchedulePanel';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -7,6 +12,11 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import type { UserOption } from '@/support/types/domain/common';
+import type {
+    ContractFormData,
+    ContractInvoicingAggregationFormValues,
+    ContractIterationFormValues,
+} from '@/support/types/domain/contract';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 
 export type ContractFormValues = {
@@ -20,11 +30,13 @@ export type ContractFormValues = {
     signed_at: string;
     canceled_at: string;
     establishment_ids: string[];
+    iterations: ContractIterationFormValues[];
+    invoicing_aggregations: ContractInvoicingAggregationFormValues[];
 };
 
 type ContractFormProps = {
     values: ContractFormValues;
-    errors: Partial<Record<keyof ContractFormValues, string>>;
+    errors: Record<string, string | undefined>;
     processing: boolean;
     codeDisabled?: boolean;
     companyOptions: UserOption[];
@@ -32,7 +44,9 @@ type ContractFormProps = {
     languageOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
-    onChange: (key: keyof ContractFormValues, value: string | string[]) => void;
+    workOrderTypeOptions: UserOption[];
+    formTemplateOptions: UserOption[];
+    onChange: (key: keyof ContractFormValues, value: ContractFormValues[keyof ContractFormValues]) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
     submitIcon?: ReactNode;
@@ -45,6 +59,45 @@ function toSelectOptions(options: UserOption[]) {
         label: option.label,
         color: option.color ?? null,
     }));
+}
+
+function mapIterationFromServer(
+    row: ContractFormData['iterations'][number],
+): ContractIterationFormValues {
+    return {
+        id: row.id,
+        temp_key: row.temp_key,
+        subject: row.subject ?? '',
+        work_order_type_id: row.work_order_type_id ? String(row.work_order_type_id) : '',
+        starts_on: row.starts_on ?? '',
+        ends_on: row.ends_on ?? '',
+        periodicity: (row.periodicity as ContractIterationFormValues['periodicity']) || 'monthly',
+        periodicity_kind: (row.periodicity_kind as ContractIterationFormValues['periodicity_kind']) || 'basic',
+        interval: row.interval != null ? String(row.interval) : '',
+        weekdays: row.weekdays.map(String),
+        month_days: row.month_days.map(String),
+        months: row.months.map(String),
+        cost_amount: row.cost_amount != null ? String(row.cost_amount) : '0',
+        establishment_ids: row.establishment_ids.map(String),
+        form_template_id: row.form_template_id ? String(row.form_template_id) : '',
+        invoicing_aggregation_id: row.invoicing_aggregation_id ? String(row.invoicing_aggregation_id) : '',
+        invoicing_aggregation_temp_key: row.invoicing_aggregation_temp_key ?? '',
+    };
+}
+
+function mapAggregationFromServer(
+    row: ContractFormData['invoicing_aggregations'][number],
+): ContractInvoicingAggregationFormValues {
+    return {
+        id: row.id,
+        temp_key: row.temp_key,
+        subject: row.subject ?? '',
+        billing_frequency:
+            (row.billing_frequency as ContractInvoicingAggregationFormValues['billing_frequency']) || 'monthly',
+        billing_day: row.billing_day != null ? String(row.billing_day) : '',
+        billing_cycle_start: row.billing_cycle_start ?? '',
+        per_establishment: Boolean(row.per_establishment),
+    };
 }
 
 export function defaultContractFormValues(
@@ -61,8 +114,27 @@ export function defaultContractFormValues(
         signed_at: '',
         canceled_at: '',
         establishment_ids: [],
+        iterations: [],
+        invoicing_aggregations: [],
         ...overrides,
     };
+}
+
+export function contractFormValuesFromData(contract: ContractFormData): ContractFormValues {
+    return defaultContractFormValues({
+        code: contract.code ?? '',
+        description: contract.description ?? '',
+        work_order_subject: contract.work_order_subject ?? '',
+        company_id: contract.company_id ? String(contract.company_id) : '',
+        responsible_user_id: contract.responsible_user_id ? String(contract.responsible_user_id) : '',
+        contract_status_id: contract.contract_status_id ? String(contract.contract_status_id) : '',
+        language_id: contract.language_id ? String(contract.language_id) : '',
+        signed_at: contract.signed_at ?? '',
+        canceled_at: contract.canceled_at ?? '',
+        establishment_ids: contract.establishment_ids.map(String),
+        iterations: (contract.iterations ?? []).map(mapIterationFromServer),
+        invoicing_aggregations: (contract.invoicing_aggregations ?? []).map(mapAggregationFromServer),
+    });
 }
 
 export function ContractForm({
@@ -75,6 +147,8 @@ export function ContractForm({
     languageOptions,
     userOptions,
     establishmentOptions,
+    workOrderTypeOptions,
+    formTemplateOptions,
     onChange,
     onSubmit,
     submitLabel,
@@ -119,8 +193,48 @@ export function ContractForm({
                             onChange={(event) => onChange('code', event.target.value)}
                         />
                         {codeDisabled ? (
-                            <p className="text-xs text-ink-muted">{t('contracts.codeAutomaticHint')}</p>
+                            <p className="mt-1 text-xs text-muted">{t('contracts.codeAutomaticHint')}</p>
                         ) : null}
+                    </Field>
+
+                    <Field label={t('contracts.client')} htmlFor="company_id" error={errors.company_id} required>
+                        <SearchableSelect
+                            id="company_id"
+                            value={values.company_id}
+                            options={toSelectOptions(companyOptions)}
+                            invalid={Boolean(errors.company_id)}
+                            onChange={(value) => onChange('company_id', value)}
+                        />
+                    </Field>
+
+                    <Field label={t('contracts.status')} htmlFor="contract_status_id" error={errors.contract_status_id} required>
+                        <SearchableSelect
+                            id="contract_status_id"
+                            value={values.contract_status_id}
+                            options={toSelectOptions(contractStatusOptions)}
+                            invalid={Boolean(errors.contract_status_id)}
+                            onChange={(value) => onChange('contract_status_id', value)}
+                        />
+                    </Field>
+
+                    <Field label={t('contracts.responsibleUser')} htmlFor="responsible_user_id" error={errors.responsible_user_id} required>
+                        <SearchableSelect
+                            id="responsible_user_id"
+                            value={values.responsible_user_id}
+                            options={toSelectOptions(userOptions)}
+                            invalid={Boolean(errors.responsible_user_id)}
+                            onChange={(value) => onChange('responsible_user_id', value)}
+                        />
+                    </Field>
+
+                    <Field label={t('contracts.language')} htmlFor="language_id" error={errors.language_id}>
+                        <SearchableSelect
+                            id="language_id"
+                            value={values.language_id}
+                            options={toSelectOptions(languageOptions)}
+                            invalid={Boolean(errors.language_id)}
+                            onChange={(value) => onChange('language_id', value)}
+                        />
                     </Field>
 
                     <Field label={t('contracts.signedAt')} htmlFor="signed_at" error={errors.signed_at}>
@@ -140,53 +254,6 @@ export function ContractForm({
                             value={values.canceled_at}
                             invalid={Boolean(errors.canceled_at)}
                             onChange={(event) => onChange('canceled_at', event.target.value)}
-                        />
-                    </Field>
-
-                    <Field label={t('contracts.client')} htmlFor="company_id" error={errors.company_id} required>
-                        <SearchableSelect
-                            id="company_id"
-                            value={values.company_id}
-                            invalid={Boolean(errors.company_id)}
-                            onChange={(value) => {
-                                onChange('company_id', value);
-                                onChange('establishment_ids', []);
-                            }}
-                            emptyLabel={t('common.select')}
-                            options={toSelectOptions(companyOptions)}
-                        />
-                    </Field>
-
-                    <Field label={t('contracts.status')} htmlFor="contract_status_id" error={errors.contract_status_id} required>
-                        <SearchableSelect
-                            id="contract_status_id"
-                            value={values.contract_status_id}
-                            invalid={Boolean(errors.contract_status_id)}
-                            onChange={(value) => onChange('contract_status_id', value)}
-                            emptyLabel={t('common.select')}
-                            options={toSelectOptions(contractStatusOptions)}
-                        />
-                    </Field>
-
-                    <Field label={t('contracts.responsibleUser')} htmlFor="responsible_user_id" error={errors.responsible_user_id} required>
-                        <SearchableSelect
-                            id="responsible_user_id"
-                            value={values.responsible_user_id}
-                            invalid={Boolean(errors.responsible_user_id)}
-                            onChange={(value) => onChange('responsible_user_id', value)}
-                            emptyLabel={t('common.select')}
-                            options={toSelectOptions(userOptions)}
-                        />
-                    </Field>
-
-                    <Field label={t('contracts.language')} htmlFor="language_id" error={errors.language_id}>
-                        <SearchableSelect
-                            id="language_id"
-                            value={values.language_id}
-                            invalid={Boolean(errors.language_id)}
-                            onChange={(value) => onChange('language_id', value)}
-                            emptyLabel={t('common.select')}
-                            options={toSelectOptions(languageOptions)}
                         />
                     </Field>
 
@@ -226,6 +293,18 @@ export function ContractForm({
                     </Field>
                 </div>
 
+                <ContractSchedulePanel
+                    iterations={values.iterations}
+                    invoicingAggregations={values.invoicing_aggregations}
+                    errors={errors}
+                    companyId={values.company_id}
+                    establishmentOptions={establishmentOptions}
+                    workOrderTypeOptions={workOrderTypeOptions}
+                    formTemplateOptions={formTemplateOptions}
+                    onIterationsChange={(rows) => onChange('iterations', rows)}
+                    onAggregationsChange={(rows) => onChange('invoicing_aggregations', rows)}
+                />
+
                 <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
                     {actions}
                     <Button type="submit" loading={processing}>
@@ -237,3 +316,5 @@ export function ContractForm({
         </FieldHelpScope>
     );
 }
+
+export { emptyAggregation, emptyIteration };

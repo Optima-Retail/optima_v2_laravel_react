@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Web\Evaluations;
 
 use App\Domain\Companies\Support\ActiveCompany;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Evaluations\Services\EvaluationService;
 use App\Models\Evaluation;
 use Illuminate\Foundation\Http\FormRequest;
@@ -67,7 +68,7 @@ final class UpdateEvaluationRequest extends FormRequest
                     ->whereIn('company_id', $companyIds),
             ],
             'evaluation_status_id' => ['nullable', 'integer', $statusRule],
-            'responsible_user_id' => ['nullable', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
+            'responsible_user_id' => ['nullable', 'integer', CompanyMemberUsers::existsRule($owner->id)],
             'next_action_at' => ['nullable', 'date'],
             'facility_question' => ['nullable', 'string', 'max:255'],
             'technician_question' => ['nullable', 'string', 'max:255'],

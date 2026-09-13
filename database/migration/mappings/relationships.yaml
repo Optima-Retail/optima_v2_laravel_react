@@ -1,0 +1,483 @@
+entity: company_relationships
+notes: >
+  One relationship per legacy cliente/proveedor/tecnico against a chosen
+  operating company. Owner company selection is UNRESOLVED.
+
+id_map: migration_company_relationship_map
+never_assume_legacy_id_equals_new_id: true
+
+target:
+  table: company_relationships
+  unique:
+    - [owner_company_id, related_company_id, kind, deleted_token]
+  check:
+    - owner_company_id_ne_related_company_id
+
+owner:
+  mapping: FK
+  via: migration_company_map
+  source: empresas
+  notes: UNRESOLVED — REQUIRES REVIEW which operating company owns each party.
+
+sources:
+  - table: clientes
+    kind: customer
+    related_via:
+      map: migration_company_map
+      source: clientes
+
+  - table: proveedores
+    kind: supplier
+    related_via:
+      map: migration_company_map
+      source: proveedores
+
+  - table: tecnicos
+    kind: technician
+    related_via:
+      map: migration_company_map
+      source: tecnicos
+
+fields:
+  kind:
+    mapping: constant
+    from_source_table:
+      clientes: customer
+      proveedores: supplier
+      tecnicos: technician
+    confidence: high
+
+  status:
+    mapping: unresolved
+    notes: UNRESOLVED — boolean estado/activo vs enum; tecnicos.estado_id → legacy_status_id only
+    default_if_forced: active
+    confidence: unresolved
+
+  classification:
+    sources:
+      - clientes.is_intercompany
+    mapping: conditional
+    transform: true_to_intercompany_else_commercial
+    confidence: medium
+
+  owner_reference:
+    sources:
+      - clientes.codigo
+      - proveedores.codigo
+      - tecnicos.codigo
+    mapping: rename
+    notes: tecnicos.codigo vs codigo_tecnico UNRESOLVED
+    confidence: medium
+
+  brand_id:
+    sources:
+      - clientes.marca_id
+    mapping: FK
+    via: migration_brand_map
+    confidence: high
+
+  delegation_id:
+    sources:
+      - clientes.delegacion_id
+      - proveedores.delegacion_id
+      - tecnicos.delegacion_id
+    mapping: FK
+    via: migration_delegation_map
+    confidence: high
+
+  billing_language_id:
+    sources:
+      - clientes.billing_language_id
+    mapping: FK
+    via: migration_language_map
+    confidence: high
+
+  series_id:
+    sources:
+      - clientes.serie_id
+    mapping: FK
+    via: migration_series_map
+    confidence: high
+
+  integration_id:
+    sources:
+      - clientes.integracion_id
+    mapping: FK
+    confidence: high
+
+  integration_external_id:
+    sources:
+      - clientes.integracion_relacion_id
+    mapping: rename
+    confidence: medium
+
+  reported_customer_relationship_id:
+    sources:
+      - clientes.cliente_reportado_id
+    mapping: FK
+    via: migration_company_relationship_map
+    source: clientes
+    defer: true
+    confidence: high
+
+  corrective_work_order_owner_id:
+    sources:
+      - clientes.responsable_ots_correctivas_id
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  preventive_work_order_owner_id:
+    sources:
+      - clientes.responsable_ots_preventivas_id
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  quality_owner_id:
+    sources:
+      - clientes.responsable_qc_id
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  account_owner_id:
+    sources:
+      - clientes.responsable_cliente_id
+      - tecnicos.responsable_id
+    mapping: FK
+    via: migration_user_map
+    notes: technician responsable_id → account_owner_id is medium confidence
+    confidence: medium
+
+  commercial_owner_id:
+    sources:
+      - clientes.responsable_comercial_id
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  sourced_by_user_id:
+    sources:
+      - tecnicos.encontrado_por_id
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  notes:
+    sources:
+      - clientes.observaciones
+      - proveedores.observaciones
+      - tecnicos.observaciones
+    mapping: rename
+    confidence: high
+
+  internal_notes:
+    sources:
+      - clientes.observaciones_privadas
+      - proveedores.observaciones_privadas
+      - tecnicos.observaciones_privadas
+    mapping: rename
+    confidence: high
+
+  notes_alert:
+    sources:
+      - clientes.observaciones_aviso
+      - proveedores.observaciones_aviso
+      - tecnicos.observaciones_aviso
+    mapping: rename
+    confidence: high
+
+  internal_notes_alert:
+    sources:
+      - clientes.observaciones_privadas_aviso
+      - proveedores.observaciones_privadas_aviso
+      - tecnicos.observaciones_privadas_aviso
+    mapping: rename
+    confidence: medium
+
+  onboarding_notes:
+    sources:
+      - clientes.onboarding
+    mapping: rename
+    confidence: high
+
+  billing_comments:
+    sources:
+      - clientes.comentarios_facturacion
+    mapping: rename
+    confidence: high
+
+  rates_notes:
+    sources:
+      - tecnicos.tarifas
+    mapping: rename
+    confidence: medium
+
+  archetype:
+    sources:
+      - clientes.arquetipo
+    mapping: rename
+    confidence: high
+
+  tax_rate:
+    sources:
+      - proveedores.impuesto
+      - tecnicos.impuesto
+    mapping: rename
+    confidence: high
+
+  is_reviewed:
+    sources:
+      - proveedores.revisado
+      - tecnicos.revisado
+    mapping: rename
+    confidence: high
+
+  is_email_reviewed:
+    sources:
+      - clientes.correo_revisado
+    mapping: rename
+    confidence: high
+
+  is_invoicing_reviewed:
+    sources:
+      - clientes.facturacion_revisada
+    mapping: rename
+    confidence: high
+
+  quote_close_days:
+    sources:
+      - clientes.dias_cierre_presupuesto
+    mapping: rename
+    confidence: high
+
+  recurring_meeting_frequency:
+    sources:
+      - clientes.meetings_frequency_recurring
+    mapping: rename
+    confidence: high
+
+  sales_feedback_meeting_frequency:
+    sources:
+      - clientes.meetings_frequency_feedback_sales
+    mapping: rename
+    confidence: high
+
+  group_zero_cost_work_orders:
+    sources:
+      - clientes.agrupar_ots_sin_coste
+    mapping: rename
+    confidence: high
+
+  load_materials_on_corrective:
+    sources:
+      - clientes.cargar_lm_en_correctivo
+    mapping: rename
+    confidence: high
+
+  group_preventive_and_corrective:
+    sources:
+      - clientes.agrupar_preventivos_y_correctivos
+    mapping: rename
+    confidence: high
+
+  group_preventives_by:
+    sources:
+      - clientes.agrupar_preventivos_por
+    mapping: transform
+    transform:
+      cliente: customer
+      establecimiento: establishment
+      ot: work_order
+    confidence: high
+
+  group_correctives_by:
+    sources:
+      - clientes.agrupar_correctivos_por
+    mapping: transform
+    transform:
+      cliente: customer
+      establecimiento: establishment
+      ot: work_order
+    confidence: high
+
+  invoice_at_month_end:
+    sources:
+      - clientes.facturar_fin_mes
+    mapping: rename
+    confidence: high
+
+  requires_purchase_order:
+    sources:
+      - clientes.po_requerida
+    mapping: rename
+    confidence: high
+
+  requires_requester:
+    sources:
+      - clientes.solicitante_requerido
+    mapping: rename
+    confidence: high
+
+  is_franchise:
+    sources:
+      - clientes.es_franquicia
+    mapping: rename
+    confidence: high
+
+  requires_justification:
+    sources:
+      - clientes.justificacion_obligatoria
+    mapping: rename
+    confidence: high
+
+  auto_send_invoices:
+    sources:
+      - clientes.facturacion_envio_automatico
+    mapping: rename
+    confidence: high
+
+  send_invoices_individually:
+    sources:
+      - clientes.facturacion_envio_individual
+    mapping: rename
+    confidence: high
+
+  send_debt_reminders:
+    sources:
+      - clientes.send_debt_reminder
+    mapping: rename
+    confidence: high
+
+  is_quality_control_contactable:
+    sources:
+      - clientes.contactable_qc
+    mapping: rename
+    confidence: high
+
+  requires_client_informed_check:
+    sources:
+      - clientes.requires_client_informed_check
+    mapping: direct
+    confidence: high
+
+  requires_intervention_scheduled_check:
+    sources:
+      - clientes.requires_intervention_scheduled_check
+    mapping: direct
+    confidence: high
+
+  requires_budget_approval_limit:
+    sources:
+      - clientes.requires_budget_approval_limit
+    mapping: direct
+    confidence: high
+
+  is_intercompany:
+    sources:
+      - clientes.is_intercompany
+    mapping: direct
+    confidence: high
+
+  optima_score:
+    sources:
+      - tecnicos.puntuacion_or
+    mapping: rename
+    confidence: high
+
+  customer_score:
+    sources:
+      - tecnicos.puntuacion_cliente
+    mapping: rename
+    confidence: high
+
+  average_score:
+    sources:
+      - tecnicos.puntuacion_media
+    mapping: rename
+    confidence: high
+
+  optima_score_count:
+    sources:
+      - tecnicos.puntuacion_or_num
+    mapping: rename
+    confidence: high
+
+  customer_score_count:
+    sources:
+      - tecnicos.puntuacion_cliente_num
+    mapping: rename
+    confidence: high
+
+  has_health_and_safety:
+    sources:
+      - tecnicos.prl
+    mapping: rename
+    confidence: high
+
+  is_field_technician:
+    sources:
+      - tecnicos.es_tecnico
+    mapping: rename
+    confidence: high
+
+  is_creditor:
+    sources:
+      - tecnicos.es_acreedor
+    mapping: rename
+    confidence: high
+
+  is_vip:
+    sources:
+      - tecnicos.es_vip
+    mapping: rename
+    confidence: high
+
+  is_available_24h:
+    sources:
+      - tecnicos.disponible_24h
+    mapping: rename
+    confidence: high
+
+  day_start_at:
+    sources:
+      - tecnicos.hora_dia_inicio
+    mapping: rename
+    confidence: high
+
+  day_end_at:
+    sources:
+      - tecnicos.hora_dia_fin
+    mapping: rename
+    confidence: high
+
+  has_garnishment:
+    sources:
+      - tecnicos.tiene_embargo
+    mapping: rename
+    confidence: high
+
+  whatsapp_messaging_authorized:
+    sources:
+      - tecnicos.whatsapp_message_authorisation
+    mapping: rename
+    confidence: high
+
+  registered_at:
+    sources:
+      - tecnicos.fecha_alta
+    mapping: transform
+    transform: date_to_timestamp
+    confidence: medium
+
+  legacy_status_id:
+    sources:
+      - tecnicos.estado_id
+    mapping: copy
+    confidence: high
+
+  deleted_token:
+    mapping: constant
+    value: ""
+    confidence: high

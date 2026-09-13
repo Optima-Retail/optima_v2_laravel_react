@@ -30,6 +30,7 @@ final class WorkOrderStatusController extends Controller
 
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
+            'kind' => $request->string('kind')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'lifecycle',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
@@ -53,10 +54,10 @@ final class WorkOrderStatusController extends Controller
 
         $filters = TabulatorQuery::fromRequest(
             $request,
-            allowedSorts: ['id', 'name', 'lifecycle', 'is_open'],
+            allowedSorts: ['id', 'name', 'kind', 'lifecycle', 'is_open'],
             defaultSort: 'lifecycle',
             defaultDirection: 'asc',
-            filterKeys: ['search'],
+            filterKeys: ['search', 'kind'],
         );
 
         return TabulatorResponse::fromPaginator(
@@ -75,6 +76,7 @@ final class WorkOrderStatusController extends Controller
     {
         $this->workOrderStatuses->create([
             'name' => $request->string('name')->toString(),
+            'kind' => $request->string('kind')->toString(),
             'color' => $request->input('color'),
             'lifecycle' => $request->input('lifecycle'),
             'is_open' => $request->boolean('is_open'),
@@ -101,6 +103,7 @@ final class WorkOrderStatusController extends Controller
     {
         $this->workOrderStatuses->update($workOrderStatus, [
             'name' => $request->string('name')->toString(),
+            'kind' => $request->string('kind')->toString(),
             'color' => $request->input('color'),
             'lifecycle' => $request->input('lifecycle'),
             'is_open' => $request->boolean('is_open'),

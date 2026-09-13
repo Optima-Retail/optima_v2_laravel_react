@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Domain\Config\Users\Services;
 
 use App\Domain\Companies\Services\CompanyService;
+use App\Domain\Companies\Support\ActiveCompany;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Models\Brand;
 use App\Models\CompanyUser;
 use App\Models\Role;
@@ -236,14 +238,17 @@ final class UserService
             $companyOptions = app(CompanyService::class)->membershipOptionsForUser($actor);
         }
 
+        $owner = app(ActiveCompany::class)->forUser($actor);
+
         return [
-            'users' => User::query()
-                ->when($editing, fn ($query) => $query->whereKeyNot($editing->id))
-                ->orderBy('name')
-                ->get(['id', 'name', 'email'])
-                ->map(fn (User $user): array => ['id' => $user->id, 'label' => "{$user->name} ({$user->email})"])
-                ->values()
-                ->all(),
+            'users' => CompanyMemberUsers::options(
+                $owner,
+                includeUserIds: array_values(array_filter([
+                    $editing?->manager_id,
+                    $editing?->team_leader_id,
+                ])),
+                excludeUserId: $editing?->id,
+            ),
             'teams' => Team::query()
                 ->orderBy('name')
                 ->get(['id', 'name'])

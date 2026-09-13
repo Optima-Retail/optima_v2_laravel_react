@@ -15,6 +15,7 @@ use App\Http\Requests\Web\Contracts\StoreContractRequest;
 use App\Http\Requests\Web\Contracts\UpdateContractRequest;
 use App\Models\Contract;
 use App\Models\ContractAttachment;
+use App\Models\ContractStatus;
 use App\Models\NumberingPattern;
 use App\Support\ListQuery;
 use App\Support\TabulatorQuery;
@@ -43,6 +44,9 @@ final class ContractController extends Controller
 
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
+            'contract_status_id' => $request->string('contract_status_id')->trim()->toString(),
+            'created_from' => $request->string('created_from')->trim()->toString(),
+            'created_to' => $request->string('created_to')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
@@ -52,6 +56,16 @@ final class ContractController extends Controller
 
         return Inertia::render('Contracts/Index', [
             'filters' => $filters,
+            'contractStatusOptions' => ContractStatus::query()
+                ->orderBy('lifecycle')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (ContractStatus $status): array => [
+                    'id' => $status->id,
+                    'label' => $status->name,
+                ])
+                ->values()
+                ->all(),
             'can' => [
                 'create' => $request->user()?->can('create', Contract::class) ?? false,
                 'update' => $request->user()?->can('contracts.update') ?? false,
@@ -73,7 +87,7 @@ final class ContractController extends Controller
             allowedSorts: ['id', 'code', 'description', 'signed_at', 'total_amount', 'created_at'],
             defaultSort: 'id',
             defaultDirection: 'desc',
-            filterKeys: ['search'],
+            filterKeys: ['search', 'contract_status_id', 'created_from', 'created_to'],
         );
 
         return TabulatorResponse::fromPaginator(
@@ -98,8 +112,10 @@ final class ContractController extends Controller
             'companyOptions' => $this->contracts->clientCompanyOptions($owner),
             'contractStatusOptions' => $this->contracts->contractStatusOptions(),
             'languageOptions' => $this->contracts->languageOptions(),
-            'userOptions' => $this->contracts->userOptions(),
+            'userOptions' => $this->contracts->userOptions($owner),
             'establishmentOptions' => $this->contracts->establishmentOptions($owner),
+            'workOrderTypeOptions' => $this->contracts->workOrderTypeOptions(),
+            'formTemplateOptions' => $this->contracts->formTemplateOptions($owner),
         ]);
     }
 
@@ -131,8 +147,10 @@ final class ContractController extends Controller
                 $contract->contract_status_id !== null ? (int) $contract->contract_status_id : null,
             ),
             'languageOptions' => $this->contracts->languageOptions(),
-            'userOptions' => $this->contracts->userOptions(),
+            'userOptions' => $this->contracts->userOptions($owner),
             'establishmentOptions' => $this->contracts->establishmentOptions($owner),
+            'workOrderTypeOptions' => $this->contracts->workOrderTypeOptions(),
+            'formTemplateOptions' => $this->contracts->formTemplateOptions($owner),
             'can' => [
                 'delete' => $user?->can('delete', $contract) ?? false,
                 'view_attachments' => $canViewAttachments,

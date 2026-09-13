@@ -305,7 +305,10 @@ final class NumberingPatternService
             $parts[] = match ($type) {
                 NumberingSegmentType::Letters,
                 NumberingSegmentType::Symbols => (string) ($segment['value'] ?? ''),
-                NumberingSegmentType::Year => (string) $year,
+                NumberingSegmentType::Year => $this->formatYear(
+                    $year,
+                    isset($segment['digit_length']) ? (int) $segment['digit_length'] : null,
+                ),
                 NumberingSegmentType::Sequence => str_pad(
                     (string) $sequence,
                     max(1, min(10, (int) ($segment['digit_length'] ?? 5))),
@@ -343,6 +346,10 @@ final class NumberingPatternService
                 $row['value'] = (string) ($segment['value'] ?? '');
             }
 
+            if ($type === NumberingSegmentType::Year && isset($segment['digit_length'])) {
+                $row['digit_length'] = max(2, min(4, (int) $segment['digit_length']));
+            }
+
             if ($type->requiresDigitLength()) {
                 $row['digit_length'] = max(1, min(10, (int) ($segment['digit_length'] ?? 5)));
             }
@@ -360,6 +367,25 @@ final class NumberingPatternService
      */
     public function defaultSegmentsFor(string $resource): array
     {
+        // Match Optima Prod CodigoSiguiente prefixes: PR{yy}/ and OT{yy}/.
+        if ($resource === NumberingResource::Estimates->value) {
+            return [
+                ['type' => NumberingSegmentType::Letters->value, 'value' => 'PR'],
+                ['type' => NumberingSegmentType::Year->value, 'digit_length' => 2],
+                ['type' => NumberingSegmentType::Letters->value, 'value' => '/'],
+                ['type' => NumberingSegmentType::Sequence->value, 'digit_length' => 5],
+            ];
+        }
+
+        if ($resource === NumberingResource::WorkOrders->value) {
+            return [
+                ['type' => NumberingSegmentType::Letters->value, 'value' => 'OT'],
+                ['type' => NumberingSegmentType::Year->value, 'digit_length' => 2],
+                ['type' => NumberingSegmentType::Letters->value, 'value' => '/'],
+                ['type' => NumberingSegmentType::Sequence->value, 'digit_length' => 5],
+            ];
+        }
+
         $prefix = mb_strtoupper(mb_substr(trim($resource), 0, 1));
 
         if ($prefix === '') {
@@ -383,6 +409,19 @@ final class NumberingPatternService
             'last_sequence' => 0,
             'last_year' => null,
         ]);
+    }
+
+    private function formatYear(int $year, ?int $digitLength): string
+    {
+        $full = (string) $year;
+
+        if ($digitLength === null) {
+            return $full;
+        }
+
+        $length = max(2, min(4, $digitLength));
+
+        return substr($full, -$length);
     }
 
     /**

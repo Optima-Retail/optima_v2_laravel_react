@@ -7,6 +7,7 @@ import {
     CompanySchedulePanel,
     type CompanyScheduleValues,
 } from '@/components/clients/CompanySchedulePanel';
+import { TechnicianIncidentsPanel } from '@/components/technicians/TechnicianIncidentsPanel';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -51,7 +52,7 @@ type RelationshipFormProps = {
     companyOptions: UserOption[];
     brandOptions?: UserOption[];
     formOptions?: RelationshipFormOptions;
-    profileMode?: 'customer' | 'supplier';
+    profileMode?: 'customer' | 'supplier' | 'technician';
     onChange: (key: string, value: string | boolean | string[]) => void;
     onRelatedCompanyChange?: (key: keyof RelationshipFormValues['related_company'], value: string) => void;
     onSubmit: (event: FormEvent) => void;
@@ -66,6 +67,9 @@ type RelationshipFormProps = {
     /** Customer/supplier edit extras (articles / rates / technician services / opening hours). */
     relationshipId?: number;
     schedule?: CompanyScheduleValues;
+    initialTab?: string;
+    selectedIncidentId?: number | null;
+    showIncidentsTab?: boolean;
 };
 
 const defaultKinds = ['customer', 'supplier', 'technician', 'partner'] as const;
@@ -114,6 +118,9 @@ export function RelationshipForm({
     showBrand = false,
     relationshipId,
     schedule,
+    initialTab = 'general',
+    selectedIncidentId = null,
+    showIncidentsTab = false,
 }: RelationshipFormProps) {
     const { t } = useTranslation();
     const showBrandField = showBrand || profileMode === 'customer';
@@ -122,8 +129,10 @@ export function RelationshipForm({
     const creatingNew = allowCreateRelated && values.related_mode === 'new';
     const isCustomerProfile = profileMode === 'customer';
     const isSupplierProfile = profileMode === 'supplier';
+    const isTechnicianProfile = profileMode === 'technician';
+    const isProviderProfile = isSupplierProfile || isTechnicianProfile;
     const resolvedBrandOptions = formOptions.brandOptions.length > 0 ? formOptions.brandOptions : brandOptions;
-    const [activeTab, setActiveTab] = useState('general');
+    const [activeTab, setActiveTab] = useState(initialTab);
 
     const canViewArticles = useCan('articles.view');
     const canEditArticles =
@@ -139,13 +148,16 @@ export function RelationshipForm({
     const canEditEstablishments = useCan('establishments.update');
     const canCreateEstablishments = useCan('establishments.create');
     const canEditSchedule = useCan('company_relationships.update');
+    const canUpdateIncidents = useCan('technician_incidents.update');
+    const canCreateIncidents = useCan('technician_incidents.create');
 
     const showCustomerExtras = isCustomerProfile && relationshipId != null;
     const showEstablishmentsTab = showCustomerExtras && canViewEstablishments;
     const showArticlesTab = showCustomerExtras && canViewArticles;
     const showRatesTab = showCustomerExtras && canViewRates;
     const showOpeningHoursTab = showCustomerExtras && schedule != null;
-    const showTechnicianServices = isSupplierProfile && values.kind === 'technician';
+    const showTechnicianServices = (isSupplierProfile || isTechnicianProfile) && values.kind === 'technician';
+    const showIncidents = isTechnicianProfile && showIncidentsTab && relationshipId != null;
 
     const relatedCompanyId = values.related_company_id
         ? Number(values.related_company_id)
@@ -182,20 +194,26 @@ export function RelationshipForm({
             }
         }
 
-        if (isSupplierProfile) {
+        if (isProviderProfile) {
             items.push({ id: 'supplier', label: t('relationships.tabs.supplier') });
 
-            if (values.kind === 'technician') {
+            if (values.kind === 'technician' || isTechnicianProfile) {
                 items.push({ id: 'technician', label: t('relationships.tabs.technician') });
+            }
+
+            if (showIncidents) {
+                items.push({ id: 'incidents', label: t('relationships.tabs.incidents') });
             }
         }
 
         return items;
     }, [
         isCustomerProfile,
-        isSupplierProfile,
+        isProviderProfile,
+        isTechnicianProfile,
         showArticlesTab,
         showEstablishmentsTab,
+        showIncidents,
         showOpeningHoursTab,
         showRatesTab,
         t,
@@ -203,7 +221,7 @@ export function RelationshipForm({
     ]);
 
     const extraTabIds = useMemo(
-        () => new Set(['establishments', 'articles', 'rates', 'opening_hours']),
+        () => new Set(['establishments', 'articles', 'rates', 'opening_hours', 'incidents']),
         [],
     );
     const isExtraTab = extraTabIds.has(activeTab);
@@ -1028,7 +1046,7 @@ export function RelationshipForm({
                     </TabPanel>
                 ) : null}
 
-                {isSupplierProfile ? (
+                {isProviderProfile ? (
                     <TabPanel id="supplier">
                         <div className="grid gap-5 sm:grid-cols-2">
                         <Toggle
@@ -1074,7 +1092,7 @@ export function RelationshipForm({
                     </TabPanel>
                 ) : null}
 
-                {isSupplierProfile && values.kind === 'technician' ? (
+                {(isTechnicianProfile || (isSupplierProfile && values.kind === 'technician')) ? (
                     <TabPanel id="technician">
                         <div className="grid gap-5 sm:grid-cols-2">
                         <Toggle
@@ -1192,6 +1210,19 @@ export function RelationshipForm({
                             schedule={schedule}
                             canEdit={canEditSchedule}
                             embedded
+                        />
+                    </TabPanel>
+                ) : null}
+
+                {showIncidents && relationshipId != null ? (
+                    <TabPanel id="incidents">
+                        <TechnicianIncidentsPanel
+                            relationshipId={relationshipId}
+                            selectedIncidentId={selectedIncidentId}
+                            canPostMessages={canUpdateIncidents}
+                            canCreate={canCreateIncidents}
+                            canVerify={canUpdateIncidents}
+                            canUpdateStatus={canUpdateIncidents}
                         />
                     </TabPanel>
                 ) : null}

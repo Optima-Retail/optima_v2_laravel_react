@@ -1,0 +1,168 @@
+import { useEffect, useRef } from 'react';
+import { Head, Link } from '@inertiajs/react';
+import { Wallet, Plus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import type { CellComponent, ColumnDefinition } from 'tabulator-tables';
+import { TypesConfigTabs } from '@/components/config/TypesConfigTabs';
+import { PageHeader } from '@/components/page/PageHeader';
+import {
+    RemoteDataTable,
+    type RemoteDataColumnHelpers,
+    type RemoteDataTableHandle,
+} from '@/components/table/RemoteDataTable';
+import { confirmAction } from '@/helpers/confirm';
+import { AppLayout } from '@/layouts/AppLayout';
+import { expenseTypesService } from '@/services';
+import {
+    isDeleteActionClick,
+    tabulatorActionsCell,
+    tabulatorDeleteButton,
+    tabulatorEditLink,
+} from '@/support/tabulator';
+import type { ExpenseTypeListItem } from '@/support/types/domain/expense-type';
+
+type ExpenseTypesIndexProps = {
+    filters: {
+        search: string;
+        sort: string;
+        direction: string;
+        per_page: string;
+    };
+    can: {
+        create: boolean;
+        update: boolean;
+        delete: boolean;
+    };
+};
+
+export default function ExpenseTypesIndex({ filters, can }: ExpenseTypesIndexProps) {
+    const { t, i18n } = useTranslation();
+    const tableRef = useRef<RemoteDataTableHandle>(null);
+    const canRef = useRef(can);
+
+    useEffect(() => {
+        canRef.current = can;
+    }, [can]);
+
+    function buildColumns({ titleFormatter, getTable }: RemoteDataColumnHelpers): ColumnDefinition[] {
+        return [
+            {
+                title: t('common.id'),
+                field: 'id',
+                width: 88,
+                headerSort: true,
+                titleFormatter,
+            },
+            {
+                title: t('common.name'),
+                field: 'name',
+                minWidth: 220,
+                headerSort: true,
+                titleFormatter,
+            },
+            {
+                title: t('common.actions'),
+                field: 'actions',
+                width: 104,
+                hozAlign: 'right',
+                headerHozAlign: 'right',
+                headerSort: false,
+                formatter: (cell: CellComponent) => {
+                    const type = cell.getRow().getData() as ExpenseTypeListItem;
+                    const parts: string[] = [];
+
+                    if (canRef.current.update) {
+                        parts.push(
+                            tabulatorEditLink(
+                                expenseTypesService.editPath(type.id),
+                                t('common.editItem', { name: type.name }),
+                            ),
+                        );
+                    }
+
+                    if (canRef.current.delete) {
+                        parts.push(tabulatorDeleteButton(t('common.deleteItem', { name: type.name })));
+                    }
+
+                    return tabulatorActionsCell(parts);
+                },
+                cellClick: async (event: UIEvent, cell: CellComponent) => {
+                    if (!isDeleteActionClick(event)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    const type = cell.getRow().getData() as ExpenseTypeListItem;
+                    const confirmed = await confirmAction({
+                        title: t('common.deleteTitle', { resource: t('expenseTypes.resource') }),
+                        message: t('common.deleteMessage', { name: type.name }),
+                        confirmLabel: t('common.delete'),
+                        tone: 'danger',
+                    });
+
+                    if (!confirmed) {
+                        return;
+                    }
+
+                    expenseTypesService.destroy(type.id, {
+                        preserveScroll: true,
+                        onSuccess: () => {
+                            getTable()?.replaceData();
+                        },
+                    });
+                },
+            },
+        ];
+    }
+
+    return (
+        <AppLayout title={t('nav.types')}>
+            <Head title={t('nav.types')} />
+            <div className="space-y-6">
+                <PageHeader
+                    title={t('nav.types')}
+                    description={t('expenseTypes.description')}
+                    actions={
+                        can.create ? (
+                            <Link
+                                href={expenseTypesService.createPath}
+                                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
+                            >
+                                <Plus className="size-3.5" aria-hidden />
+                                {t('common.newItem', { resource: t('expenseTypes.resource') })}
+                            </Link>
+                        ) : null
+                    }
+                />
+
+                <TypesConfigTabs activeId="expense" />
+
+                <RemoteDataTable<ExpenseTypeListItem>
+                    ref={tableRef}
+                    ajaxURL={expenseTypesService.dataPath}
+                    columns={buildColumns}
+                    initialSort={{
+                        column: filters.sort || 'name',
+                        dir: filters.direction === 'desc' ? 'desc' : 'asc',
+                    }}
+                    pageSize={Number(filters.per_page) || 12}
+                    initialFilters={{
+                        search: filters.search,
+                    }}
+                    filterFields={[
+                        {
+                            type: 'search',
+                            name: 'search',
+                            label: t('common.search'),
+                            placeholder: t('expenseTypes.searchPlaceholder'),
+                        },
+                    ]}
+                    syncUrlBase={expenseTypesService.indexPath}
+                    emptyIcon={<Wallet className="size-5" aria-hidden />}
+                    emptyMessage={t('common.empty', { resource: t('expenseTypes.resourcePlural') })}
+                    deps={[i18n.language]}
+                />
+            </div>
+        </AppLayout>
+    );
+}

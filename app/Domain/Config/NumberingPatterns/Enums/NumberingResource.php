@@ -8,6 +8,8 @@ enum NumberingResource: string
 {
     case Contracts = 'contracts';
     case Invoices = 'invoices';
+    case Estimates = 'estimates';
+    case WorkOrders = 'work_orders';
 
     /**
      * @return list<string>

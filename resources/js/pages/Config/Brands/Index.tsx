@@ -27,6 +27,8 @@ import type { BrandListItem } from '@/support/types/domain/brand';
 type BrandsIndexProps = {
     filters: {
         search: string;
+        created_from: string;
+        created_to: string;
         sort: string;
         direction: string;
         per_page: string;
@@ -226,6 +228,8 @@ export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
                     pageSize={Number(filters.per_page) || 12}
                     initialFilters={{
                         search: filters.search,
+                        created_from: filters.created_from,
+                        created_to: filters.created_to,
                     }}
                     filterFields={[
                         {
@@ -234,7 +238,18 @@ export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
                             label: t('common.search'),
                             placeholder: t('brands.searchPlaceholder'),
                         },
+                        {
+                            type: 'date',
+                            name: 'created_from',
+                            label: t('filters.createdFrom'),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_to',
+                            label: t('filters.createdTo'),
+                        },
                     ]}
+                    savedFiltersPageKey="brands"
                     syncUrlBase={brandsService.indexPath}
                     emptyIcon={<Tags className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('brands.resourcePlural') })}

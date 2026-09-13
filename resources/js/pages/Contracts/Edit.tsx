@@ -3,7 +3,7 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ContractAttachmentsPanel } from '@/components/contracts/ContractAttachmentsPanel';
-import { ContractForm, defaultContractFormValues } from '@/components/contracts/ContractForm';
+import { ContractForm, contractFormValuesFromData } from '@/components/contracts/ContractForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
@@ -22,6 +22,8 @@ type EditContractProps = {
     languageOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
+    workOrderTypeOptions: UserOption[];
+    formTemplateOptions: UserOption[];
     can: {
         delete: boolean;
         view_attachments: boolean;
@@ -50,6 +52,8 @@ export default function EditContract({
     languageOptions,
     userOptions,
     establishmentOptions,
+    workOrderTypeOptions,
+    formTemplateOptions,
     can,
 }: EditContractProps) {
     const { t } = useTranslation();
@@ -59,20 +63,7 @@ export default function EditContract({
 
         return tab === 'attachments' && !can.view_attachments ? 'details' : tab;
     });
-    const form = useForm(
-        defaultContractFormValues({
-            code: contract.code ?? '',
-            description: contract.description ?? '',
-            work_order_subject: contract.work_order_subject ?? '',
-            company_id: contract.company_id ? String(contract.company_id) : '',
-            responsible_user_id: contract.responsible_user_id ? String(contract.responsible_user_id) : '',
-            contract_status_id: contract.contract_status_id ? String(contract.contract_status_id) : '',
-            language_id: contract.language_id ? String(contract.language_id) : '',
-            signed_at: contract.signed_at ?? '',
-            canceled_at: contract.canceled_at ?? '',
-            establishment_ids: contract.establishment_ids.map(String),
-        }),
-    );
+    const form = useForm(contractFormValuesFromData(contract));
 
     const tabItems = useMemo<TabItem[]>(() => {
         const items: TabItem[] = [{ id: 'details', label: t('contracts.tabDetails') }];
@@ -143,6 +134,8 @@ export default function EditContract({
                             languageOptions={languageOptions}
                             userOptions={userOptions}
                             establishmentOptions={establishmentOptions}
+                            workOrderTypeOptions={workOrderTypeOptions}
+                            formTemplateOptions={formTemplateOptions}
                             onChange={(key, value) => form.setData(key, value)}
                             onSubmit={submit}
                             submitLabel={t('common.save')}

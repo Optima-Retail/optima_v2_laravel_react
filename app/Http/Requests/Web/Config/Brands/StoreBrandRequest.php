@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Web\Config\Brands;
 
+use App\Domain\Companies\Support\ActiveCompany;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Models\Brand;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -38,15 +40,18 @@ final class StoreBrandRequest extends FormRequest
      */
     public function rules(): array
     {
+        $ownerId = app(ActiveCompany::class)->forUser($this->user())?->id;
+        $memberUser = CompanyMemberUsers::existsRule($ownerId);
+
         return [
             'name' => ['required', 'string', 'max:255', Rule::unique('brands', 'name')->whereNull('deleted_at')],
-            'account_manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
-            'commercial_manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
+            'account_manager_id' => ['nullable', 'integer', $memberUser],
+            'commercial_manager_id' => ['nullable', 'integer', $memberUser],
             'collaborator_ids' => ['sometimes', 'array'],
             'collaborator_ids.*' => [
                 'integer',
                 'distinct',
-                Rule::exists('users', 'id')->whereNull('deleted_at'),
+                $memberUser,
             ],
             'loyalty_meeting_frequency' => ['nullable', 'string', 'max:255'],
             'is_quality_control_contactable' => ['required', 'boolean'],

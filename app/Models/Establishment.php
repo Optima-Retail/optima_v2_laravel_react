@@ -188,6 +188,14 @@ class Establishment extends Model
         return $this->hasMany(Evaluation::class);
     }
 
+    /**
+     * @return HasMany<WorkOrder, $this>
+     */
+    public function workOrders(): HasMany
+    {
+        return $this->hasMany(WorkOrder::class);
+    }
+
     public function softDeleteSafely(): bool
     {
         if ($this->code !== null && $this->code !== '') {

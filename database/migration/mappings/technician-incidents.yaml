@@ -1,0 +1,86 @@
+entity: technician_incidents
+id_map: migration_technician_incident_map
+never_assume_legacy_id_equals_new_id: true
+
+sources:
+  - table: tecnicos_incidencias
+
+target:
+  table: technician_incidents
+
+fields:
+  status_id:
+    sources: [tecnicos_incidencias.estado_id]
+    mapping: FK
+    catalog_ids_preserved: [96, 97, 98, 155, 156, 173]
+    confidence: high
+    notes: Confirm live column name estado_id vs status_id
+
+  technician_incident_type_id:
+    sources: [tecnicos_incidencias.tipo_id]
+    mapping: FK
+    required: true
+    confidence: high
+
+  incident_text:
+    mapping: rename
+    notes: Confirm live source column name
+    confidence: medium
+
+  response_text:
+    mapping: rename
+    confidence: medium
+
+  requested_by_id:
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  responded_by_id:
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  responded_at:
+    mapping: transform
+    transform: datetime_to_date
+    confidence: high
+
+  technician_id:
+    sources: [tecnicos_incidencias.tecnico_id]
+    mapping: FK
+    via: migration_company_relationship_map
+    source: tecnicos
+    notes: company_relationships.id, not companies.id
+    confidence: high
+
+  is_verified:
+    mapping: rename
+    confidence: high
+
+  verified_at:
+    mapping: rename
+    confidence: high
+
+  verified_by_id:
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  due_at:
+    mapping: rename
+    confidence: medium
+
+  negotiation_succeeded:
+    mapping: rename
+    confidence: medium
+
+  unsuccessful_negotiation_solution:
+    mapping: rename
+    confidence: medium
+
+ignored:
+  - abierta
+  - num_facturas
+  - num_facturas_reclamadas
+  - invoice pivot

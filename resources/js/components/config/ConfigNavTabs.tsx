@@ -26,8 +26,7 @@ export function ConfigNavTabs({ tabs, activeId, className, alwaysShow = false }:
             role="tablist"
             aria-orientation="horizontal"
             className={cn(
-                'inline-flex max-w-full gap-0.5 overflow-x-auto rounded-xl border border-line bg-canvas p-1',
-                '[-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+                'app-scroll flex w-full min-w-0 max-w-full gap-0.5 overflow-x-auto overscroll-x-contain rounded-xl border border-line bg-canvas p-1',
                 className,
             )}
         >
@@ -42,7 +41,7 @@ export function ConfigNavTabs({ tabs, activeId, className, alwaysShow = false }:
                         aria-selected={selected}
                         tabIndex={selected ? 0 : -1}
                         className={cn(
-                            'shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors duration-150',
+                            'shrink-0 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors duration-150',
                             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30',
                             selected
                                 ? 'bg-brand-soft text-brand shadow-sm'

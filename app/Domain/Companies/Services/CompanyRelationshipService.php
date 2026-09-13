@@ -6,6 +6,8 @@ namespace App\Domain\Companies\Services;
 
 use App\Domain\Companies\Enums\CompanyKind;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Domain\Companies\Enums\CompanyRelationshipStatus;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Companies\Support\CompanyValidation;
 use App\Domain\Config\TechnicianAlternativeDelegations\Services\TechnicianAlternativeDelegationService;
 use App\Domain\Config\TechnicianGlobalServiceTypes\Services\TechnicianGlobalServiceTypeService;
@@ -29,13 +31,16 @@ use Illuminate\Validation\ValidationException;
 final class CompanyRelationshipService
 {
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, page?: int|string|null, kind?: string|null, kinds?: list<string>|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, page?: int|string|null, kind?: string|null, kinds?: list<string>|null, status?: string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, CompanyRelationship>
      */
     public function paginateForOwner(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $kind = trim((string) ($filters['kind'] ?? ''));
+        $status = trim((string) ($filters['status'] ?? ''));
+        $createdFrom = trim((string) ($filters['created_from'] ?? ''));
+        $createdTo = trim((string) ($filters['created_to'] ?? ''));
         /** @var list<string> $kinds */
         $kinds = array_values(array_filter(
             array_map('strval', $filters['kinds'] ?? []),
@@ -50,6 +55,10 @@ final class CompanyRelationshipService
             ->where('owner_company_id', $owner->id)
             ->when($kinds !== [], fn ($query) => $query->whereIn('kind', $kinds))
             ->when($kind !== '', fn ($query) => $query->where('kind', $kind))
+            ->when(
+                $status !== '' && in_array($status, CompanyRelationshipStatus::values(), true),
+                fn ($query) => $query->where('status', $status),
+            )
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner
@@ -61,13 +70,15 @@ final class CompanyRelationshipService
                             ->orWhere('tax_id', 'like', "%{$search}%"));
                 });
             })
+            ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
+            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
             ->orderBy($sort, $direction)
             ->paginate($perPage, ['*'], 'page', $page)
             ->withQueryString();
     }
 
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, page?: int|string|null, kind?: string|null, kinds?: list<string>|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, page?: int|string|null, kind?: string|null, kinds?: list<string>|null, status?: string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     public function paginateForWeb(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator
@@ -261,7 +272,7 @@ final class CompanyRelationshipService
      *     globalServiceTypeOptions: list<array{id: int, label: string, color: string|null}>
      * }
      */
-    public function formOptions(): array
+    public function formOptions(Company $owner): array
     {
         return [
             'brandOptions' => Brand::query()
@@ -309,15 +320,7 @@ final class CompanyRelationshipService
                 ])
                 ->values()
                 ->all(),
-            'userOptions' => User::query()
-                ->orderBy('name')
-                ->get(['id', 'name', 'email'])
-                ->map(fn (User $user): array => [
-                    'id' => $user->id,
-                    'label' => "{$user->name} ({$user->email})",
-                ])
-                ->values()
-                ->all(),
+            'userOptions' => CompanyMemberUsers::options($owner),
             'priorityOptions' => ClientPriority::query()
                 ->orderBy('level')
                 ->orderBy('name')

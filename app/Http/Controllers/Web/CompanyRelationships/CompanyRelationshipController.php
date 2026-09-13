@@ -44,10 +44,10 @@ final class CompanyRelationshipController extends Controller
     private const CLIENT_KINDS = [CompanyRelationshipKind::Customer->value];
 
     /** @var list<string> */
-    private const SUPPLIER_KINDS = [
-        CompanyRelationshipKind::Supplier->value,
-        CompanyRelationshipKind::Technician->value,
-    ];
+    private const SUPPLIER_KINDS = [CompanyRelationshipKind::Supplier->value];
+
+    /** @var list<string> */
+    private const TECHNICIAN_KINDS = [CompanyRelationshipKind::Technician->value];
 
     public function __construct(
         private readonly CompanyRelationshipService $relationships,
@@ -70,6 +70,11 @@ final class CompanyRelationshipController extends Controller
         return $this->indexScoped($request, 'Suppliers/Index', self::SUPPLIER_KINDS);
     }
 
+    public function indexTechnicians(Request $request): Response
+    {
+        return $this->indexScoped($request, 'Technicians/Index', self::TECHNICIAN_KINDS);
+    }
+
     public function dataClients(Request $request): JsonResponse
     {
         return $this->dataScoped($request, self::CLIENT_KINDS);
@@ -80,6 +85,11 @@ final class CompanyRelationshipController extends Controller
         return $this->dataScoped($request, self::SUPPLIER_KINDS);
     }
 
+    public function dataTechnicians(Request $request): JsonResponse
+    {
+        return $this->dataScoped($request, self::TECHNICIAN_KINDS);
+    }
+
     public function createClient(Request $request): Response
     {
         $this->authorize('create', CompanyRelationship::class);
@@ -88,7 +98,7 @@ final class CompanyRelationshipController extends Controller
 
         return Inertia::render('Clients/Create', [
             'companyOptions' => $this->companies->companyOptions($owner->id),
-            'formOptions' => $this->relationships->formOptions(),
+            'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
         ]);
     }
 
@@ -100,7 +110,19 @@ final class CompanyRelationshipController extends Controller
 
         return Inertia::render('Suppliers/Create', [
             'companyOptions' => $this->companies->companyOptions($owner->id),
-            'formOptions' => $this->relationships->formOptions(),
+            'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
+        ]);
+    }
+
+    public function createTechnician(Request $request): Response
+    {
+        $this->authorize('create', CompanyRelationship::class);
+
+        $owner = $this->activeCompany($request);
+
+        return Inertia::render('Technicians/Create', [
+            'companyOptions' => $this->companies->companyOptions($owner->id),
+            'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
         ]);
     }
 
@@ -123,7 +145,7 @@ final class CompanyRelationshipController extends Controller
     public function storeSupplier(StoreCompanyRelationshipRequest $request): RedirectResponse
     {
         $data = $request->validated();
-        abort_unless(in_array($data['kind'], self::SUPPLIER_KINDS, true), 422);
+        $data['kind'] = CompanyRelationshipKind::Supplier->value;
 
         $this->relationships->create(
             $this->activeCompany($request),
@@ -134,6 +156,22 @@ final class CompanyRelationshipController extends Controller
         return redirect()
             ->route('suppliers.index')
             ->with('success', 'supplier_created_successfully');
+    }
+
+    public function storeTechnician(StoreCompanyRelationshipRequest $request): RedirectResponse
+    {
+        $data = $request->validated();
+        $data['kind'] = CompanyRelationshipKind::Technician->value;
+
+        $this->relationships->create(
+            $this->activeCompany($request),
+            $data,
+            $request->user(),
+        );
+
+        return redirect()
+            ->route('technicians.index')
+            ->with('success', 'technician_created_successfully');
     }
 
     public function editClient(Request $request, CompanyRelationship $relationship): Response
@@ -149,7 +187,7 @@ final class CompanyRelationshipController extends Controller
             'relationship' => $this->relationships->toFormData($relationship),
             'schedule' => $this->schedules->toFormData($relationship->relatedCompany?->schedule),
             'companyOptions' => $this->companies->companyOptions($owner->id),
-            'formOptions' => $this->relationships->formOptions(),
+            'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
             'can' => [
                 'delete' => $request->user()?->can('delete', $relationship) ?? false,
             ],
@@ -181,9 +219,29 @@ final class CompanyRelationshipController extends Controller
         return Inertia::render('Suppliers/Edit', [
             'relationship' => $this->relationships->toFormData($relationship),
             'companyOptions' => $this->companies->companyOptions($owner->id),
-            'formOptions' => $this->relationships->formOptions(),
+            'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
             'can' => [
                 'delete' => $request->user()?->can('delete', $relationship) ?? false,
+            ],
+        ]);
+    }
+
+    public function editTechnician(Request $request, CompanyRelationship $relationship): Response
+    {
+        $this->assertKind($relationship, self::TECHNICIAN_KINDS);
+        $this->authorize('update', $relationship);
+
+        $owner = $this->activeCompany($request);
+
+        return Inertia::render('Technicians/Edit', [
+            'relationship' => $this->relationships->toFormData($relationship),
+            'companyOptions' => $this->companies->companyOptions($owner->id),
+            'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
+            'initialTab' => $request->string('tab')->trim()->toString() ?: 'general',
+            'selectedIncidentId' => $request->integer('incident') ?: null,
+            'can' => [
+                'delete' => $request->user()?->can('delete', $relationship) ?? false,
+                'viewIncidents' => $request->user()?->can('technician_incidents.view') ?? false,
             ],
         ]);
     }
@@ -207,13 +265,27 @@ final class CompanyRelationshipController extends Controller
         $this->assertKind($relationship, self::SUPPLIER_KINDS);
 
         $data = $request->validated();
-        abort_unless(in_array($data['kind'], self::SUPPLIER_KINDS, true), 422);
+        $data['kind'] = CompanyRelationshipKind::Supplier->value;
 
         $this->relationships->update($relationship, $data, $request->user());
 
         return redirect()
             ->route('suppliers.index')
             ->with('success', 'supplier_updated_successfully');
+    }
+
+    public function updateTechnician(UpdateCompanyRelationshipRequest $request, CompanyRelationship $relationship): RedirectResponse
+    {
+        $this->assertKind($relationship, self::TECHNICIAN_KINDS);
+
+        $data = $request->validated();
+        $data['kind'] = CompanyRelationshipKind::Technician->value;
+
+        $this->relationships->update($relationship, $data, $request->user());
+
+        return redirect()
+            ->route('technicians.index')
+            ->with('success', 'technician_updated_successfully');
     }
 
     public function destroyClient(CompanyRelationship $relationship): RedirectResponse
@@ -238,6 +310,18 @@ final class CompanyRelationshipController extends Controller
         return redirect()
             ->route('suppliers.index')
             ->with('success', 'supplier_deleted_successfully');
+    }
+
+    public function destroyTechnician(CompanyRelationship $relationship): RedirectResponse
+    {
+        $this->assertKind($relationship, self::TECHNICIAN_KINDS);
+        $this->authorize('delete', $relationship);
+
+        $this->relationships->delete($relationship);
+
+        return redirect()
+            ->route('technicians.index')
+            ->with('success', 'technician_deleted_successfully');
     }
 
     public function establishments(CompanyRelationship $relationship): JsonResponse
@@ -378,6 +462,9 @@ final class CompanyRelationshipController extends Controller
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
             'kind' => $this->validKindFilter($request, $kinds),
+            'status' => $request->string('status')->trim()->toString(),
+            'created_from' => $request->string('created_from')->trim()->toString(),
+            'created_to' => $request->string('created_to')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => $request->integer('per_page', 12),
@@ -408,7 +495,7 @@ final class CompanyRelationshipController extends Controller
             allowedSorts: ['id', 'kind', 'status', 'created_at'],
             defaultSort: 'id',
             defaultDirection: 'desc',
-            filterKeys: ['search', 'kind'],
+            filterKeys: ['search', 'kind', 'status', 'created_from', 'created_to'],
         );
 
         $filters['kind'] = $this->validKindFilter($request, $kinds, $filters['kind']);

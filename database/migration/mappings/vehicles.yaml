@@ -1,0 +1,33 @@
+entity: vehicles
+id_map: migration_vehicle_map
+never_assume_legacy_id_equals_new_id: true
+
+sources:
+  - table: vehiculos
+
+target:
+  table: vehicles
+
+fields:
+  brand:
+    sources: [vehiculos.marca]
+    mapping: rename
+    confidence: high
+
+  model:
+    sources: [vehiculos.modelo]
+    mapping: rename
+    confidence: high
+
+  license_plate:
+    sources: [vehiculos.matricula]
+    mapping: rename
+    confidence: high
+
+  company_relationship_id:
+    sources: [vehiculos.tecnico_id]
+    mapping: FK
+    via: migration_company_relationship_map
+    source: tecnicos
+    notes: Technician relationship id, not companies.id
+    confidence: high

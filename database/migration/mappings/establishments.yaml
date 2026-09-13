@@ -1,0 +1,238 @@
+entity: establishments
+id_map: migration_establishment_map
+never_assume_legacy_id_equals_new_id: true
+
+sources:
+  - table: establecimientos
+    identity_key: codigo
+    notes: Unique in v2 is (company_id, code), not global code.
+
+target:
+  table: establishments
+  unique:
+    - [company_id, code]
+
+fields:
+  company_id:
+    sources: [establecimientos.cliente_id]
+    mapping: FK
+    via: migration_company_map
+    source: clientes
+    notes: Party company, not operating company.
+    required: true
+    confidence: high
+
+  name:
+    sources: [establecimientos.nombre]
+    mapping: rename
+    required: true
+    confidence: high
+
+  code:
+    sources: [establecimientos.codigo]
+    mapping: transform
+    transform:
+      - trim
+      - empty_string_to_null
+    confidence: high
+
+  store_code:
+    sources: [establecimientos.codigo_tienda]
+    mapping: rename
+    confidence: high
+
+  alternate_store_code:
+    sources: [establecimientos.codigo_tienda_2]
+    mapping: rename
+    confidence: high
+
+  phone:
+    sources: [establecimientos.telefono]
+    mapping: rename
+    confidence: high
+
+  email:
+    sources: [establecimientos.correo]
+    mapping: rename
+    confidence: high
+
+  emails:
+    sources: [establecimientos.correos]
+    mapping: rename
+    confidence: high
+
+  recipient_emails:
+    sources: [establecimientos.correos_destinatarios]
+    mapping: rename
+    confidence: high
+
+  address_line_1:
+    sources: [establecimientos.direccion_1]
+    mapping: rename
+    confidence: high
+
+  address_line_2:
+    sources: [establecimientos.direccion_2]
+    mapping: rename
+    confidence: high
+
+  city:
+    sources: [establecimientos.poblacion]
+    mapping: rename
+    confidence: high
+
+  province_id:
+    sources: [establecimientos.provincia]
+    mapping: unresolved
+    notes: UNRESOLVED — REQUIRES REVIEW
+
+  postal_code:
+    sources: [establecimientos.codigo_postal]
+    mapping: rename
+    confidence: high
+
+  country_id:
+    sources: [establecimientos.pais_id]
+    mapping: FK
+    via: migration_country_map
+    confidence: high
+
+  timezone_id:
+    sources: [establecimientos.zona_horaria_id]
+    mapping: FK
+    via: migration_timezone_map
+    confidence: high
+
+  language_id:
+    sources: [establecimientos.idioma_id]
+    mapping: FK
+    via: migration_language_map
+    confidence: high
+
+  establishment_type_id:
+    sources: [establecimientos.tipos_establecimiento_id]
+    mapping: FK
+    confidence: high
+
+  delegation_id:
+    sources: [establecimientos.delegacion_id]
+    mapping: FK
+    via: migration_delegation_map
+    confidence: high
+
+  series_id:
+    sources: [establecimientos.serie_id]
+    mapping: FK
+    confidence: high
+
+  billing_company_id:
+    sources: [establecimientos.cliente_facturacion_id]
+    mapping: FK
+    via: migration_company_map
+    source: clientes
+    confidence: high
+
+  responsible_user_id:
+    sources: [establecimientos.responsable_id]
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  is_active:
+    sources: [establecimientos.estado]
+    mapping: rename
+    confidence: high
+
+  is_client_priority:
+    sources: [establecimientos.importante_cliente]
+    mapping: rename
+    confidence: high
+
+  is_reviewed:
+    sources: [establecimientos.revisado]
+    mapping: rename
+    confidence: high
+
+  is_email_reviewed:
+    sources: [establecimientos.revisado_email]
+    mapping: rename
+    confidence: high
+
+  has_site_health_and_safety:
+    sources: [establecimientos.prl_centro]
+    mapping: rename
+    confidence: high
+
+  has_customer_health_and_safety:
+    sources: [establecimientos.prl_cliente]
+    mapping: rename
+    confidence: high
+
+  is_quality_control_contactable:
+    sources: [establecimientos.contactable_qc]
+    mapping: rename
+    confidence: high
+
+  has_parking:
+    sources: [establecimientos.parking]
+    mapping: rename
+    confidence: high
+
+  is_ulez_zone:
+    sources: [establecimientos.ulez]
+    mapping: rename
+    confidence: high
+
+  latitude:
+    sources: [establecimientos.latitud]
+    mapping: rename
+    confidence: high
+
+  longitude:
+    sources: [establecimientos.longitud]
+    mapping: rename
+    confidence: high
+
+  tax_rate:
+    sources: [establecimientos.iva_valor]
+    mapping: rename
+    confidence: high
+
+  tax_included:
+    sources: [establecimientos.iva_incluido]
+    mapping: rename
+    confidence: high
+
+  notes:
+    sources: [establecimientos.observaciones]
+    mapping: rename
+    confidence: high
+
+  notes_alert:
+    sources: [establecimientos.observaciones_aviso]
+    mapping: rename
+    confidence: high
+
+  internal_notes:
+    sources: [establecimientos.observaciones_privadas]
+    mapping: rename
+    confidence: high
+
+  internal_notes_alert:
+    sources: [establecimientos.observaciones_privadas_aviso]
+    mapping: rename
+    confidence: high
+
+  voicebot_time_slots:
+    sources: [establecimientos.nora_franjas_horario]
+    mapping: rename
+    confidence: medium
+
+  integration_external_id:
+    sources: [establecimientos.integracion_relacion_id]
+    mapping: rename
+    confidence: medium
+
+ignored:
+  - establecimientos.marca_id
+  notes: No marca_id column; brand via client relationship.

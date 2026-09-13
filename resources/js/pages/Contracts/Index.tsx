@@ -24,10 +24,14 @@ import type { ContractListItem } from '@/support/types/domain/contract';
 type ContractsIndexProps = {
     filters: {
         search: string;
+        contract_status_id: string;
+        created_from: string;
+        created_to: string;
         sort: string;
         direction: string;
         per_page: string;
     };
+    contractStatusOptions: Array<{ id: number; label: string }>;
     can: {
         create: boolean;
         update: boolean;
@@ -36,7 +40,7 @@ type ContractsIndexProps = {
     };
 };
 
-export default function ContractsIndex({ filters, can }: ContractsIndexProps) {
+export default function ContractsIndex({ filters, contractStatusOptions, can }: ContractsIndexProps) {
     const { t, i18n } = useTranslation();
     const tableRef = useRef<RemoteDataTableHandle>(null);
     const canRef = useRef(can);
@@ -236,6 +240,9 @@ export default function ContractsIndex({ filters, can }: ContractsIndexProps) {
                     pageSize={Number(filters.per_page) || 12}
                     initialFilters={{
                         search: filters.search,
+                        contract_status_id: filters.contract_status_id,
+                        created_from: filters.created_from,
+                        created_to: filters.created_to,
                     }}
                     filterFields={[
                         {
@@ -244,7 +251,28 @@ export default function ContractsIndex({ filters, can }: ContractsIndexProps) {
                             label: t('common.search'),
                             placeholder: t('contracts.searchPlaceholder'),
                         },
+                        {
+                            type: 'select',
+                            name: 'contract_status_id',
+                            label: t('filters.status'),
+                            emptyLabel: t('common.all'),
+                            options: contractStatusOptions.map((option) => ({
+                                value: String(option.id),
+                                label: option.label,
+                            })),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_from',
+                            label: t('filters.createdFrom'),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_to',
+                            label: t('filters.createdTo'),
+                        },
                     ]}
+                    savedFiltersPageKey="contracts"
                     syncUrlBase={contractsService.indexPath}
                     emptyIcon={<FileText className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('contracts.resourcePlural') })}

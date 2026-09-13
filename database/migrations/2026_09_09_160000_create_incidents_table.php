@@ -26,9 +26,13 @@ use Illuminate\Support\Facades\Schema;
  * - origen_modelo_id + origen_relacion_id → origin_type (string nullable) + origin_id (unsignedBigInteger nullable)
  * - relacion_modelo_id + relacion_relacion_id → related_type (string nullable) + related_id (unsignedBigInteger nullable)
  *
- * V2 scoping helper (not in legacy after merge; evaluations pattern):
- * - establishment_id nullable → establishments (company-scoped lists)
+ * V2 scoping:
+ * - company_id → active owner company (required)
+ * - establishment_id nullable → establishments (subject helper)
  * - evaluation_id nullable → evaluations (when related is evaluation)
+ *
+ * Required catalog FKs (match create/update validation):
+ * - incident_status_id, incident_priority_id, incident_type_id, incident_subtype_id, responsible_user_id
  *
  * Skipped: fecha_limite, fecha_recibida, fecha_ultima_revision (dead/broken in prod).
  */
@@ -38,12 +42,13 @@ return new class extends Migration
     {
         Schema::create('incidents', function (Blueprint $table): void {
             $table->id();
+            $table->foreignId('company_id')->constrained('companies')->cascadeOnDelete();
             $table->string('subject');
             $table->text('comment')->nullable();
-            $table->foreignId('incident_status_id')->nullable()->constrained('incident_statuses')->nullOnDelete();
-            $table->foreignId('incident_priority_id')->nullable()->constrained('incident_priorities')->nullOnDelete();
-            $table->foreignId('incident_type_id')->nullable()->constrained('incident_types')->nullOnDelete();
-            $table->foreignId('incident_subtype_id')->nullable()->constrained('incident_subtypes')->nullOnDelete();
+            $table->foreignId('incident_status_id')->constrained('incident_statuses')->restrictOnDelete();
+            $table->foreignId('incident_priority_id')->constrained('incident_priorities')->restrictOnDelete();
+            $table->foreignId('incident_type_id')->constrained('incident_types')->restrictOnDelete();
+            $table->foreignId('incident_subtype_id')->constrained('incident_subtypes')->restrictOnDelete();
             $table->foreignId('establishment_id')->nullable()->constrained('establishments')->nullOnDelete();
             $table->foreignId('evaluation_id')->nullable()->constrained('evaluations')->nullOnDelete();
             $table->dateTime('control_at')->nullable();
@@ -51,7 +56,7 @@ return new class extends Migration
             $table->integer('duration_seconds')->nullable();
             $table->integer('qc_duration_seconds')->nullable();
             $table->foreignId('requester_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('responsible_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('responsible_user_id')->constrained('users')->restrictOnDelete();
             $table->foreignId('qc_responsible_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('origin_type')->nullable();
             $table->unsignedBigInteger('origin_id')->nullable();

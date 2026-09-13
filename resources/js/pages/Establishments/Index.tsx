@@ -24,6 +24,9 @@ import type { EstablishmentListItem } from '@/support/types/domain/establishment
 type EstablishmentsIndexProps = {
     filters: {
         search: string;
+        is_active: string;
+        created_from: string;
+        created_to: string;
         sort: string;
         direction: string;
         per_page: string;
@@ -186,6 +189,9 @@ export default function EstablishmentsIndex({ filters, can }: EstablishmentsInde
                     pageSize={Number(filters.per_page) || 12}
                     initialFilters={{
                         search: filters.search,
+                        is_active: filters.is_active,
+                        created_from: filters.created_from,
+                        created_to: filters.created_to,
                     }}
                     filterFields={[
                         {
@@ -194,7 +200,28 @@ export default function EstablishmentsIndex({ filters, can }: EstablishmentsInde
                             label: t('common.search'),
                             placeholder: t('establishments.searchPlaceholder'),
                         },
+                        {
+                            type: 'select',
+                            name: 'is_active',
+                            label: t('common.status'),
+                            emptyLabel: t('common.all'),
+                            options: [
+                                { value: '1', label: t('filters.active') },
+                                { value: '0', label: t('filters.inactive') },
+                            ],
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_from',
+                            label: t('filters.createdFrom'),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_to',
+                            label: t('filters.createdTo'),
+                        },
                     ]}
+                    savedFiltersPageKey="establishments"
                     syncUrlBase={establishmentsService.indexPath}
                     emptyIcon={<Warehouse className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('establishments.resourcePlural') })}

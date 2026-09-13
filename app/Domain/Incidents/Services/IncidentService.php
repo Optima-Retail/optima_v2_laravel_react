@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Incidents\Services;
 
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Incidents\Support\IncidentLineStatusRules;
 use App\Models\Brand;
 use App\Models\Company;
@@ -15,7 +16,6 @@ use App\Models\IncidentPriority;
 use App\Models\IncidentStatus;
 use App\Models\IncidentSubtype;
 use App\Models\IncidentType;
-use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
@@ -300,21 +300,12 @@ final class IncidentService
     }
 
     /**
+     * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
-    public function userOptions(): array
+    public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return User::query()
-            ->orderBy('name')
-            ->get(['id', 'name', 'email'])
-            ->map(fn (User $user): array => [
-                'id' => $user->id,
-                'label' => $user->email
-                    ? "{$user->name} ({$user->email})"
-                    : $user->name,
-            ])
-            ->values()
-            ->all();
+        return CompanyMemberUsers::options($owner, $includeUserIds);
     }
 
     /**
@@ -341,12 +332,15 @@ final class IncidentService
     }
 
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, incident_status_id?: string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, Incident>
      */
     public function paginateForOwner(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator
     {
         $search = trim((string) ($filters['search'] ?? ''));
+        $incidentStatusId = trim((string) ($filters['incident_status_id'] ?? ''));
+        $createdFrom = trim((string) ($filters['created_from'] ?? ''));
+        $createdTo = trim((string) ($filters['created_to'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
         [$sort, $direction] = ListQuery::sort(
             $filters,
@@ -354,46 +348,9 @@ final class IncidentService
             'id',
         );
 
-        $companyIds = $this->accessibleCompanyIds($owner);
-        $brandIds = $this->accessibleBrandIds($companyIds);
-
         return Incident::query()
             ->with(['establishment', 'status', 'priority', 'type', 'responsibleUser'])
-            ->where(function ($query) use ($companyIds, $brandIds): void {
-                $query
-                    ->whereHas('establishment', function ($establishmentQuery) use ($companyIds): void {
-                        $establishmentQuery->whereIn('company_id', $companyIds === [] ? [0] : $companyIds);
-                    })
-                    ->orWhere(function ($originQuery) use ($companyIds): void {
-                        $originQuery
-                            ->where('origin_type', 'company')
-                            ->whereIn('origin_id', $companyIds === [] ? [0] : $companyIds);
-                    })
-                    ->orWhere(function ($originQuery) use ($brandIds): void {
-                        $originQuery
-                            ->where('origin_type', 'brand')
-                            ->whereIn('origin_id', $brandIds === [] ? [0] : $brandIds);
-                    })
-                    ->orWhere(function ($originQuery) use ($companyIds): void {
-                        $originQuery
-                            ->where('origin_type', 'establishment')
-                            ->whereIn('origin_id', function ($sub) use ($companyIds): void {
-                                $sub->select('id')
-                                    ->from('establishments')
-                                    ->whereIn('company_id', $companyIds === [] ? [0] : $companyIds)
-                                    ->whereNull('deleted_at');
-                            });
-                    })
-                    ->orWhere(function ($unscoped): void {
-                        // Types that do not require an origin (configured on the type row).
-                        $unscoped
-                            ->whereNull('origin_type')
-                            ->whereNull('establishment_id')
-                            ->whereHas('type', function ($typeQuery): void {
-                                $typeQuery->where('origin_required', false);
-                            });
-                    });
-            })
+            ->where('company_id', $owner->id)
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner
@@ -406,6 +363,9 @@ final class IncidentService
                         });
                 });
             })
+            ->when($incidentStatusId !== '', fn ($query) => $query->where('incident_status_id', (int) $incidentStatusId))
+            ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
+            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
             ->orderBy($sort, $direction)
             ->paginate($perPage)
             ->withQueryString();
@@ -432,7 +392,7 @@ final class IncidentService
     }
 
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, incident_status_id?: string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     public function paginateForWeb(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator
@@ -444,10 +404,11 @@ final class IncidentService
     /**
      * @param  array<string, mixed>  $data
      */
-    public function create(array $data): Incident
+    public function create(Company $owner, array $data): Incident
     {
-        return DB::transaction(function () use ($data): Incident {
+        return DB::transaction(function () use ($owner, $data): Incident {
             $attributes = $this->attributes($data);
+            $attributes['company_id'] = $owner->id;
 
             if (($attributes['incident_status_id'] ?? null) === null) {
                 $attributes['incident_status_id'] = $this->defaultIncidentStatusId();
@@ -526,6 +487,7 @@ final class IncidentService
 
         return [
             'id' => $incident->id,
+            'company_id' => $incident->company_id,
             'subject' => $incident->subject,
             'comment' => $incident->comment,
             'collaborator_ids' => $incident->collaborators->pluck('id')->values()->all(),
@@ -569,6 +531,11 @@ final class IncidentService
             'closed_at' => $incident->closed_at?->toIso8601String(),
             'created_at' => $incident->created_at?->toIso8601String(),
         ];
+    }
+
+    public function canAccess(Company $owner, Incident $incident): bool
+    {
+        return (int) $incident->company_id === (int) $owner->id;
     }
 
     /**

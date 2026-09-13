@@ -1,0 +1,86 @@
+entity: evaluations
+id_map: migration_evaluation_map
+never_assume_legacy_id_equals_new_id: true
+
+sources:
+  - table: evaluaciones
+
+target:
+  table: evaluations
+  unique:
+    - public_id
+
+fields:
+  subject:
+    sources: [evaluaciones.asunto]
+    mapping: rename
+    confidence: high
+
+  public_id:
+    sources: [evaluaciones.id_publico]
+    mapping: transform
+    transform: copy_if_valid_uuid_else_generate
+    required: true
+    confidence: high
+
+  establishment_id:
+    sources: [evaluaciones.establecimiento_id]
+    mapping: FK
+    via: migration_establishment_map
+    required: true
+    confidence: high
+
+  evaluation_status_id:
+    sources: [evaluaciones.estado_id]
+    mapping: FK
+    catalog_ids_preserved: [73, 74, 75, 76, 99, 117, 133, 134, 139]
+    confidence: high
+
+  responsible_user_id:
+    sources: [evaluaciones.responsable_id]
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  next_action_at:
+    sources: [evaluaciones.fecha_proxima_accion]
+    mapping: rename
+    confidence: high
+
+  closed_at:
+    sources: [evaluaciones.fecha_cierre]
+    mapping: rename
+    confidence: high
+
+  facility_question:
+    sources: [evaluaciones.pregunta_facility]
+    mapping: rename
+    confidence: high
+
+  technician_question:
+    sources: [evaluaciones.pregunta_tecnico]
+    mapping: rename
+    confidence: high
+
+  visit_count:
+    sources: [evaluaciones.visitas]
+    mapping: rename
+    default: 0
+    confidence: high
+
+  qc_duration_minutes:
+    sources: [evaluaciones.tiempo_qc]
+    mapping: rename
+    unit: minutes
+    notes: Not seconds (unlike incidents.tiempo_qc)
+    confidence: high
+
+  call_count:
+    sources: [evaluaciones.num_llamadas]
+    mapping: rename
+    confidence: high
+
+  first_contact_attempt_at:
+    sources: [evaluaciones.primer_intento_contacto]
+    mapping: rename
+    confidence: high

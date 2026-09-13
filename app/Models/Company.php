@@ -206,6 +206,14 @@ class Company extends Model
         return $this->hasMany(NumberingPattern::class);
     }
 
+    /**
+     * @return HasMany<Requester, $this>
+     */
+    public function requesters(): HasMany
+    {
+        return $this->hasMany(Requester::class);
+    }
+
     public function softDeleteSafely(): bool
     {
         $suffix = '__deleted_'.$this->getKey().'_'.now()->timestamp;

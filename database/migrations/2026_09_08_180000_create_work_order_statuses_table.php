@@ -7,8 +7,9 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * OT statuses from legacy `estados` (modelo OT).
- * Kept: name, color, lifecycle (ciclo_vida), is_open (abierto) — needed for OT workflow / FK logic.
+ * Shared statuses for estimates and work orders (legacy `estados` for Presupuesto + OT).
+ * kind: estimate | work_order.
+ * Kept: name, color, lifecycle (ciclo_vida), is_open (abierto).
  * Skipped: `estados_ot`, `modelo_id`, `codigo`.
  */
 return new class extends Migration
@@ -18,11 +19,14 @@ return new class extends Migration
         Schema::create('work_order_statuses', function (Blueprint $table): void {
             $table->id();
             $table->string('name');
+            $table->string('kind', 32);
             $table->string('color', 32)->nullable();
             $table->unsignedTinyInteger('lifecycle')->nullable();
             $table->boolean('is_open')->default(true);
             $table->timestamps();
             $table->softDeletes();
+
+            $table->index('kind');
         });
     }
 

@@ -1,0 +1,92 @@
+entity: contracts
+id_map: migration_contract_map
+never_assume_legacy_id_equals_new_id: true
+
+sources:
+  - table: contratos
+
+target:
+  table: contracts
+
+fields:
+  code:
+    sources: [contratos.codigo]
+    mapping: rename
+    confidence: high
+
+  company_id:
+    sources: [contratos.cliente_id]
+    mapping: FK
+    via: migration_company_map
+    source: clientes
+    notes: Party company id, not relationship id
+    confidence: high
+
+  responsible_user_id:
+    sources: [contratos.responsable_id]
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  contract_status_id:
+    sources: [contratos.estado_id]
+    mapping: FK
+    catalog_ids_preserved: [77, 95, 78, 79, 80]
+    confidence: high
+
+  language_id:
+    sources: [contratos.idioma_id]
+    mapping: FK
+    via: migration_language_map
+    confidence: high
+
+  description:
+    sources: [contratos.descripcion]
+    mapping: rename
+    confidence: high
+
+  work_order_subject:
+    sources: [contratos.asunto_ot]
+    mapping: rename
+    confidence: high
+
+  progress:
+    sources: [contratos.progreso]
+    mapping: rename
+    confidence: high
+
+  total_progress:
+    sources: [contratos.total_progreso]
+    mapping: rename
+    confidence: high
+
+  total_amount:
+    sources: [contratos.importe_total]
+    mapping: rename
+    precision: [10, 2]
+    confidence: high
+
+  signed_at:
+    sources: [contratos.fecha_firma]
+    mapping: rename
+    confidence: high
+
+  canceled_at:
+    sources: [contratos.canceled_date]
+    mapping: rename
+    confidence: high
+
+pivot:
+  legacy: contratos_establecimientos
+  target: contract_establishment
+  fields:
+    contract_id: via migration_contract_map
+    establishment_id: via migration_establishment_map
+  confidence: high
+
+ignored:
+  - coste
+  - ots_tipo_id
+  - seguimiento
+  - fecha_inicio
+  - fecha_fin

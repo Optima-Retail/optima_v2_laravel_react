@@ -24,10 +24,14 @@ import type { IncidentListItem } from '@/support/types/domain/incident';
 type IncidentsIndexProps = {
     filters: {
         search: string;
+        incident_status_id: string;
+        created_from: string;
+        created_to: string;
         sort: string;
         direction: string;
         per_page: string;
     };
+    incidentStatusOptions: Array<{ id: number; label: string }>;
     can: {
         create: boolean;
         update: boolean;
@@ -35,7 +39,7 @@ type IncidentsIndexProps = {
     };
 };
 
-export default function IncidentsIndex({ filters, can }: IncidentsIndexProps) {
+export default function IncidentsIndex({ filters, incidentStatusOptions, can }: IncidentsIndexProps) {
     const { t, i18n } = useTranslation();
     const tableRef = useRef<RemoteDataTableHandle>(null);
     const canRef = useRef(can);
@@ -241,6 +245,9 @@ export default function IncidentsIndex({ filters, can }: IncidentsIndexProps) {
                     pageSize={Number(filters.per_page) || 12}
                     initialFilters={{
                         search: filters.search,
+                        incident_status_id: filters.incident_status_id,
+                        created_from: filters.created_from,
+                        created_to: filters.created_to,
                     }}
                     filterFields={[
                         {
@@ -249,7 +256,28 @@ export default function IncidentsIndex({ filters, can }: IncidentsIndexProps) {
                             label: t('common.search'),
                             placeholder: t('incidents.searchPlaceholder'),
                         },
+                        {
+                            type: 'select',
+                            name: 'incident_status_id',
+                            label: t('filters.status'),
+                            emptyLabel: t('common.all'),
+                            options: incidentStatusOptions.map((option) => ({
+                                value: String(option.id),
+                                label: option.label,
+                            })),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_from',
+                            label: t('filters.createdFrom'),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_to',
+                            label: t('filters.createdTo'),
+                        },
                     ]}
+                    savedFiltersPageKey="incidents"
                     syncUrlBase={incidentsService.indexPath}
                     emptyIcon={<TriangleAlert className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('incidents.resourcePlural') })}

@@ -11,6 +11,36 @@ export type ContractListItem = {
     created_at: string | null;
 };
 
+export type ContractIterationFormValues = {
+    id: number | null;
+    temp_key: string | null;
+    subject: string;
+    work_order_type_id: string;
+    starts_on: string;
+    ends_on: string;
+    periodicity: 'weekly' | 'monthly';
+    periodicity_kind: 'basic' | 'complex';
+    interval: string;
+    weekdays: string[];
+    month_days: string[];
+    months: string[];
+    cost_amount: string;
+    establishment_ids: string[];
+    form_template_id: string;
+    invoicing_aggregation_id: string;
+    invoicing_aggregation_temp_key: string;
+};
+
+export type ContractInvoicingAggregationFormValues = {
+    id: number | null;
+    temp_key: string | null;
+    subject: string;
+    billing_frequency: 'monthly' | 'bimonthly' | 'quarterly' | 'annually' | 'biannually';
+    billing_day: string;
+    billing_cycle_start: string;
+    per_establishment: boolean;
+};
+
 export type ContractFormData = {
     id: number;
     code: string | null;
@@ -23,6 +53,34 @@ export type ContractFormData = {
     signed_at: string | null;
     canceled_at: string | null;
     establishment_ids: number[];
+    iterations: Array<{
+        id: number;
+        temp_key: string | null;
+        subject: string | null;
+        work_order_type_id: number;
+        starts_on: string | null;
+        ends_on: string | null;
+        periodicity: string | null;
+        periodicity_kind: string | null;
+        interval: number | null;
+        weekdays: number[];
+        month_days: number[];
+        months: number[];
+        cost_amount: string | number | null;
+        establishment_ids: number[];
+        form_template_id: number | null;
+        invoicing_aggregation_id: number | null;
+        invoicing_aggregation_temp_key: string | null;
+    }>;
+    invoicing_aggregations: Array<{
+        id: number;
+        temp_key: string | null;
+        subject: string | null;
+        billing_frequency: string;
+        billing_day: number | null;
+        billing_cycle_start: string | null;
+        per_establishment: boolean;
+    }>;
 };
 
 export type ContractAttachmentItem = {

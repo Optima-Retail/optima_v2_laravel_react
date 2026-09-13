@@ -29,7 +29,7 @@ final class TechnicianAlternativeDelegationsCrudTest extends TestCase
         $this->seed(RolesAndPermissionsSeeder::class);
     }
 
-    public function test_admin_can_sync_alternative_delegations_via_supplier_update(): void
+    public function test_admin_can_sync_alternative_delegations_via_technician_update(): void
     {
         $admin = User::factory()->create();
         $admin->assignRole(RoleEnum::Admin->value);
@@ -49,15 +49,15 @@ final class TechnicianAlternativeDelegationsCrudTest extends TestCase
         $barcelona = Delegation::factory()->create(['name' => 'Barcelona']);
 
         $this->actingAs($admin)
-            ->get("/suppliers/{$relationship->id}/edit")
+            ->get("/technicians/{$relationship->id}/edit")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('Suppliers/Edit')
+                ->component('Technicians/Edit')
                 ->where('relationship.alternative_delegation_ids', [])
                 ->has('formOptions.delegationOptions'));
 
         $this->actingAs($admin)
-            ->put("/suppliers/{$relationship->id}", [
+            ->put("/technicians/{$relationship->id}", [
                 'related_company_id' => $technicianCompany->id,
                 'kind' => CompanyRelationshipKind::Technician->value,
                 'status' => CompanyRelationshipStatus::Active->value,
@@ -66,7 +66,7 @@ final class TechnicianAlternativeDelegationsCrudTest extends TestCase
                 'collaborator_ids' => [],
                 'priority_ids' => [],
             ])
-            ->assertRedirect(route('suppliers.index'));
+            ->assertRedirect(route('technicians.index'));
 
         $this->assertDatabaseHas('technician_alternative_delegations', [
             'company_relationship_id' => $relationship->id,
@@ -84,13 +84,13 @@ final class TechnicianAlternativeDelegationsCrudTest extends TestCase
         );
 
         $this->actingAs($admin)
-            ->get("/suppliers/{$relationship->id}/edit")
+            ->get("/technicians/{$relationship->id}/edit")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('relationship.alternative_delegation_ids', [$madrid->id, $barcelona->id]));
 
         $this->actingAs($admin)
-            ->put("/suppliers/{$relationship->id}", [
+            ->put("/technicians/{$relationship->id}", [
                 'related_company_id' => $technicianCompany->id,
                 'kind' => CompanyRelationshipKind::Technician->value,
                 'status' => CompanyRelationshipStatus::Active->value,
@@ -99,7 +99,7 @@ final class TechnicianAlternativeDelegationsCrudTest extends TestCase
                 'collaborator_ids' => [],
                 'priority_ids' => [],
             ])
-            ->assertRedirect(route('suppliers.index'));
+            ->assertRedirect(route('technicians.index'));
 
         $this->assertSoftDeleted('technician_alternative_delegations', [
             'company_relationship_id' => $relationship->id,

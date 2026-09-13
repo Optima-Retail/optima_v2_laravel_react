@@ -25,6 +25,7 @@ import type { WorkOrderStatusListItem } from '@/support/types/domain/work-order-
 type WorkOrderStatusesIndexProps = {
     filters: {
         search: string;
+        kind?: string;
         sort: string;
         direction: string;
         per_page: string;
@@ -60,6 +61,18 @@ export default function WorkOrderStatusesIndex({ filters, can }: WorkOrderStatus
                 minWidth: 200,
                 headerSort: true,
                 titleFormatter,
+            },
+            {
+                title: t('workOrderStatuses.kind'),
+                field: 'kind',
+                width: 140,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) => {
+                    const kind = cell.getValue() as string;
+
+                    return t(`workOrderStatuses.kinds.${kind}`, { defaultValue: kind });
+                },
             },
             {
                 title: t('workOrderStatuses.lifecycle'),
@@ -187,6 +200,7 @@ export default function WorkOrderStatusesIndex({ filters, can }: WorkOrderStatus
                     pageSize={Number(filters.per_page) || 12}
                     initialFilters={{
                         search: filters.search,
+                        kind: (filters as { kind?: string }).kind ?? '',
                     }}
                     filterFields={[
                         {
@@ -194,6 +208,16 @@ export default function WorkOrderStatusesIndex({ filters, can }: WorkOrderStatus
                             name: 'search',
                             label: t('common.search'),
                             placeholder: t('workOrderStatuses.searchPlaceholder'),
+                        },
+                        {
+                            type: 'select',
+                            name: 'kind',
+                            label: t('workOrderStatuses.kind'),
+                            emptyLabel: t('common.all'),
+                            options: [
+                                { value: 'work_order', label: t('workOrderStatuses.kinds.work_order') },
+                                { value: 'estimate', label: t('workOrderStatuses.kinds.estimate') },
+                            ],
                         },
                     ]}
                     syncUrlBase={workOrderStatusesService.indexPath}

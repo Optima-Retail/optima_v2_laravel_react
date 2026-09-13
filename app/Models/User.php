@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\QualityScores\Enums\QualityActionId;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -144,6 +146,45 @@ class User extends Authenticatable
     public function ssoIdentities(): HasMany
     {
         return $this->hasMany(UserSsoIdentity::class);
+    }
+
+    /**
+     * Legacy `historial_qcoins` → quality score movements for this user.
+     *
+     * @return HasMany<QualityScoreLedger, $this>
+     */
+    public function qualityScoreLedger(): HasMany
+    {
+        return $this->hasMany(QualityScoreLedger::class);
+    }
+
+    /**
+     * Port of optimaback `User::anyadirQcoins`.
+     * Writes `quality_score_ledger` (historial_qcoins) and updates `quality_score`.
+     * Manual adjustments (action CambioPuntuacionQc) also update `balance` (saldo).
+     */
+    public function addQualityScore(float $amount, int $actionId, ?int $causedByUserId = null): void
+    {
+        $amount = round($amount, 2);
+        $previous = (float) $this->quality_score;
+        $new = round($previous + $amount, 2);
+
+        QualityScoreLedger::query()->create([
+            'user_id' => $this->id,
+            'caused_by_user_id' => $causedByUserId ?? Auth::id(),
+            'action_id' => $actionId,
+            'previous_score' => $previous,
+            'new_score' => $new,
+            'delta' => $amount,
+        ]);
+
+        $this->quality_score = $new;
+
+        if ($actionId === QualityActionId::CambioPuntuacionQc->value) {
+            $this->balance = round((float) $this->balance + $amount, 2);
+        }
+
+        $this->save();
     }
 
     public function belongsToCompany(int $companyId): bool

@@ -1,0 +1,90 @@
+entity: collaborators
+legacy_table: colaboradores
+never_assume_legacy_id_equals_new_id: true
+
+modelo_enum:
+  1: Presupuesto
+  2: OT
+  3: Tecnico
+  4: Proveedor
+  5: Marca
+  6: Cliente
+  7: Establecimiento
+  15: TecnicoIncidencia
+  21: Evaluacion
+  22: Incidencia
+
+routes:
+  - modelo_id: 1
+    target: work_order_collaborators
+    parent_fk: work_order_id
+    parent_via: migration_work_order_map
+    source: presupuestos
+    confidence: high
+
+  - modelo_id: 2
+    target: work_order_collaborators
+    parent_fk: work_order_id
+    parent_via: migration_work_order_map
+    source: ots
+    confidence: high
+
+  - modelo_id: 5
+    target: brand_collaborators
+    parent_fk: brand_id
+    parent_via: migration_brand_map
+    confidence: high
+
+  - modelo_id: 6
+    target: company_relationship_collaborators
+    parent_fk: company_relationship_id
+    parent_via: migration_company_relationship_map
+    source: clientes
+    confidence: high
+
+  - modelo_id: 3
+    target: company_relationship_collaborators
+    parent_fk: company_relationship_id
+    parent_via: migration_company_relationship_map
+    source: tecnicos
+    confidence: high
+
+  - modelo_id: 4
+    target: company_relationship_collaborators
+    parent_fk: company_relationship_id
+    parent_via: migration_company_relationship_map
+    source: proveedores
+    confidence: high
+
+  - modelo_id: 7
+    target: establishment_collaborators
+    parent_fk: establishment_id
+    parent_via: migration_establishment_map
+    confidence: high
+
+  - modelo_id: 22
+    target: incident_collaborators
+    parent_fk: incident_id
+    parent_via: migration_incident_map
+    confidence: high
+
+  - modelo_id: 15
+    target: technician_incident_collaborators
+    parent_fk: technician_incident_id
+    parent_via: migration_technician_incident_map
+    confidence: high
+
+  - modelo_id: 21
+    target: evaluation_collaborators
+    parent_fk: evaluation_id
+    parent_via: migration_evaluation_map
+    confidence: high
+
+user_id:
+  mapping: FK
+  via: migration_user_map
+  confidence: high
+
+other_modelo_ids:
+  mapping: ignore
+  destination: docs/data-migration/08-unresolved-records.md

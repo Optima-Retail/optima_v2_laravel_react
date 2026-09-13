@@ -1,0 +1,69 @@
+entity: articles
+never_assume_legacy_id_equals_new_id: true
+
+articles:
+  id_map: migration_article_map
+  sources:
+    - table: articulos
+  target:
+    table: articles
+    unique: [code]
+  fields:
+    code:
+      sources: [articulos.codigo]
+      mapping: rename
+      required: true
+      confidence: high
+    is_deletable:
+      sources: [articulos.borrable]
+      mapping: rename
+      confidence: high
+  skipped_on_articulos:
+    - nombre
+    - descripcion
+    - precio_venta
+    - cliente_id
+    - tipo_id
+
+article_languages:
+  sources:
+    - table: articulo_idiomas
+  target:
+    table: article_languages
+    unique: [article_id, language_id]
+  fields:
+    article_id:
+      mapping: FK
+      via: migration_article_map
+    language_id:
+      mapping: FK
+      via: migration_language_map
+    name:
+      mapping: rename
+      required: true
+    description:
+      mapping: rename
+  confidence: high
+
+article_clients:
+  sources:
+    - table: articulo_cliente
+  target:
+    table: article_clients
+    unique: [article_id, company_relationship_id]
+  fields:
+    article_id:
+      mapping: FK
+      via: migration_article_map
+    company_relationship_id:
+      sources: [articulo_cliente.cliente_id]
+      mapping: FK
+      via: migration_company_relationship_map
+      source: clientes
+      notes: Relationship id, not companies.id
+      confidence: high
+    sale_price:
+      mapping: rename
+      required: true
+      precision: [10, 2]
+      confidence: high

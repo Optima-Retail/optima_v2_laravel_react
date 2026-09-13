@@ -1,0 +1,166 @@
+entity: users
+id_map: migration_user_map
+never_assume_legacy_id_equals_new_id: true
+
+sources:
+  - table: users
+    identity_key: email
+    identity_unique_in_source: intended_yes_confirm_live
+
+target:
+  table: users
+  unique:
+    - email
+    - username
+
+fields:
+  name:
+    sources: [users.name]
+    mapping: direct
+    required: true
+    confidence: high
+
+  email:
+    sources: [users.email]
+    mapping: transform
+    transform: trim
+    required: true
+    unique: true
+    confidence: high
+
+  password:
+    sources: [users.password]
+    mapping: direct
+    transform: copy_hash_do_not_rehash
+    confidence: high
+
+  locale:
+    sources: [users.locale]
+    mapping: direct
+    confidence: high
+
+  manager_id:
+    sources: [users.manager_id]
+    mapping: FK
+    via: migration_user_map
+    pass: 2
+    confidence: high
+
+  team_leader_id:
+    sources: [users.team_leader_id]
+    mapping: FK
+    via: migration_user_map
+    pass: 2
+    confidence: high
+
+  team_id:
+    sources: [users.equipo_id]
+    mapping: FK
+    via: migration_team_map
+    confidence: high
+
+  timezone_id:
+    sources: [users.zona_horaria_id]
+    mapping: FK
+    via: migration_timezone_map
+    confidence: high
+
+  brand_id:
+    sources: [users.marca_id]
+    mapping: FK
+    via: migration_brand_map
+    defer: true
+    confidence: medium
+
+  phone:
+    sources: [users.telefono]
+    mapping: rename
+    confidence: high
+
+  pbx_extension:
+    sources: [users.pbx_extension]
+    mapping: direct
+    confidence: high
+
+  external_hr_id:
+    sources: [users.external_hr_id]
+    mapping: direct
+    confidence: high
+
+  is_active:
+    sources: [users.activo]
+    mapping: rename
+    confidence: high
+
+  is_internal_employee:
+    sources: [users.empleado_optima]
+    mapping: rename
+    confidence: high
+
+  is_team_account:
+    sources: [users.es_usuario_equipo]
+    mapping: rename
+    confidence: high
+
+  performance_factor:
+    sources: [users.factor_x]
+    mapping: rename
+    confidence: high
+
+  invoiced_revenue_target:
+    sources: [users.objetivo_eur_facturados]
+    mapping: rename
+    confidence: high
+
+  quality_score:
+    sources: [users.puntuacion_qc]
+    mapping: rename
+    confidence: high
+
+  balance:
+    sources: [users.saldo]
+    mapping: rename
+    confidence: high
+
+  budget_approval_limit:
+    sources: [users.budget_approval_limit]
+    mapping: direct
+    confidence: high
+
+  sso_only:
+    sources: [users.login_unicamente_sso]
+    mapping: rename
+    confidence: high
+
+  must_change_password:
+    sources: [users.must_change_password]
+    mapping: direct
+    confidence: high
+
+  totp_secret:
+    sources: [users.totp_secret]
+    mapping: direct
+    confidence: high
+
+  email_verified_at:
+    sources: [users.email_verified_at]
+    mapping: direct
+    confidence: high
+
+  remember_token:
+    sources: [users.remember_token]
+    mapping: direct
+    confidence: high
+
+unresolved:
+  active_company_id: UNRESOLVED — REQUIRES REVIEW
+  username: UNRESOLVED confirm legacy column
+  tenant_id: UNRESOLVED vs v2 tenants
+  establecimiento_id: no v2 column — do not map to company_user
+  company_user:
+    sources_not_authorized:
+      - clientes_users
+      - establecimientos_users
+      - marcas_usuarios
+      - all empleado_optima users
+    notes: Membership rule UNRESOLVED — REQUIRES REVIEW

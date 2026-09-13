@@ -37,6 +37,9 @@ final class EstablishmentController extends Controller
 
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
+            'is_active' => $request->string('is_active')->trim()->toString(),
+            'created_from' => $request->string('created_from')->trim()->toString(),
+            'created_to' => $request->string('created_to')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
@@ -65,7 +68,7 @@ final class EstablishmentController extends Controller
             allowedSorts: ['id', 'name', 'code', 'city', 'is_active'],
             defaultSort: 'name',
             defaultDirection: 'asc',
-            filterKeys: ['search'],
+            filterKeys: ['search', 'is_active', 'created_from', 'created_to'],
         );
 
         return TabulatorResponse::fromPaginator(
@@ -94,7 +97,7 @@ final class EstablishmentController extends Controller
             'languageOptions' => $this->establishments->languageOptions(),
             'establishmentTypeOptions' => $this->establishments->establishmentTypeOptions(),
             'seriesOptions' => $this->establishments->seriesOptions(),
-            'userOptions' => $this->establishments->userOptions(),
+            'userOptions' => $this->establishments->userOptions($owner),
         ]);
     }
 
@@ -123,7 +126,7 @@ final class EstablishmentController extends Controller
             'languageOptions' => $this->establishments->languageOptions(),
             'establishmentTypeOptions' => $this->establishments->establishmentTypeOptions(),
             'seriesOptions' => $this->establishments->seriesOptions(),
-            'userOptions' => $this->establishments->userOptions(),
+            'userOptions' => $this->establishments->userOptions($owner),
             'can' => [
                 'delete' => $request->user()?->can('delete', $establishment) ?? false,
             ],

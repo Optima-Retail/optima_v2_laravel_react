@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Web\Config\WorkOrderStatuses;
 
+use App\Domain\WorkOrders\Enums\WorkOrderStage;
 use App\Models\WorkOrderStatus;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 final class UpdateWorkOrderStatusRequest extends FormRequest
 {
@@ -33,6 +35,7 @@ final class UpdateWorkOrderStatusRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'kind' => ['required', 'string', Rule::in(WorkOrderStage::values())],
             'color' => ['nullable', 'string', 'max:32', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
             'lifecycle' => ['nullable', 'integer', 'min:0', 'max:255'],
             'is_open' => ['required', 'boolean'],

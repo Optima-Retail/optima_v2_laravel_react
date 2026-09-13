@@ -21,6 +21,7 @@ export default function EditWorkOrderStatus({ workOrderStatus, can }: EditWorkOr
     const { t } = useTranslation();
     const form = useForm({
         name: workOrderStatus.name,
+        kind: workOrderStatus.kind,
         color: workOrderStatus.color ?? '#a9cef0',
         lifecycle: workOrderStatus.lifecycle ?? '',
         is_open: workOrderStatus.is_open,

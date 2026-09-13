@@ -34,6 +34,9 @@ final class CompanyController extends Controller
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
             'kind' => $request->string('kind')->trim()->toString(),
+            'is_active' => $request->string('is_active')->trim()->toString(),
+            'created_from' => $request->string('created_from')->trim()->toString(),
+            'created_to' => $request->string('created_to')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
@@ -60,7 +63,7 @@ final class CompanyController extends Controller
             allowedSorts: ['id', 'name', 'tax_id', 'kind', 'is_active', 'created_at'],
             defaultSort: 'name',
             defaultDirection: 'asc',
-            filterKeys: ['search', 'kind'],
+            filterKeys: ['search', 'kind', 'is_active', 'created_from', 'created_to'],
         );
 
         $kind = (string) ($filters['kind'] ?? '');

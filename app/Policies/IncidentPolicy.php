@@ -6,7 +6,6 @@ namespace App\Policies;
 
 use App\Domain\Companies\Support\ActiveCompany;
 use App\Domain\Incidents\Services\IncidentService;
-use App\Models\Establishment;
 use App\Models\Incident;
 use App\Models\User;
 use App\Policies\Concerns\ChecksDiscoveredPermissions;
@@ -53,41 +52,6 @@ final class IncidentPolicy
             return false;
         }
 
-        $service = app(IncidentService::class);
-        $companyIds = $service->accessibleCompanyIds($active);
-
-        if ($companyIds === []) {
-            return false;
-        }
-
-        $incident->loadMissing(['establishment', 'type']);
-
-        if ($incident->establishment_id !== null) {
-            $companyId = $incident->establishment?->company_id;
-
-            return $companyId !== null && in_array((int) $companyId, $companyIds, true);
-        }
-
-        if ($incident->origin_type === 'company' && $incident->origin_id !== null) {
-            return in_array((int) $incident->origin_id, $companyIds, true);
-        }
-
-        if ($incident->origin_type === 'brand' && $incident->origin_id !== null) {
-            return in_array((int) $incident->origin_id, $service->accessibleBrandIds($companyIds), true);
-        }
-
-        if ($incident->origin_type === 'establishment' && $incident->origin_id !== null) {
-            $companyId = Establishment::query()
-                ->whereKey($incident->origin_id)
-                ->value('company_id');
-
-            return $companyId !== null && in_array((int) $companyId, $companyIds, true);
-        }
-
-        if ($incident->origin_type === null && $incident->type?->origin_required === false) {
-            return true;
-        }
-
-        return false;
+        return app(IncidentService::class)->canAccess($active, $incident);
     }
 }

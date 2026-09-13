@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Web\Config\Users;
 
+use App\Domain\Companies\Support\ActiveCompany;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Models\User;
 use App\Support\Locale;
 use Illuminate\Foundation\Http\FormRequest;
@@ -44,6 +46,8 @@ final class UpdateUserRequest extends FormRequest
         /** @var User $user */
         $user = $this->route('user');
         $guard = config('auth.defaults.guard', 'web');
+        $ownerId = app(ActiveCompany::class)->forUser($this->user())?->id;
+        $memberUser = CompanyMemberUsers::existsRule($ownerId);
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -65,13 +69,13 @@ final class UpdateUserRequest extends FormRequest
             'manager_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('users', 'id')->whereNull('deleted_at'),
+                $memberUser,
                 'not_in:'.$user->id,
             ],
             'team_leader_id' => [
                 'nullable',
                 'integer',
-                Rule::exists('users', 'id')->whereNull('deleted_at'),
+                $memberUser,
                 'not_in:'.$user->id,
             ],
             'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')->whereNull('deleted_at')],

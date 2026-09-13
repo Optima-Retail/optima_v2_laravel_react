@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Domain\Config\Brands\Services;
 
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Models\Brand;
+use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\User;
 use App\Support\ListQuery;
@@ -16,12 +18,14 @@ use Illuminate\Support\Facades\DB;
 final class BrandService
 {
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, Brand>
      */
     public function paginate(array $filters = [], ?int $perPage = null): LengthAwarePaginator
     {
         $search = trim((string) ($filters['search'] ?? ''));
+        $createdFrom = trim((string) ($filters['created_from'] ?? ''));
+        $createdTo = trim((string) ($filters['created_to'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
         [$sort, $direction] = ListQuery::sort(
             $filters,
@@ -40,13 +44,15 @@ final class BrandService
                         ->orWhereHas('commercialManager', fn ($users) => $users->where('name', 'like', "%{$search}%"));
                 });
             })
+            ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
+            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
             ->orderBy($sort, $direction)
             ->paginate($perPage)
             ->withQueryString();
     }
 
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     public function paginateForWeb(array $filters = [], ?int $perPage = null): LengthAwarePaginator
@@ -112,20 +118,12 @@ final class BrandService
     }
 
     /**
+     * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
-    public function userOptions(): array
+    public function userOptions(?Company $owner = null, array $includeUserIds = []): array
     {
-        return User::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email'])
-            ->map(fn (User $user): array => [
-                'id' => $user->id,
-                'label' => "{$user->name} ({$user->email})",
-            ])
-            ->values()
-            ->all();
+        return CompanyMemberUsers::options($owner, $includeUserIds);
     }
 
     /**

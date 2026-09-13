@@ -9,10 +9,12 @@ import {
     type DependencyList,
     type ReactNode,
 } from 'react';
+import { usePage } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
 import type { ColumnDefinition, Options } from 'tabulator-tables';
 import { FilterBar, type FilterField } from '@/components/page/FilterBar';
+import { SavedFiltersMenu } from '@/components/filters/SavedFiltersMenu';
 import { Pagination } from '@/components/page/Pagination';
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 import { replaceListQueryUrl } from '@/services/shared';
@@ -26,6 +28,7 @@ import {
     type RemoteSort,
     type TabulatorListResponse,
 } from '@/support/tabulator';
+import type { SharedPageProps } from '@/types';
 
 export const REMOTE_PAGE_SIZE_OPTIONS = [10, 12, 25, 50, 100] as const;
 const EMPTY_DEPS: DependencyList = [];
@@ -55,6 +58,8 @@ type RemoteDataTableProps = {
     pageSize?: number;
     filterFields?: FilterField[];
     initialFilters?: Record<string, string>;
+    /** Main-sidebar page key — enables saved filter presets (not used on config lists). */
+    savedFiltersPageKey?: string;
     /** Called when filters, page size, or sort change. Prefer URL-only sync — do not refetch list data here. */
     onQueryChange?: (query: RemoteQueryState) => void;
     /** If set, sync query string via history.replaceState (no network request). */
@@ -103,6 +108,7 @@ function RemoteDataTableInner<T = unknown>(
         pageSize = 12,
         filterFields,
         initialFilters = {},
+        savedFiltersPageKey,
         onQueryChange,
         syncUrlBase,
         emptyIcon,
@@ -115,6 +121,8 @@ function RemoteDataTableInner<T = unknown>(
     ref: React.ForwardedRef<RemoteDataTableHandle>,
 ) {
     const { t, i18n } = useTranslation();
+    const { auth } = usePage<SharedPageProps>().props;
+    const activeCompanyId = auth.company?.id ?? null;
     const tableHostRef = useRef<HTMLDivElement>(null);
     const tabulatorRef = useRef<Tabulator | null>(null);
     const ajaxParamsRef = useRef(ajaxParams);
@@ -341,9 +349,17 @@ function RemoteDataTableInner<T = unknown>(
             tabulatorRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps -- deps provided by caller
-    }, [ajaxURL, getTable, emitQueryChange, i18n.language, ...deps]);
+    }, [ajaxURL, getTable, emitQueryChange, i18n.language, activeCompanyId, ...deps]);
 
     const showEmpty = useMemo(() => !hasRows && !loading, [hasRows, loading]);
+
+    function applySavedFilters(next: Record<string, string>) {
+        setFilterDraft(next);
+        setFilterValues(next);
+        filterValuesRef.current = next;
+        emitQueryChange(next);
+        reloadTable();
+    }
 
     function applyFilters() {
         setFilterValues(filterDraft);
@@ -398,6 +414,16 @@ function RemoteDataTableInner<T = unknown>(
                     onSubmit={applyFilters}
                     onReset={resetFilters}
                     fields={filterFields}
+                    actions={
+                        savedFiltersPageKey ? (
+                            <SavedFiltersMenu
+                                pageKey={savedFiltersPageKey}
+                                currentFilters={filterDraft}
+                                fieldNames={filterFields.map((field) => field.name)}
+                                onApply={applySavedFilters}
+                            />
+                        ) : null
+                    }
                 />
             ) : null}
 

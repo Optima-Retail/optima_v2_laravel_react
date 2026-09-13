@@ -18,6 +18,7 @@ class Incident extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'company_id',
         'subject',
         'comment',
         'incident_status_id',
@@ -52,6 +53,14 @@ class Incident extends Model
             'origin_id' => 'integer',
             'related_id' => 'integer',
         ];
+    }
+
+    /**
+     * @return BelongsTo<Company, $this>
+     */
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
     }
 
     /**

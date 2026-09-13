@@ -246,22 +246,83 @@ final class ClientsSuppliersCrudTest extends TestCase
         $this->actingAs($admin)
             ->put("/suppliers/{$relationship->id}", [
                 'related_company_id' => $related->id,
-                'kind' => CompanyRelationshipKind::Technician->value,
+                'kind' => CompanyRelationshipKind::Supplier->value,
                 'classification' => 'commercial',
-                'status' => 'active',
+                'status' => 'inactive',
             ])
             ->assertRedirect(route('suppliers.index'))
             ->assertSessionHas('success', 'supplier_updated_successfully');
 
         $this->assertDatabaseHas('company_relationships', [
             'id' => $relationship->id,
-            'kind' => 'technician',
+            'kind' => 'supplier',
+            'status' => 'inactive',
         ]);
 
         $this->actingAs($admin)
             ->delete("/suppliers/{$relationship->id}")
             ->assertRedirect(route('suppliers.index'))
             ->assertSessionHas('success', 'supplier_deleted_successfully');
+
+        $this->assertSoftDeleted($relationship);
+    }
+
+    public function test_admin_can_manage_technicians(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleEnum::Admin->value);
+
+        $owner = Company::factory()->create();
+        $this->attachToCompany($admin, $owner);
+
+        $this->actingAs($admin)
+            ->get('/technicians')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Technicians/Index')
+                ->has('filters')
+                ->has('can.create'));
+
+        $related = Company::factory()->create(['name' => 'Technician Co']);
+
+        $this->actingAs($admin)
+            ->post('/technicians', [
+                'related_mode' => 'existing',
+                'related_company_id' => $related->id,
+                'kind' => CompanyRelationshipKind::Technician->value,
+                'classification' => 'commercial',
+                'status' => 'active',
+            ])
+            ->assertRedirect(route('technicians.index'))
+            ->assertSessionHas('success', 'technician_created_successfully');
+
+        $relationship = CompanyRelationship::query()
+            ->where('owner_company_id', $owner->id)
+            ->where('related_company_id', $related->id)
+            ->firstOrFail();
+
+        $this->assertSame(CompanyRelationshipKind::Technician->value, $relationship->kind->value);
+
+        $this->actingAs($admin)
+            ->put("/technicians/{$relationship->id}", [
+                'related_company_id' => $related->id,
+                'kind' => CompanyRelationshipKind::Technician->value,
+                'classification' => 'commercial',
+                'status' => 'inactive',
+            ])
+            ->assertRedirect(route('technicians.index'))
+            ->assertSessionHas('success', 'technician_updated_successfully');
+
+        $this->assertDatabaseHas('company_relationships', [
+            'id' => $relationship->id,
+            'kind' => 'technician',
+            'status' => 'inactive',
+        ]);
+
+        $this->actingAs($admin)
+            ->delete("/technicians/{$relationship->id}")
+            ->assertRedirect(route('technicians.index'))
+            ->assertSessionHas('success', 'technician_deleted_successfully');
 
         $this->assertSoftDeleted($relationship);
     }
@@ -280,7 +341,7 @@ final class ClientsSuppliersCrudTest extends TestCase
             'kind' => CompanyRelationshipKind::Supplier,
         ]);
 
-        $technician = CompanyRelationship::factory()->create([
+        CompanyRelationship::factory()->create([
             'owner_company_id' => $owner->id,
             'kind' => CompanyRelationshipKind::Technician,
         ]);
@@ -306,18 +367,9 @@ final class ClientsSuppliersCrudTest extends TestCase
                 ],
             ]))
             ->assertOk()
-            ->assertJsonPath('last_row', 2)
-            ->assertJsonCount(2, 'data');
-
-        $this->actingAs($admin)
-            ->getJson('/suppliers/data?'.http_build_query([
-                'page' => 1,
-                'size' => 10,
-                'kind' => CompanyRelationshipKind::Technician->value,
-            ]))
-            ->assertOk()
             ->assertJsonPath('last_row', 1)
-            ->assertJsonPath('data.0.id', $technician->id);
+            ->assertJsonPath('data.0.id', $supplier->id)
+            ->assertJsonCount(1, 'data');
 
         $this->actingAs($admin)
             ->getJson('/suppliers/data?'.http_build_query([
@@ -326,9 +378,35 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'kind' => 'not_a_real_kind',
             ]))
             ->assertOk()
-            ->assertJsonPath('last_row', 2);
+            ->assertJsonPath('last_row', 1);
+    }
 
-        $this->assertNotSame($supplier->id, $technician->id);
+    public function test_technicians_data_is_scoped_to_active_company(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleEnum::Admin->value);
+
+        $owner = Company::factory()->create();
+        $this->attachToCompany($admin, $owner);
+
+        $technician = CompanyRelationship::factory()->create([
+            'owner_company_id' => $owner->id,
+            'kind' => CompanyRelationshipKind::Technician,
+        ]);
+
+        CompanyRelationship::factory()->create([
+            'owner_company_id' => $owner->id,
+            'kind' => CompanyRelationshipKind::Supplier,
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/technicians/data?'.http_build_query([
+                'page' => 1,
+                'size' => 10,
+            ]))
+            ->assertOk()
+            ->assertJsonPath('last_row', 1)
+            ->assertJsonPath('data.0.id', $technician->id);
     }
 
     public function test_user_without_permission_cannot_view_suppliers(): void

@@ -1,0 +1,137 @@
+entity: incidents
+id_map: migration_incident_map
+never_assume_legacy_id_equals_new_id: true
+
+sources:
+  - table: incidencias
+
+target:
+  table: incidents
+
+fields:
+  subject:
+    sources: [incidencias.asunto]
+    mapping: rename
+    required: true
+    confidence: high
+
+  comment:
+    sources: [incidencias.comentario]
+    mapping: rename
+    confidence: high
+
+  incident_status_id:
+    sources: [incidencias.estado_id]
+    mapping: FK
+    catalog_ids_preserved: [89, 91, 92, 94, 150, 170]
+    confidence: high
+
+  incident_priority_id:
+    sources: [incidencias.prioridad_id]
+    mapping: FK
+    confidence: high
+
+  incident_type_id:
+    sources: [incidencias.tipo_id]
+    mapping: FK
+    confidence: high
+
+  incident_subtype_id:
+    sources: [incidencias.subtipo_id]
+    mapping: FK
+    confidence: high
+
+  control_at:
+    sources: [incidencias.fecha_control]
+    mapping: rename
+    confidence: high
+
+  closed_at:
+    sources: [incidencias.fecha_cierre]
+    mapping: rename
+    confidence: high
+
+  duration_seconds:
+    sources: [incidencias.tiempo]
+    mapping: rename
+    unit: seconds
+    confidence: high
+
+  qc_duration_seconds:
+    sources: [incidencias.tiempo_qc]
+    mapping: rename
+    unit: seconds
+    confidence: high
+
+  requester_user_id:
+    sources: [incidencias.solicitante_id]
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  responsible_user_id:
+    sources: [incidencias.responsable_id]
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  qc_responsible_user_id:
+    sources: [incidencias.responsable_qc_id]
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  origin_type:
+    sources: [incidencias.origen_modelo_id]
+    mapping: transform
+    transform:
+      7: establishment
+      6: company
+      5: brand
+    other: unresolved_drop_origin
+    confidence: medium
+
+  origin_id:
+    sources: [incidencias.origen_relacion_id]
+    mapping: FK
+    via_by_origin_type:
+      establishment: migration_establishment_map
+      company: migration_company_map
+      brand: migration_brand_map
+    company_source: clientes
+    confidence: medium
+
+  related_type:
+    sources: [incidencias.relacion_modelo_id]
+    mapping: transform
+    transform:
+      21: evaluation
+    other: drop
+    confidence: high
+
+  related_id:
+    sources: [incidencias.relacion_relacion_id]
+    mapping: FK
+    via: migration_evaluation_map
+    when: related_type == evaluation
+    confidence: high
+
+  establishment_id:
+    mapping: computed
+    from:
+      - origin establishment
+      - related evaluation.establishment_id
+    confidence: high
+
+  evaluation_id:
+    mapping: computed
+    from: related evaluation
+    confidence: high
+
+ignored:
+  - fecha_limite
+  - fecha_recibida
+  - fecha_ultima_revision
+
+unresolved:
+  - incidencias.establecimiento_id dropped 2024-10-10 vs stale fillable

@@ -18,13 +18,16 @@ use Illuminate\Support\Str;
 final class CompanyService
 {
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, page?: int|string|null, kind?: string|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, page?: int|string|null, kind?: string|null, is_active?: string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, Company>
      */
     public function paginate(array $filters = [], ?int $perPage = null, ?User $member = null): LengthAwarePaginator
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $kind = trim((string) ($filters['kind'] ?? ''));
+        $isActive = trim((string) ($filters['is_active'] ?? ''));
+        $createdFrom = trim((string) ($filters['created_from'] ?? ''));
+        $createdTo = trim((string) ($filters['created_to'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
         [$sort, $direction] = ListQuery::sort($filters, ['id', 'name', 'tax_id', 'kind', 'is_active', 'created_at'], 'name');
         $page = max(1, (int) ($filters['page'] ?? request()->integer('page', 1)));
@@ -46,13 +49,16 @@ final class CompanyService
                 });
             })
             ->when($kind !== '', fn ($query) => $query->where('kind', $kind))
+            ->when($isActive === '1' || $isActive === '0', fn ($query) => $query->where('is_active', $isActive === '1'))
+            ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
+            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
             ->orderBy($sort, $direction)
             ->paginate($perPage, ['*'], 'page', $page)
             ->withQueryString();
     }
 
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, kind?: string|null}  $filters
+     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, kind?: string|null, is_active?: string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     public function paginateForWeb(array $filters = [], ?int $perPage = null, ?User $member = null): LengthAwarePaginator

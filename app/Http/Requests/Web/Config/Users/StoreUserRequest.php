@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Web\Config\Users;
 
+use App\Domain\Companies\Support\ActiveCompany;
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Models\User;
 use App\Support\Locale;
 use Illuminate\Foundation\Http\FormRequest;
@@ -39,6 +41,8 @@ final class StoreUserRequest extends FormRequest
     public function rules(): array
     {
         $guard = config('auth.defaults.guard', 'web');
+        $ownerId = app(ActiveCompany::class)->forUser($this->user())?->id;
+        $memberUser = CompanyMemberUsers::existsRule($ownerId);
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -52,8 +56,8 @@ final class StoreUserRequest extends FormRequest
             'username' => ['nullable', 'string', 'max:255', Rule::unique('users', 'username')->whereNull('deleted_at')],
             'password' => ['required', 'confirmed', Password::defaults()],
             'locale' => ['nullable', 'string', Rule::in(Locale::supported())],
-            'manager_id' => ['nullable', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
-            'team_leader_id' => ['nullable', 'integer', Rule::exists('users', 'id')->whereNull('deleted_at')],
+            'manager_id' => ['nullable', 'integer', $memberUser],
+            'team_leader_id' => ['nullable', 'integer', $memberUser],
             'team_id' => ['nullable', 'integer', Rule::exists('teams', 'id')->whereNull('deleted_at')],
             'timezone_id' => ['nullable', 'integer', Rule::exists('timezones', 'id')->whereNull('deleted_at')],
             'brand_id' => ['nullable', 'integer', Rule::exists('brands', 'id')->whereNull('deleted_at')],

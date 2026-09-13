@@ -32,6 +32,9 @@ type ClientsIndexProps = {
     filters: {
         search: string;
         kind: string;
+        status: string;
+        created_from: string;
+        created_to: string;
         sort: string;
         direction: string;
         per_page: string;
@@ -40,6 +43,8 @@ type ClientsIndexProps = {
         create: boolean;
     };
 };
+
+const relationshipStatuses = ['prospect', 'active', 'blocked', 'inactive', 'archived'] as const;
 
 type EstablishmentsModalState = {
     relationshipId: number;
@@ -232,6 +237,9 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                     pageSize={Number(filters.per_page) || 12}
                     initialFilters={{
                         search: filters.search,
+                        status: filters.status,
+                        created_from: filters.created_from,
+                        created_to: filters.created_to,
                     }}
                     filterFields={[
                         {
@@ -240,7 +248,28 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                             label: t('common.search'),
                             placeholder: t('clients.searchPlaceholder'),
                         },
+                        {
+                            type: 'select',
+                            name: 'status',
+                            label: t('filters.status'),
+                            emptyLabel: t('common.all'),
+                            options: relationshipStatuses.map((status) => ({
+                                value: status,
+                                label: t(`relationships.statuses.${status}`),
+                            })),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_from',
+                            label: t('filters.createdFrom'),
+                        },
+                        {
+                            type: 'date',
+                            name: 'created_to',
+                            label: t('filters.createdTo'),
+                        },
                     ]}
+                    savedFiltersPageKey="clients"
                     syncUrlBase={clientsService.indexPath}
                     emptyIcon={<Handshake className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('clients.resourcePlural') })}

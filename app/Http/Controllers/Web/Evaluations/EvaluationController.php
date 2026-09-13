@@ -9,6 +9,7 @@ use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Evaluations\UpdateEvaluationRequest;
 use App\Models\Evaluation;
+use App\Models\EvaluationStatus;
 use App\Support\ListQuery;
 use App\Support\TabulatorQuery;
 use App\Support\TabulatorResponse;
@@ -32,6 +33,9 @@ final class EvaluationController extends Controller
 
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
+            'evaluation_status_id' => $request->string('evaluation_status_id')->trim()->toString(),
+            'created_from' => $request->string('created_from')->trim()->toString(),
+            'created_to' => $request->string('created_to')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
@@ -41,6 +45,16 @@ final class EvaluationController extends Controller
 
         return Inertia::render('Evaluations/Index', [
             'filters' => $filters,
+            'evaluationStatusOptions' => EvaluationStatus::query()
+                ->orderBy('lifecycle')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (EvaluationStatus $status): array => [
+                    'id' => $status->id,
+                    'label' => $status->name,
+                ])
+                ->values()
+                ->all(),
             'can' => [
                 'update' => $request->user()?->can('evaluations.update') ?? false,
                 'delete' => $request->user()?->can('evaluations.delete') ?? false,
@@ -59,7 +73,7 @@ final class EvaluationController extends Controller
             allowedSorts: ['id', 'subject', 'next_action_at', 'visit_count', 'call_count', 'created_at'],
             defaultSort: 'id',
             defaultDirection: 'desc',
-            filterKeys: ['search'],
+            filterKeys: ['search', 'evaluation_status_id', 'created_from', 'created_to'],
         );
 
         return TabulatorResponse::fromPaginator(
@@ -79,7 +93,7 @@ final class EvaluationController extends Controller
             'evaluationStatusOptions' => $this->evaluations->evaluationStatusOptions(
                 $evaluation->evaluation_status_id !== null ? (int) $evaluation->evaluation_status_id : null,
             ),
-            'userOptions' => $this->evaluations->userOptions(),
+            'userOptions' => $this->evaluations->userOptions($owner),
             'establishmentOptions' => $this->evaluations->establishmentOptions($owner),
             'can' => [
                 'delete' => $user?->can('delete', $evaluation) ?? false,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Config;
 
+use App\Domain\Companies\Support\ActiveCompany;
 use App\Domain\Config\Brands\Services\BrandMessageService;
 use App\Domain\Config\Brands\Services\BrandService;
 use App\Http\Controllers\Controller;
@@ -36,6 +37,8 @@ final class BrandController extends Controller
 
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
+            'created_from' => $request->string('created_from')->trim()->toString(),
+            'created_to' => $request->string('created_to')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
@@ -60,7 +63,7 @@ final class BrandController extends Controller
             allowedSorts: ['id', 'name', 'account_manager_id', 'commercial_manager_id', 'loyalty_meeting_frequency', 'created_at'],
             defaultSort: 'name',
             defaultDirection: 'asc',
-            filterKeys: ['search'],
+            filterKeys: ['search', 'created_from', 'created_to'],
         );
 
         return TabulatorResponse::fromPaginator(
@@ -77,12 +80,14 @@ final class BrandController extends Controller
         ]);
     }
 
-    public function create(): Response
+    public function create(Request $request): Response
     {
         $this->authorize('create', Brand::class);
 
+        $owner = app(ActiveCompany::class)->forUser($request->user());
+
         return Inertia::render('Config/Brands/Create', [
-            'userOptions' => $this->brands->userOptions(),
+            'userOptions' => $this->brands->userOptions($owner),
         ]);
     }
 
@@ -100,11 +105,17 @@ final class BrandController extends Controller
         $this->authorize('update', $brand);
 
         $user = $request->user();
+        $owner = app(ActiveCompany::class)->forUser($user);
         $canViewMessages = $user?->can('viewMessages', $brand) ?? false;
+        $brand->loadMissing('collaborators');
 
         return Inertia::render('Config/Brands/Edit', [
             'brand' => $this->brands->toFormData($brand),
-            'userOptions' => $this->brands->userOptions(),
+            'userOptions' => $this->brands->userOptions($owner, array_values(array_filter([
+                $brand->account_manager_id,
+                $brand->commercial_manager_id,
+                ...$brand->collaborators->pluck('id')->all(),
+            ]))),
             'messages' => $canViewMessages
                 ? $this->messages->listForBrand($brand, $user)
                 : [],

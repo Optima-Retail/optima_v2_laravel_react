@@ -1,0 +1,55 @@
+entity: brands
+id_map: migration_brand_map
+never_assume_legacy_id_equals_new_id: true
+
+sources:
+  - table: marcas
+    identity_key: nombre
+
+target:
+  table: brands
+  unique:
+    - name
+
+fields:
+  name:
+    sources: [marcas.nombre]
+    mapping: rename
+    required: true
+    unique: true
+    notes: Application uppercases on create; unique index may be case-insensitive.
+    confidence: high
+
+  account_manager_id:
+    sources: [marcas.responsable_id]
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  commercial_manager_id:
+    sources: [marcas.responsable_comercial_id]
+    mapping: FK
+    via: migration_user_map
+    confidence: high
+
+  loyalty_meeting_frequency:
+    sources: [marcas.periodicidad_reunion_fidelizacion]
+    mapping: rename
+    confidence: high
+
+  is_quality_control_contactable:
+    sources: [marcas.contactable_qc]
+    mapping: rename
+    confidence: high
+
+  send_debt_reminders:
+    sources: [marcas.send_debt_reminders]
+    mapping: direct
+    confidence: high
+
+deprecated:
+  - marcas.minutos_reunion
+
+unresolved:
+  corporation_company_id: UNRESOLVED — may point at CRM companies, not v2 companies
+  marcas_usuarios: UNRESOLVED vs brand_collaborators

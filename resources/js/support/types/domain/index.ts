@@ -22,9 +22,21 @@ export type { ClientPriorityListItem, ClientPriorityFormData } from './client-pr
 export type { IncidentPriorityListItem, IncidentPriorityFormData } from './incident-priority';
 export type { IncidentTypeListItem, IncidentTypeFormData } from './incident-type';
 export type { WorkOrderStatusListItem, WorkOrderStatusFormData } from './work-order-status';
+export type {
+    WorkOrderListItem,
+    WorkOrderFormData,
+    WorkOrderAttachmentItem,
+} from './work-order';
+export type {
+    ChecklistListItem,
+    ChecklistFormData,
+    ChecklistDocumentTypeOption,
+    ChecklistStatusOption,
+} from './checklist';
 export type { ContractStatusListItem, ContractStatusFormData } from './contract-status';
 export type { EvaluationStatusListItem, EvaluationStatusFormData } from './evaluation-status';
 export type { ContractListItem, ContractFormData, ContractAttachmentItem } from './contract';
+export type { ComplimentAttachmentItem } from './compliment';
 export type { EvaluationListItem, EvaluationFormData } from './evaluation';
 export type {
     NumberingSegmentFormData,
@@ -34,6 +46,18 @@ export type {
 export type { TeamListItem, TeamFormData } from './team';
 export type { LanguageListItem, LanguageFormData } from './language';
 export type { JobTitleListItem, JobTitleFormData } from './job-title';
+export type { CostCenterListItem, CostCenterFormData } from './cost-center';
+export type { OtherExpenseTypeListItem, OtherExpenseTypeFormData } from './other-expense-type';
+export type {
+    TechnicianIncidentTypeListItem,
+    TechnicianIncidentTypeFormData,
+} from './technician-incident-type';
+export type {
+    TechnicianIncidentStatusListItem,
+    TechnicianIncidentStatusFormData,
+} from './technician-incident-status';
+export type { ExpenseTypeListItem, ExpenseTypeFormData } from './expense-type';
+export type { IndirectCostTypeListItem, IndirectCostTypeFormData } from './indirect-cost-type';
 export type { VehicleListItem, VehicleFormData } from './vehicle';
 export type {
     TaskDocumentType,

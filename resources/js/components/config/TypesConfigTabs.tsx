@@ -9,8 +9,13 @@ export type TypesConfigTabId =
     | 'service'
     | 'global-service'
     | 'incident'
+    | 'technician-incident'
     | 'form'
-    | 'attendance-confirmation';
+    | 'attendance-confirmation'
+    | 'other-expense'
+    | 'expense'
+    | 'indirect-cost'
+    | 'compliment';
 
 type TypesConfigTabsProps = {
     activeId: TypesConfigTabId;
@@ -23,8 +28,13 @@ export function TypesConfigTabs({ activeId }: TypesConfigTabsProps) {
     const canService = useCan('service_types.view');
     const canGlobalService = useCan('global_service_types.view');
     const canIncident = useCan('incident_types.view');
+    const canTechnicianIncident = useCan('technician_incident_types.view');
     const canForm = useCan('form_types.view');
     const canAttendanceConfirmation = useCan('technician_attendance_confirmation_types.view');
+    const canOtherExpense = useCan('other_expense_types.view');
+    const canExpense = useCan('expense_types.view');
+    const canIndirectCost = useCan('indirect_cost_types.view');
+    const canCompliment = useCan('compliment_types.view');
 
     const tabs = useMemo(() => {
         const items: ConfigNavTab[] = [];
@@ -69,6 +79,14 @@ export function TypesConfigTabs({ activeId }: TypesConfigTabsProps) {
             });
         }
 
+        if (canTechnicianIncident) {
+            items.push({
+                id: 'technician-incident',
+                href: '/config/technician-incident-types',
+                label: t('technicianIncidentTypes.resourcePlural'),
+            });
+        }
+
         if (canForm) {
             items.push({
                 id: 'form',
@@ -85,14 +103,51 @@ export function TypesConfigTabs({ activeId }: TypesConfigTabsProps) {
             });
         }
 
+        if (canOtherExpense) {
+            items.push({
+                id: 'other-expense',
+                href: '/config/other-expense-types',
+                label: t('otherExpenseTypes.resourcePlural'),
+            });
+        }
+
+        if (canExpense) {
+            items.push({
+                id: 'expense',
+                href: '/config/expense-types',
+                label: t('expenseTypes.resourcePlural'),
+            });
+        }
+
+        if (canIndirectCost) {
+            items.push({
+                id: 'indirect-cost',
+                href: '/config/indirect-cost-types',
+                label: t('indirectCostTypes.resourcePlural'),
+            });
+        }
+
+        if (canCompliment) {
+            items.push({
+                id: 'compliment',
+                href: '/config/compliment-types',
+                label: t('complimentTypes.resourcePlural'),
+            });
+        }
+
         return items.sort((a, b) => a.label.localeCompare(b.label, i18n.language, { sensitivity: 'base' }));
     }, [
         canAttendanceConfirmation,
+        canCompliment,
         canEstablishment,
+        canExpense,
         canForm,
         canGlobalService,
         canIncident,
+        canIndirectCost,
+        canOtherExpense,
         canService,
+        canTechnicianIncident,
         canWorkOrder,
         i18n.language,
         t,
