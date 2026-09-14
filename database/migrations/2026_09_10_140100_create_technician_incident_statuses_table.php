@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Technician incident statuses from legacy EstadosTecnicoIncidenciaEnum.
  * Kept: name, color, lifecycle (ciclo_vida), is_open (abierto).
+ * Behavior flags: is_default, marks_verified, sets_response_date.
  * Skipped: modelo_id.
  */
 return new class extends Migration
@@ -21,6 +22,9 @@ return new class extends Migration
             $table->string('color', 32)->nullable();
             $table->unsignedTinyInteger('lifecycle')->nullable();
             $table->boolean('is_open')->default(true);
+            $table->boolean('is_default')->default(false);
+            $table->boolean('marks_verified')->default(false);
+            $table->boolean('sets_response_date')->default(false);
             $table->timestamps();
             $table->softDeletes();
         });

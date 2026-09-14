@@ -8,9 +8,7 @@ use Illuminate\Support\Facades\Schema;
 
 /**
  * Legacy `establecimiento_plantilla` → `establishment_form_template`.
- *
- * Includes work_order_type_id (legacy `tipo_ot_id`). Fresh installs get the final
- * shape; existing DBs are rebuilt by `2026_09_14_140100_rebuild_establishment_form_template_table`.
+ * Final shape: establishment + form template + work order type.
  */
 return new class extends Migration
 {

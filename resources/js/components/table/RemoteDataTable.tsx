@@ -82,6 +82,56 @@ function activeSorterField(sorter: { field?: string; column?: { getField?: () =>
     return sorter.column?.getField?.() ?? '';
 }
 
+function columnFloorWidth(definition: ColumnDefinition): number {
+    const minWidth = definition.minWidth;
+    const width = definition.width;
+
+    if (typeof minWidth === 'number' && minWidth > 0) {
+        return minWidth;
+    }
+
+    if (typeof width === 'number' && width > 0) {
+        return width;
+    }
+
+    return 80;
+}
+
+/** Size the host to max(column floors, card width) so fitColumns fills wide cards and scrolls on mobile. */
+function applyTableWidthFloor(table: Tabulator): void {
+    const floor = table.getColumns().reduce((sum, column) => {
+        if (!column.isVisible()) {
+            return sum;
+        }
+
+        return sum + columnFloorWidth(column.getDefinition());
+    }, 0);
+
+    const scroller = table.element.closest('.overflow-x-auto');
+    const available =
+        scroller instanceof HTMLElement
+            ? scroller.clientWidth
+            : (table.element.parentElement?.clientWidth ?? 0);
+    const width = Math.max(floor, available);
+
+    table.element.style.width = `${width}px`;
+    table.element.style.minWidth = `${floor}px`;
+}
+
+function withColumnFloors(columns: ColumnDefinition[]): ColumnDefinition[] {
+    return columns.map((column) => {
+        if (typeof column.minWidth === 'number' && column.minWidth > 0) {
+            return column;
+        }
+
+        if (typeof column.width === 'number' && column.width > 0) {
+            return { ...column, minWidth: column.width };
+        }
+
+        return { ...column, minWidth: 80 };
+    });
+}
+
 function serializeQuery(query: RemoteQueryState): string {
     return JSON.stringify(query);
 }
@@ -283,11 +333,12 @@ function RemoteDataTableInner<T = unknown>(
                     last_row: total,
                 };
             },
-            // Fill the card width. Cell CSS uses text-overflow:clip (not ellipsis)
-            // so squeezed badges do not paint trailing "..." after the pill.
+            // Fill the card when there is spare width. Column floors (below) keep a
+            // usable min width so narrow viewports scroll horizontally instead of crushing.
             layout: 'fitColumns',
             columnDefaults: {
                 resizable: false,
+                minWidth: 80,
             },
             reactiveData: false,
             height: 'auto',
@@ -308,7 +359,7 @@ function RemoteDataTableInner<T = unknown>(
             placeholder: ' ',
             dataLoader: false,
             selectableRows: false,
-            columns: columnsRef.current(helpers),
+            columns: withColumnFloors(columnsRef.current(helpers)),
             ...optionsRef.current,
         });
 
@@ -318,6 +369,7 @@ function RemoteDataTableInner<T = unknown>(
 
         table.on('dataLoaded', () => {
             setLoading(false);
+            applyTableWidthFloor(table);
             table.redraw(true);
             // Enable URL sync only after bootstrap load (prevents extra /companies Inertia visit on entry).
             window.setTimeout(() => {
@@ -330,6 +382,7 @@ function RemoteDataTableInner<T = unknown>(
         });
 
         table.on('dataSorted', () => {
+            applyTableWidthFloor(table);
             table.redraw(true);
 
             if (allowQueryEmitRef.current) {
@@ -338,12 +391,14 @@ function RemoteDataTableInner<T = unknown>(
         });
 
         const onWindowResize = () => {
+            applyTableWidthFloor(table);
             table.redraw(true);
         };
         window.addEventListener('resize', onWindowResize);
 
         tableHostRef.current.classList.add('app-tabulator');
         tabulatorRef.current = table;
+        applyTableWidthFloor(table);
         setLoading(true);
 
         return () => {
@@ -437,7 +492,7 @@ function RemoteDataTableInner<T = unknown>(
                 className="app-scroll overflow-x-auto overscroll-x-contain rounded-2xl border border-line bg-surface"
                 label={loadingLabel ?? t('common.loading')}
             >
-                <div className={showEmpty ? 'hidden' : 'min-w-0'}>
+                <div className={showEmpty ? 'hidden' : 'w-max min-w-full'}>
                     <div ref={tableHostRef} />
                 </div>
                 {showEmpty ? (

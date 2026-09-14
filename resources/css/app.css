@@ -188,20 +188,14 @@
         font-size: 0.875rem;
         line-height: 1.25rem;
         color: var(--color-ink);
-        width: 100% !important;
-    }
-
-    /* Phone / tablet: keep a usable column floor so the card can scroll horizontally */
-    @media (max-width: 1023px) {
-        .app-tabulator.tabulator {
-            min-width: 48rem;
-        }
+        /* Width is set in px by RemoteDataTable (fill card or column floor). */
+        max-width: none !important;
+        box-sizing: border-box !important;
     }
 
     .app-tabulator .tabulator-tableholder {
         /* Vertical: visible for height:auto. Horizontal scroll lives on the card wrapper. */
         overflow: visible !important;
-        width: 100% !important;
     }
 
     .app-tabulator .tabulator-table {
