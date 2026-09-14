@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class CompanyRelationship extends Model
@@ -312,11 +313,55 @@ class CompanyRelationship extends Model
         return $this->hasMany(Vehicle::class);
     }
 
+    /**
+     * @return HasOne<TechnicianRate, $this>
+     */
+    public function technicianRate(): HasOne
+    {
+        return $this->hasOne(TechnicianRate::class);
+    }
+
+    /**
+     * @return HasMany<TechnicianRating, $this>
+     */
+    public function technicianRatings(): HasMany
+    {
+        return $this->hasMany(TechnicianRating::class);
+    }
+
     public function softDeleteSafely(): bool
     {
         $this->deleted_token = $this->getKey().'_'.now()->timestamp;
         $this->save();
 
         return (bool) $this->delete();
+    }
+
+    /**
+     * Option payload for selects that pick a relationship but display the related company.
+     *
+     * @return array{id: int, label: string, logo_url: string|null}
+     */
+    public function toSelectOption(?string $label = null): array
+    {
+        $company = $this->relatedCompany;
+        $resolvedLabel = $label
+            ?? ($company?->tradename ?: null)
+            ?? ($company?->name ?: null)
+            ?? '#'.$this->id;
+
+        return [
+            'id' => $this->id,
+            'label' => $resolvedLabel,
+            'logo_url' => $company?->logoUrl(),
+        ];
+    }
+
+    /**
+     * @return HasOne<TechnicianChat, $this>
+     */
+    public function chat(): HasOne
+    {
+        return $this->hasOne(TechnicianChat::class, 'company_relationship_id');
     }
 }

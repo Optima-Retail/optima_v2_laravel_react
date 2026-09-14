@@ -33,7 +33,7 @@ final class ContractStatusController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'lifecycle',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,7 +73,7 @@ final class ContractStatusController extends Controller
 
     public function store(StoreContractStatusRequest $request): RedirectResponse
     {
-        $this->contractStatuses->create([
+        $record = $this->contractStatuses->create([
             'name' => $request->string('name')->toString(),
             'color' => $request->input('color'),
             'lifecycle' => $request->input('lifecycle'),
@@ -81,7 +81,7 @@ final class ContractStatusController extends Controller
         ]);
 
         return redirect()
-            ->route('config.contract-statuses.index')
+            ->route('config.contract-statuses.edit', $record)
             ->with('success', 'contract_status_created_successfully');
     }
 
@@ -107,7 +107,7 @@ final class ContractStatusController extends Controller
         ]);
 
         return redirect()
-            ->route('config.contract-statuses.index')
+            ->route('config.contract-statuses.edit', $contractStatus)
             ->with('success', 'contract_status_updated_successfully');
     }
 

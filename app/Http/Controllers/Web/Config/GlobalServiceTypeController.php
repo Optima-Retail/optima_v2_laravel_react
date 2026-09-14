@@ -33,7 +33,7 @@ final class GlobalServiceTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class GlobalServiceTypeController extends Controller
 
     public function store(StoreGlobalServiceTypeRequest $request): RedirectResponse
     {
-        $this->globalServiceTypes->create($request->validated());
+        $record = $this->globalServiceTypes->create($request->validated());
 
         return redirect()
-            ->route('config.global-service-types.index')
+            ->route('config.global-service-types.edit', $record)
             ->with('success', 'global_service_type_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class GlobalServiceTypeController extends Controller
         $this->globalServiceTypes->update($globalServiceType, $request->validated());
 
         return redirect()
-            ->route('config.global-service-types.index')
+            ->route('config.global-service-types.edit', $globalServiceType)
             ->with('success', 'global_service_type_updated_successfully');
     }
 

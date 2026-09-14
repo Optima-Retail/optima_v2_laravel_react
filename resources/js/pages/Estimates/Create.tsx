@@ -13,11 +13,15 @@ type CreateEstimateProps = {
     suggestedCode: string | null;
     codeIsAutomatic: boolean;
     defaultStatusId: number | null;
+    defaultEstablishmentId: number | null;
+    defaultContractId: number | null;
+    defaultSubject: string | null;
     statusOptions: UserOption[];
     typeOptions: UserOption[];
     priorityOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
+    contractOptions: UserOption[];
     requesterOptions: UserOption[];
     technicianOptions: UserOption[];
     articleOptions: UserOption[];
@@ -27,11 +31,15 @@ export default function CreateEstimate({
     suggestedCode,
     codeIsAutomatic,
     defaultStatusId,
+    defaultEstablishmentId,
+    defaultContractId,
+    defaultSubject,
     statusOptions,
     typeOptions,
     priorityOptions,
     userOptions,
     establishmentOptions,
+    contractOptions,
     requesterOptions,
     technicianOptions,
     articleOptions,
@@ -40,8 +48,11 @@ export default function CreateEstimate({
     const form = useForm(
         defaultWorkOrderFormValues({
             code: suggestedCode ?? '',
+            subject: defaultSubject ?? '',
             stage: 'estimate',
             status_id: defaultStatusId ? String(defaultStatusId) : '',
+            establishment_id: defaultEstablishmentId ? String(defaultEstablishmentId) : '',
+            contract_id: defaultContractId ? String(defaultContractId) : '',
         }),
     );
 
@@ -73,6 +84,7 @@ export default function CreateEstimate({
                     priorityOptions={priorityOptions}
                     userOptions={userOptions}
                     establishmentOptions={establishmentOptions}
+                    contractOptions={contractOptions}
                     requesterOptions={requesterOptions}
                     technicianOptions={technicianOptions}
                     articleOptions={articleOptions}

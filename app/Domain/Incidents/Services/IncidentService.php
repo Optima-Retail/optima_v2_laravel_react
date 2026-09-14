@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domain\Incidents\Services;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Incidents\Support\IncidentLineStatusRules;
+use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
 use App\Models\Brand;
 use App\Models\Company;
 use App\Models\Establishment;
@@ -25,6 +27,7 @@ final class IncidentService
 {
     public function __construct(
         private readonly IncidentLineStatusRules $lineStatusRules,
+        private readonly StatusChangeHistoryService $statusChanges,
     ) {}
 
     /**
@@ -48,7 +51,13 @@ final class IncidentService
      *
      * @return list<array{id: int, label: string, company_id: int}>
      */
-    public function establishmentOptions(Company $owner): array
+    /**
+     * Active establishments for selects. Keep `$includeIds` so edit still shows saved inactive values.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, company_id: int}>
+     */
+    public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
         $ids = $this->accessibleCompanyIds($owner);
 
@@ -56,8 +65,20 @@ final class IncidentService
             return [];
         }
 
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
         return Establishment::query()
             ->whereIn('company_id', $ids)
+            ->where(function ($query) use ($includeIds): void {
+                $query->where('is_active', true);
+
+                if ($includeIds !== []) {
+                    $query->orWhereIn('id', $includeIds);
+                }
+            })
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'company_id'])
             ->map(fn (Establishment $establishment): array => [
@@ -177,9 +198,14 @@ final class IncidentService
     /**
      * Client companies linked to the owner (kind = customer).
      *
-     * @return list<array{id: int, label: string}>
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function clientOptions(Company $owner): array
+    /**
+     * Active client companies for selects. Keep `$includeId` for edit forms.
+     *
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function clientOptions(Company $owner, ?int $includeId = null): array
     {
         $ids = $this->accessibleCompanyIds($owner);
 
@@ -189,14 +215,16 @@ final class IncidentService
 
         return Company::query()
             ->whereIn('id', $ids)
+            ->where(function ($query) use ($includeId): void {
+                $query->where('is_active', true);
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
             ->orderBy('name')
-            ->get(['id', 'name', 'tradename'])
-            ->map(fn (Company $company): array => [
-                'id' => $company->id,
-                'label' => $company->tradename
-                    ? "{$company->name} ({$company->tradename})"
-                    : $company->name,
-            ])
+            ->get(['id', 'name', 'tradename', 'logo'])
+            ->map(fn (Company $company): array => $company->toSelectOption('tradename'))
             ->values()
             ->all();
     }
@@ -416,6 +444,13 @@ final class IncidentService
 
             $incident = Incident::query()->create($attributes);
             $incident->collaborators()->sync($data['collaborator_ids'] ?? []);
+
+            $this->statusChanges->record(
+                ChatDocumentType::Incident,
+                (int) $incident->id,
+                null,
+                $incident->incident_status_id !== null ? (int) $incident->incident_status_id : null,
+            );
 
             return $incident->load([
                 'establishment',

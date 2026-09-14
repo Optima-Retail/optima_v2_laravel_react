@@ -33,7 +33,7 @@ final class DelegationController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -78,10 +78,10 @@ final class DelegationController extends Controller
 
     public function store(StoreDelegationRequest $request): RedirectResponse
     {
-        $this->delegations->create($request->validated());
+        $record = $this->delegations->create($request->validated());
 
         return redirect()
-            ->route('config.delegations.index')
+            ->route('config.delegations.edit', $record)
             ->with('success', 'delegation_created_successfully');
     }
 
@@ -91,10 +91,14 @@ final class DelegationController extends Controller
 
         return Inertia::render('Config/Delegations/Edit', [
             'delegation' => $this->delegations->toFormData($delegation),
-            'companyOptions' => $this->delegations->companyOptions(),
+            'companyOptions' => $this->delegations->companyOptions(
+                $delegation->company_id !== null ? (int) $delegation->company_id : null,
+            ),
             'currencyOptions' => $this->delegations->currencyOptions(),
             'countryOptions' => $this->delegations->countryOptions(),
-            'seriesOptions' => $this->delegations->seriesOptions(),
+            'seriesOptions' => $this->delegations->seriesOptions(
+                $delegation->series_id !== null ? (int) $delegation->series_id : null,
+            ),
             'can' => [
                 'delete' => $request->user()?->can('delete', $delegation) ?? false,
             ],
@@ -106,7 +110,7 @@ final class DelegationController extends Controller
         $this->delegations->update($delegation, $request->validated());
 
         return redirect()
-            ->route('config.delegations.index')
+            ->route('config.delegations.edit', $delegation)
             ->with('success', 'delegation_updated_successfully');
     }
 

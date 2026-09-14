@@ -46,7 +46,7 @@ final class DelegationsCrudTest extends TestCase
                 'cost_includes_vat' => false,
                 'recovers_vat' => true,
             ])
-            ->assertRedirect(route('config.delegations.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'delegation_created_successfully');
 
         $delegation = Delegation::query()->where('name', 'Madrid Central')->firstOrFail();
@@ -78,7 +78,7 @@ final class DelegationsCrudTest extends TestCase
                 'cost_includes_vat' => true,
                 'recovers_vat' => true,
             ])
-            ->assertRedirect(route('config.delegations.index'))
+            ->assertRedirect(route('config.delegations.edit', $delegation))
             ->assertSessionHas('success', 'delegation_updated_successfully');
 
         $this->assertDatabaseHas('delegations', [

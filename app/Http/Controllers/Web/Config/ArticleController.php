@@ -33,7 +33,7 @@ final class ArticleController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'code',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -76,10 +76,10 @@ final class ArticleController extends Controller
 
     public function store(StoreArticleRequest $request): RedirectResponse
     {
-        $this->articles->create($request->validated());
+        $record = $this->articles->create($request->validated());
 
         return redirect()
-            ->route('config.articles.index')
+            ->route('config.articles.edit', $record)
             ->with('success', 'article_created_successfully');
     }
 
@@ -102,7 +102,7 @@ final class ArticleController extends Controller
         $this->articles->update($article, $request->validated());
 
         return redirect()
-            ->route('config.articles.index')
+            ->route('config.articles.edit', $article)
             ->with('success', 'article_updated_successfully');
     }
 

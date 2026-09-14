@@ -91,11 +91,56 @@ export default function WorkOrderStatusesIndex({ filters, can }: WorkOrderStatus
             {
                 title: t('workOrderStatuses.isOpen'),
                 field: 'is_open',
-                width: 120,
+                width: 110,
                 headerSort: true,
                 titleFormatter,
                 formatter: (cell: CellComponent) =>
                     tabulatorStatusBadge(Boolean(cell.getValue()), t('common.active'), t('common.inactive')),
+            },
+            {
+                title: t('workOrderStatuses.isDefault'),
+                field: 'is_default',
+                width: 110,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.yes'), t('common.no')),
+            },
+            {
+                title: t('workOrderStatuses.confirmsEstimate'),
+                field: 'confirms_estimate',
+                width: 130,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.yes'), t('common.no')),
+            },
+            {
+                title: t('workOrderStatuses.rejectsToEstimate'),
+                field: 'rejects_to_estimate',
+                width: 140,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.yes'), t('common.no')),
+            },
+            {
+                title: t('workOrderStatuses.isPostConfirmDefault'),
+                field: 'is_post_confirm_default',
+                width: 150,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.yes'), t('common.no')),
+            },
+            {
+                title: t('workOrderStatuses.setsSentAt'),
+                field: 'sets_sent_at',
+                width: 130,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.yes'), t('common.no')),
             },
             {
                 title: t('common.color'),
@@ -197,7 +242,7 @@ export default function WorkOrderStatusesIndex({ filters, can }: WorkOrderStatus
                         column: filters.sort || 'lifecycle',
                         dir: filters.direction === 'desc' ? 'desc' : 'asc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         kind: (filters as { kind?: string }).kind ?? '',

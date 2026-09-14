@@ -98,7 +98,7 @@ final class ContractIterationCrudTest extends TestCase
         $this->assertNotNull($contract);
 
         $response
-            ->assertRedirect(route('contracts.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'contract_created_successfully');
 
         $aggregation = ContractInvoicingAggregation::query()->where('contract_id', $contract->id)->first();
@@ -184,7 +184,7 @@ final class ContractIterationCrudTest extends TestCase
         ]);
 
         $response
-            ->assertRedirect(route('contracts.index'))
+            ->assertRedirect(route('contracts.edit', $contract))
             ->assertSessionHas('success', 'contract_updated_successfully');
 
         $iteration->refresh();

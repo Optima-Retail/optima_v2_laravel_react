@@ -32,7 +32,7 @@ final class ActiveCompany
     }
 
     /**
-     * @return list<array{id: int, name: string}>
+     * @return list<array{id: int, name: string, logo_url: string|null}>
      */
     public function membershipsForUser(?User $user): array
     {
@@ -43,10 +43,11 @@ final class ActiveCompany
         return $user->companies()
             ->wherePivot('is_active', true)
             ->orderBy('companies.name')
-            ->get(['companies.id', 'companies.name'])
+            ->get(['companies.id', 'companies.name', 'companies.logo'])
             ->map(fn (Company $company): array => [
                 'id' => $company->id,
                 'name' => $company->name,
+                'logo_url' => $company->logoUrl(),
             ])
             ->values()
             ->all();

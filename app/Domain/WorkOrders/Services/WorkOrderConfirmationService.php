@@ -15,6 +15,7 @@ final class WorkOrderConfirmationService
 {
     public function __construct(
         private readonly NumberingPatternService $numbering,
+        private readonly WorkOrderStatusCatalog $statuses,
     ) {}
 
     public function confirm(WorkOrder $workOrder, ?int $workOrderStatusId = null, ?Company $owner = null): WorkOrder
@@ -25,9 +26,15 @@ final class WorkOrderConfirmationService
 
         $workOrder->unsetRelation('status');
 
+        $statusId = $workOrderStatusId ?? $this->statuses->postConfirmDefaultId();
+
+        if ($statusId === null) {
+            throw new InvalidArgumentException('Configure a post-confirm work-order status first.');
+        }
+
         $payload = [
             'stage' => WorkOrderStage::WorkOrder,
-            'status_id' => $workOrderStatusId ?? WorkOrder::DEFAULT_CONFIRMED_STATUS_ID,
+            'status_id' => $statusId,
             'confirmed_at' => now(),
         ];
 

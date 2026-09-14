@@ -2,6 +2,7 @@ import { FormEvent } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
 import { defaultIncidentFormValues, IncidentForm } from '@/components/incidents/IncidentForm';
 import { IncidentLinesPanel } from '@/components/incidents/IncidentLinesPanel';
 import { PageHeader } from '@/components/page/PageHeader';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { incidentsService } from '@/services';
+import type { DocumentChatPayload } from '@/support/types/domain/chat';
 import type { UserOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type {
@@ -33,9 +35,11 @@ type EditIncidentProps = {
     clientOptions: UserOption[];
     brandOptions: UserOption[];
     evaluationOptions: UserOption[];
+    chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
         create_line: boolean;
+        post_chat: boolean;
     };
 };
 
@@ -53,6 +57,7 @@ export default function EditIncident({
     clientOptions,
     brandOptions,
     evaluationOptions,
+    chat,
     can,
 }: EditIncidentProps) {
     const { t } = useTranslation();
@@ -127,7 +132,19 @@ export default function EditIncident({
     }
 
     return (
-        <AppLayout title={t('common.editResource', { resource: t('incidents.resource') })}>
+        <AppLayout
+            title={t('common.editResource', { resource: t('incidents.resource') })}
+            aside={
+                chat ? (
+                    <DocumentChatPanel
+                        documentType="incident"
+                        documentId={incident.id}
+                        initialChat={chat}
+                        canPost={can.post_chat}
+                    />
+                ) : null
+            }
+        >
             <Head
                 title={t('common.editItem', {
                     name: incident.subject || incident.id,

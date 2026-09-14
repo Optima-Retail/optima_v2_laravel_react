@@ -44,7 +44,7 @@ final class TeamsCrudTest extends TestCase
                 'code' => 'ADM',
                 'name' => 'Administration',
             ])
-            ->assertRedirect(route('config.teams.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'team_created_successfully');
 
         $team = Team::query()->where('code', 'ADM')->firstOrFail();
@@ -82,7 +82,7 @@ final class TeamsCrudTest extends TestCase
                 'code' => 'ADM',
                 'name' => 'Admin Office',
             ])
-            ->assertRedirect(route('config.teams.index'))
+            ->assertRedirect(route('config.teams.edit', $team))
             ->assertSessionHas('success', 'team_updated_successfully');
 
         $this->assertDatabaseHas('teams', [

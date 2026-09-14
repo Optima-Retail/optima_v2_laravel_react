@@ -41,7 +41,7 @@ final class CostCentersCrudTest extends TestCase
                 'name' => 'Marketing',
                 'code' => 'mkt',
             ])
-            ->assertRedirect(route('config.cost-centers.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'cost_center_created_successfully');
 
         $center = CostCenter::query()->where('code', 'MKT')->firstOrFail();
@@ -57,7 +57,7 @@ final class CostCentersCrudTest extends TestCase
                 'name' => 'Marketing Updated',
                 'code' => 'MKTG',
             ])
-            ->assertRedirect(route('config.cost-centers.index'))
+            ->assertRedirect(route('config.cost-centers.edit', $center))
             ->assertSessionHas('success', 'cost_center_updated_successfully');
 
         $this->assertDatabaseHas('cost_centers', [

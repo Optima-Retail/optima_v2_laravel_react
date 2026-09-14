@@ -33,7 +33,7 @@ final class ChecklistController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'sort_order',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -77,10 +77,10 @@ final class ChecklistController extends Controller
 
     public function store(StoreChecklistRequest $request): RedirectResponse
     {
-        $this->checklists->create($request->validated());
+        $record = $this->checklists->create($request->validated());
 
         return redirect()
-            ->route('config.checklists.index')
+            ->route('config.checklists.edit', $record)
             ->with('success', 'checklist_created_successfully');
     }
 
@@ -104,7 +104,7 @@ final class ChecklistController extends Controller
         $this->checklists->update($checklist, $request->validated());
 
         return redirect()
-            ->route('config.checklists.index')
+            ->route('config.checklists.edit', $checklist)
             ->with('success', 'checklist_updated_successfully');
     }
 

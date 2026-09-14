@@ -6,7 +6,10 @@ import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { CompanyOption } from '@/support/types/domain/common';
 import { confirmAction } from '@/helpers/confirm';
 import { copyText } from '@/helpers/clipboard';
 import { AppLayout } from '@/layouts/AppLayout';
@@ -63,7 +66,7 @@ type EditProps = {
     statusOptions: Option[];
     templateOptions: Option[];
     workOrderOptions: Option[];
-    technicianOptions: Option[];
+    technicianOptions: CompanyOption[];
     languageOptions: Option[];
     can: { delete: boolean };
 };
@@ -275,18 +278,13 @@ export default function EditForm({
                                     error={form.errors.company_relationship_id}
                                     required
                                 >
-                                    <Select
+                                    <SearchableSelect
                                         id="company_relationship_id"
                                         value={form.data.company_relationship_id}
-                                        onChange={(event) => form.setData('company_relationship_id', event.target.value)}
-                                    >
-                                        <option value="">{t('common.select')}</option>
-                                        {technicianOptions.map((option) => (
-                                            <option key={option.id} value={option.id}>
-                                                {option.label}
-                                            </option>
-                                        ))}
-                                    </Select>
+                                        emptyLabel={t('common.select')}
+                                        onChange={(value) => form.setData('company_relationship_id', value)}
+                                        options={toCompanySelectOptions(technicianOptions)}
+                                    />
                                 </Field>
                             )}
 

@@ -43,7 +43,7 @@ final class FormTypesCrudTest extends TestCase
             ->post('/config/form-types', [
                 'name' => 'Correctivo',
             ])
-            ->assertRedirect(route('config.form-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'form_type_created_successfully');
 
         $type = FormType::query()->where('name', 'Correctivo')->firstOrFail();
@@ -59,7 +59,7 @@ final class FormTypesCrudTest extends TestCase
             ->put("/config/form-types/{$type->id}", [
                 'name' => 'Corrective',
             ])
-            ->assertRedirect(route('config.form-types.index'))
+            ->assertRedirect(route('config.form-types.edit', $type))
             ->assertSessionHas('success', 'form_type_updated_successfully');
 
         $this->assertDatabaseHas('form_types', [

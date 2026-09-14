@@ -181,7 +181,7 @@ export default function UsersIndex({ filters, roleOptions, can }: UsersIndexProp
                         column: filters.sort || 'name',
                         dir: filters.direction === 'desc' ? 'desc' : 'asc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         role: filters.role,

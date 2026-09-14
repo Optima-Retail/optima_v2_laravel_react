@@ -173,7 +173,7 @@ export default function NumberingPatternsIndex({ filters, can }: NumberingPatter
                         column: filters.sort || 'resource',
                         dir: filters.direction === 'desc' ? 'desc' : 'asc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{ search: filters.search }}
                     filterFields={[
                         {

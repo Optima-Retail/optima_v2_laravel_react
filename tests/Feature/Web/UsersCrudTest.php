@@ -59,7 +59,7 @@ final class UsersCrudTest extends TestCase
                 'password_confirmation' => 'Password1!',
                 'roles' => [RoleEnum::User->value, RoleEnum::Admin->value],
             ])
-            ->assertRedirect(route('config.users.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'user_created_successfully');
 
         $this->assertDatabaseHas('users', ['email' => 'operator@example.com']);
@@ -101,7 +101,7 @@ final class UsersCrudTest extends TestCase
                 'email' => 'operator@example.com',
                 'roles' => [RoleEnum::User->value],
             ])
-            ->assertRedirect(route('config.users.index'))
+            ->assertRedirect(route('config.users.edit', $created))
             ->assertSessionHas('success', 'user_updated_successfully');
 
         $this->assertDatabaseHas('users', [

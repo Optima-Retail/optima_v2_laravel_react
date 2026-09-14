@@ -5,7 +5,8 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { UserOption } from '@/support/types/domain/common';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 
 export type VehicleFormValues = {
     brand: string;
@@ -19,7 +20,7 @@ type VehicleFormProps = {
     values: VehicleFormValues;
     errors: Partial<Record<keyof VehicleFormValues, string>>;
     processing: boolean;
-    technicianOptions: UserOption[];
+    technicianOptions: CompanyOption[];
     onChange: (key: keyof VehicleFormValues, value: string) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
@@ -55,10 +56,7 @@ export function VehicleForm({
                         invalid={Boolean(errors.company_relationship_id)}
                         placeholder={t('vehicles.technicianPlaceholder')}
                         onChange={(value) => onChange('company_relationship_id', value)}
-                        options={technicianOptions.map((option) => ({
-                            value: String(option.id),
-                            label: option.label,
-                        }))}
+                        options={toCompanySelectOptions(technicianOptions)}
                     />
                 </Field>
 

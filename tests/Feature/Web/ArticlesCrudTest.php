@@ -68,7 +68,7 @@ final class ArticlesCrudTest extends TestCase
                 ],
                 'clients' => [],
             ])
-            ->assertRedirect(route('config.articles.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'article_created_successfully');
 
         $article = Article::query()->where('code', 'TEST-ART')->firstOrFail();
@@ -100,7 +100,7 @@ final class ArticlesCrudTest extends TestCase
                 ],
                 'clients' => [],
             ])
-            ->assertRedirect(route('config.articles.index'))
+            ->assertRedirect(route('config.articles.edit', $article))
             ->assertSessionHas('success', 'article_updated_successfully');
 
         $this->assertDatabaseHas('articles', [

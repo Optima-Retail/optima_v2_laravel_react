@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\TechnicianRequests;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
+use App\Domain\Chats\Services\DocumentChatService;
 use App\Domain\TechnicianRequests\Enums\TechnicianRequestStatusKind;
 use App\Domain\TechnicianRequests\Services\TechnicianRequestService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
@@ -29,6 +31,7 @@ final class TechnicianRequestController extends Controller
 
     public function __construct(
         private readonly TechnicianRequestService $technicianRequests,
+        private readonly DocumentChatService $chats,
     ) {}
 
     public function index(Request $request): Response
@@ -50,7 +53,7 @@ final class TechnicianRequestController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -177,6 +180,9 @@ final class TechnicianRequestController extends Controller
                 $form['work_order_id'] !== null ? (int) $form['work_order_id'] : null,
             ),
             'technicianOptions' => $this->technicianRequests->technicianOptions($owner),
+            'chat' => $user !== null
+                ? $this->chats->payload(ChatDocumentType::TechnicianRequest, (int) $technicianRequest->id, $user)
+                : null,
             'can' => [
                 'delete' => $user?->can('delete', $technicianRequest) ?? false,
                 'cancel' => ($user?->can('update', $technicianRequest) ?? false)
@@ -185,6 +191,7 @@ final class TechnicianRequestController extends Controller
                 'create_screening' => ($user?->can('update', $technicianRequest) ?? false)
                     && ! $form['is_screening'],
                 'manage_technicians' => $user?->can('update', $technicianRequest) ?? false,
+                'post_chat' => $user?->can('update', $technicianRequest) ?? false,
             ],
         ]);
     }

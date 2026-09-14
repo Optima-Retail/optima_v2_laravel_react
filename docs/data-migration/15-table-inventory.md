@@ -8,7 +8,7 @@ Quick reference in three parts:
 
 **Important:** most areas have **schema + CRUD** only. Production **rows** are generally **not** copied yet.
 
-See also: [01-table-mapping.md](01-table-mapping.md), [09](09-work-orders.md)–[14](14-contract-iterations.md), [16](16-technician-requests.md).
+See also: [01-table-mapping.md](01-table-mapping.md), [09](09-work-orders.md)–[14](14-contract-iterations.md), [16](16-technician-requests.md), [17](17-document-chats.md), [18](18-technician-rates-ratings-establishment-lists.md).
 
 ---
 
@@ -68,6 +68,7 @@ See also: [01-table-mapping.md](01-table-mapping.md), [09](09-work-orders.md)–
 | `contratos` | `contracts` |
 | `contratos_establecimientos` | `contract_establishment` |
 | `archivos` (contrato) | `contract_attachments` |
+| `archivos` (establecimiento) | `establishment_attachments` |
 | `iteraciones` | `contract_iterations` |
 | `contract_invoicing_aggregations` | `contract_invoicing_aggregations` |
 | `evaluaciones` | `evaluations` |
@@ -86,6 +87,8 @@ See also: [01-table-mapping.md](01-table-mapping.md), [09](09-work-orders.md)–
 | `presupuestos_solicitados` ∪ `ot_tecnico` | `work_order_technicians` |
 | `chequeos` | `work_order_checklist_completions` |
 | `archivos` (presupuesto/OT) | `work_order_attachments` |
+| `chats` / `lineas_chats` / `chats_pendientes` / `chats_silenciados` / message `archivos` (OT, presupuesto, incidencias, evaluaciones, peticiones, tecnicos) | Typed `*_chat_*` tables — see [17-document-chats.md](17-document-chats.md) |
+| `historial_cambios_estados` | `status_change_histories` — see [20-status-change-histories.md](20-status-change-histories.md) |
 | `acciones` | `actions` |
 | `accion_usuarios` | `user_action_scores` |
 | `kpi_configuraciones` | `kpi_configurations` |
@@ -99,6 +102,10 @@ See also: [01-table-mapping.md](01-table-mapping.md), [09](09-work-orders.md)–
 | `peticion_tecnico` | `technician_request_technician` |
 | `tecnicos_prioridades` | `technician_request_priorities` |
 | `estados` (peticiones / filtraje) | `technician_request_statuses` |
+| `tecnicos_tarifas` | `technician_rates` |
+| `valoraciones_tecnico` | `technician_ratings` |
+| `establecimiento_tecnico` | `establishment_technician_blacklist` |
+| `establecimiento_tecnico_fav` | `establishment_favorite_technicians` |
 | `formularios_tipos` | `form_types` |
 | `formularios_estados` | `form_statuses` |
 | `biblias` | `form_bibles` |
@@ -142,6 +149,8 @@ Also “new as a table shape” (legacy was polymorphic or two tables):
 | Typed `*_collaborators` | split of `colaboradores` |
 | Typed `*_attachments` | split of `archivos` |
 | Dedicated `*_statuses` catalogs | split of `estados` |
+| Typed `*_chat_*` (+ unreads/mutes/attachments) | split of polymorphic `chats` / `lineas_chats` / pendientes / silenciados |
+| `historial_cambios_estados` | `status_change_histories` (+ system chat lines) — see [20](20-status-change-histories.md) |
 
 ---
 
@@ -156,8 +165,7 @@ Also “new as a table shape” (legacy was polymorphic or two tables):
 | `preferencia_plantillas` | Template preferences |
 | `ticket_plantillas` | Ticket templates |
 | `plantillas_outlook` | Outlook templates |
-| `chats` / `lineas_chats` | Messaging |
-| `historial_cambios_estados` | Status audit |
+| `chats` / `lineas_chats` (Ticket, PRL, inventario, facturas, CX, efectos, …) | Messaging for domains not yet in v2 — see [17-document-chats.md](17-document-chats.md) |
 | `ot_visita` | OT visits |
 | `prl_tickets` | PRL |
 | `avisos_app` | App notices |
@@ -168,6 +176,7 @@ Also “new as a table shape” (legacy was polymorphic or two tables):
 | Old | Why |
 | --- | --- |
 | `facturas_*` (+ invoice/treasury/stock) | No billing domain in v2 yet |
+| `tecnico_incidencia_factura_compra` | Purchase-invoice link on technician incidents — deferred with billing; see [18](18-technician-rates-ratings-establishment-lists.md) |
 | CRM `companies` / `contacts` / `deals` / `workplaces` | HubSpot overlay — **not** v2 `companies` |
 | `modelos` | Morph catalog → typed enums |
 | `plataformas` | Int on `forms.app_platform_id` only |
@@ -220,3 +229,6 @@ These appear in [01-table-mapping.md](01-table-mapping.md) as intended targets; 
 | [13-forms-and-templates.md](13-forms-and-templates.md) | Plantillas / formularios |
 | [14-contract-iterations.md](14-contract-iterations.md) | Iteraciones |
 | [16-technician-requests.md](16-technician-requests.md) | Peticiones / filtraje |
+| [17-document-chats.md](17-document-chats.md) | Typed document chats |
+| [18-technician-rates-ratings-establishment-lists.md](18-technician-rates-ratings-establishment-lists.md) | Technician rates / ratings / establishment lists |
+| [19-establishment-attachments-and-templates.md](19-establishment-attachments-and-templates.md) | Establishment attachments (`is_private`) + plantilla `work_order_type_id` |

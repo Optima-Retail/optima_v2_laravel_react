@@ -14,6 +14,9 @@ export default function CreateTechnicianIncidentStatus() {
         color: '#a9cef0',
         lifecycle: 1,
         is_open: true,
+        is_default: false,
+        marks_verified: false,
+        sets_response_date: false,
     });
 
     function submit(event: FormEvent) {

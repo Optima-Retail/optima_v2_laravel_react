@@ -8,6 +8,7 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
+import { toCompanySelectOptions } from '@/support/companySelect';
 import type { UserFormOptions } from '@/support/types/domain/user';
 import type { SharedPageProps } from '@/types';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
@@ -411,10 +412,7 @@ export function UserForm({
                         onChange={(companyIds) => onChange('company_ids', companyIds)}
                         placeholder={t('users.companiesPlaceholder')}
                         invalid={Boolean(errors.company_ids)}
-                        options={formOptions.companies.map((company) => ({
-                            value: String(company.id),
-                            label: company.label,
-                        }))}
+                        options={toCompanySelectOptions(formOptions.companies)}
                     />
                 </Field>
             ) : null}

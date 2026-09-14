@@ -44,7 +44,7 @@ final class LanguagesCrudTest extends TestCase
                 'name' => 'ESPAÑOL',
                 'code' => 'es',
             ])
-            ->assertRedirect(route('config.languages.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'language_created_successfully');
 
         $language = Language::query()->where('code', 'es')->firstOrFail();
@@ -74,7 +74,7 @@ final class LanguagesCrudTest extends TestCase
                 'name' => 'Español',
                 'code' => 'es',
             ])
-            ->assertRedirect(route('config.languages.index'))
+            ->assertRedirect(route('config.languages.edit', $language))
             ->assertSessionHas('success', 'language_updated_successfully');
 
         $this->assertDatabaseHas('languages', [

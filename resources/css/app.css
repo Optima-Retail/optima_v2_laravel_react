@@ -23,6 +23,8 @@
 
 @layer base {
     html {
+        height: 100%;
+        overflow: hidden;
         scroll-behavior: smooth;
         scrollbar-width: auto;
         scrollbar-color: color-mix(in srgb, var(--color-ink-muted) 45%, transparent) transparent;
@@ -51,7 +53,13 @@
     }
 
     body {
+        height: 100%;
+        overflow: hidden;
         background-color: var(--color-canvas);
+    }
+
+    #app {
+        height: 100%;
     }
 }
 
@@ -281,6 +289,12 @@
         height: auto !important;
         min-height: 0 !important;
         white-space: nowrap;
+        /*
+         * Tabulator defaults: overflow:hidden + text-overflow:ellipsis.
+         * That paints "..." after clipped HTML badges (status/priority/type).
+         */
+        overflow: hidden !important;
+        text-overflow: clip !important;
     }
 
     .app-tabulator .tabulator-cell.cell-muted {

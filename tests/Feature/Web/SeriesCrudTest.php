@@ -46,7 +46,7 @@ final class SeriesCrudTest extends TestCase
                 'is_selectable' => true,
                 'credit_note_series_id' => null,
             ])
-            ->assertRedirect(route('config.series.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'series_created_successfully');
 
         $series = Series::query()->where('key', 'A')->firstOrFail();
@@ -84,7 +84,7 @@ final class SeriesCrudTest extends TestCase
                 'is_selectable' => true,
                 'credit_note_series_id' => $credit->id,
             ])
-            ->assertRedirect(route('config.series.index'))
+            ->assertRedirect(route('config.series.edit', $series))
             ->assertSessionHas('success', 'series_updated_successfully');
 
         $this->assertDatabaseHas('series', [

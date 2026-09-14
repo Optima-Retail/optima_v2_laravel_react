@@ -42,7 +42,7 @@ final class BrandController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -93,10 +93,10 @@ final class BrandController extends Controller
 
     public function store(StoreBrandRequest $request): RedirectResponse
     {
-        $this->brands->create($request->validated());
+        $record = $this->brands->create($request->validated());
 
         return redirect()
-            ->route('brands.index')
+            ->route('brands.edit', $record)
             ->with('success', 'brand_created_successfully');
     }
 
@@ -119,8 +119,10 @@ final class BrandController extends Controller
             'messages' => $canViewMessages
                 ? $this->messages->listForBrand($brand, $user)
                 : [],
+            'clients' => $this->brands->clientsForBrand($brand),
             'can' => [
                 'delete' => $user?->can('delete', $brand) ?? false,
+                'update_clients' => $user?->can('company_relationships.update') ?? false,
                 'view_messages' => $canViewMessages,
                 'send_messages' => $user?->can('sendMessages', $brand) ?? false,
                 'view_message_files' => $user?->can('viewMessageFiles', $brand) ?? false,
@@ -135,7 +137,7 @@ final class BrandController extends Controller
         $this->brands->update($brand, $request->validated());
 
         return redirect()
-            ->route('brands.index')
+            ->route('brands.edit', $brand)
             ->with('success', 'brand_updated_successfully');
     }
 

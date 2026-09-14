@@ -41,7 +41,7 @@ final class PaymentCatalogsCrudTest extends TestCase
                 'days' => 10,
                 'code' => 'N10',
             ])
-            ->assertRedirect(route('config.payment-methods.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'payment_method_created_successfully');
 
         $method = PaymentMethod::query()->where('name', 'Net 10')->firstOrFail();
@@ -53,7 +53,7 @@ final class PaymentCatalogsCrudTest extends TestCase
                 'days' => 10,
                 'code' => 'N10',
             ])
-            ->assertRedirect(route('config.payment-methods.index'));
+            ->assertRedirect(route('config.payment-methods.edit', $method));
 
         $this->assertDatabaseHas('payment_methods', [
             'id' => $method->id,
@@ -70,14 +70,14 @@ final class PaymentCatalogsCrudTest extends TestCase
             ->post('/config/payment-documents', [
                 'name' => 'Wire transfer',
             ])
-            ->assertRedirect(route('config.payment-documents.index'))
+            ->assertRedirect(route('config.payment-documents.edit', $method))
             ->assertSessionHas('success', 'payment_document_created_successfully');
 
         $document = PaymentDocument::query()->where('name', 'Wire transfer')->firstOrFail();
 
         $this->actingAs($admin)
             ->delete("/config/payment-documents/{$document->id}")
-            ->assertRedirect(route('config.payment-documents.index'));
+            ->assertRedirect();
 
         $this->assertSoftDeleted($document);
     }

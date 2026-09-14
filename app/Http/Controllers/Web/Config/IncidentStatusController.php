@@ -33,7 +33,7 @@ final class IncidentStatusController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'lifecycle',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -75,7 +75,7 @@ final class IncidentStatusController extends Controller
 
     public function store(StoreIncidentStatusRequest $request): RedirectResponse
     {
-        $this->incidentStatuses->create([
+        $record = $this->incidentStatuses->create([
             'name' => $request->string('name')->toString(),
             'color' => $request->input('color'),
             'lifecycle' => $request->input('lifecycle'),
@@ -84,7 +84,7 @@ final class IncidentStatusController extends Controller
         ]);
 
         return redirect()
-            ->route('config.incident-statuses.index')
+            ->route('config.incident-statuses.edit', $record)
             ->with('success', 'incident_status_created_successfully');
     }
 
@@ -112,7 +112,7 @@ final class IncidentStatusController extends Controller
         ]);
 
         return redirect()
-            ->route('config.incident-statuses.index')
+            ->route('config.incident-statuses.edit', $incidentStatus)
             ->with('success', 'incident_status_updated_successfully');
     }
 

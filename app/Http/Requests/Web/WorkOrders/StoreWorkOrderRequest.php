@@ -35,11 +35,13 @@ final class StoreWorkOrderRequest extends FormRequest
         $service = app(WorkOrderService::class);
         $establishmentIds = array_column($service->establishmentOptions($owner), 'id');
         $establishmentIds = $establishmentIds === [] ? [0] : $establishmentIds;
+        $contractIds = array_column($service->contractOptions($owner), 'id');
 
         return array_merge(WorkOrderFormInput::baseRules(
             $owner->id,
             $establishmentIds,
             WorkOrderStage::WorkOrder->value,
+            $contractIds,
         ), [
             'stage' => ['required', 'string', 'in:'.WorkOrderStage::WorkOrder->value],
             'code' => ['nullable', 'string', 'max:64'],

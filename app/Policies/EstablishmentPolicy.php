@@ -38,6 +38,31 @@ final class EstablishmentPolicy
         return $this->allows($user, 'delete') && $this->canAccess($user, $establishment);
     }
 
+    public function viewAttachments(User $user, Establishment $establishment): bool
+    {
+        return $this->allows($user, 'view-attachments') && $this->canAccess($user, $establishment);
+    }
+
+    public function uploadAttachments(User $user, Establishment $establishment): bool
+    {
+        return $this->allows($user, 'upload-attachments') && $this->canAccess($user, $establishment);
+    }
+
+    public function downloadAttachments(User $user, Establishment $establishment): bool
+    {
+        return $this->allows($user, 'download-attachments') && $this->canAccess($user, $establishment);
+    }
+
+    public function deleteAttachments(User $user, Establishment $establishment): bool
+    {
+        return $this->allows($user, 'delete-attachments') && $this->canAccess($user, $establishment);
+    }
+
+    public function viewPrivateAttachments(User $user, Establishment $establishment): bool
+    {
+        return $this->allows($user, 'view-private-attachments') && $this->canAccess($user, $establishment);
+    }
+
     private function hasActiveCompany(User $user): bool
     {
         return app(ActiveCompany::class)->forUser($user) !== null;

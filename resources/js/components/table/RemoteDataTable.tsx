@@ -15,6 +15,7 @@ import { TabulatorFull as Tabulator } from 'tabulator-tables';
 import type { ColumnDefinition, Options } from 'tabulator-tables';
 import { FilterBar, type FilterField } from '@/components/page/FilterBar';
 import { SavedFiltersMenu } from '@/components/filters/SavedFiltersMenu';
+import { isConfigRoute } from '@/components/navigation/ConfigSidebar';
 import { Pagination } from '@/components/page/Pagination';
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 import { replaceListQueryUrl } from '@/services/shared';
@@ -30,7 +31,7 @@ import {
 } from '@/support/tabulator';
 import type { SharedPageProps } from '@/types';
 
-export const REMOTE_PAGE_SIZE_OPTIONS = [10, 12, 25, 50, 100] as const;
+export const REMOTE_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const EMPTY_DEPS: DependencyList = [];
 
 export type RemoteDataTableHandle = {
@@ -105,7 +106,7 @@ function RemoteDataTableInner<T = unknown>(
         ajaxParams,
         columns,
         initialSort,
-        pageSize = 12,
+        pageSize = 25,
         filterFields,
         initialFilters = {},
         savedFiltersPageKey,
@@ -121,7 +122,9 @@ function RemoteDataTableInner<T = unknown>(
     ref: React.ForwardedRef<RemoteDataTableHandle>,
 ) {
     const { t, i18n } = useTranslation();
-    const { auth } = usePage<SharedPageProps>().props;
+    const page = usePage<SharedPageProps>();
+    const { auth } = page.props;
+    const collapseFilters = !isConfigRoute(page.url);
     const activeCompanyId = auth.company?.id ?? null;
     const tableHostRef = useRef<HTMLDivElement>(null);
     const tabulatorRef = useRef<Tabulator | null>(null);
@@ -255,7 +258,7 @@ function RemoteDataTableInner<T = unknown>(
             ajaxResponse: (_url, params, response: TabulatorListResponse<T>) => {
                 const page = Number((params as { page?: number | string }).page ?? 1);
                 const size = Number(
-                    (params as { size?: number | string }).size ?? pageSizeRef.current ?? 12,
+                    (params as { size?: number | string }).size ?? pageSizeRef.current ?? 25,
                 );
                 const total = response.last_row ?? 0;
                 const from = total === 0 ? null : (page - 1) * size + 1;
@@ -280,7 +283,8 @@ function RemoteDataTableInner<T = unknown>(
                     last_row: total,
                 };
             },
-            // fitColumns fills the card width; on small screens CSS min-width enables horizontal scroll.
+            // Fill the card width. Cell CSS uses text-overflow:clip (not ellipsis)
+            // so squeezed badges do not paint trailing "..." after the pill.
             layout: 'fitColumns',
             columnDefaults: {
                 resizable: false,
@@ -290,7 +294,7 @@ function RemoteDataTableInner<T = unknown>(
             headerVisible: true,
             pagination: true,
             paginationMode: 'remote',
-            paginationSize: pageSizeRef.current || 12,
+            paginationSize: pageSizeRef.current || 25,
             sortMode: 'remote',
             filterMode: 'remote',
             initialSort: initialSortRef.current
@@ -393,7 +397,7 @@ function RemoteDataTableInner<T = unknown>(
     }
 
     function changePerPage(perPage: string) {
-        const size = Number(perPage) || 12;
+        const size = Number(perPage) || 25;
         const table = tabulatorRef.current;
 
         pageSizeRef.current = size;
@@ -414,6 +418,7 @@ function RemoteDataTableInner<T = unknown>(
                     onSubmit={applyFilters}
                     onReset={resetFilters}
                     fields={filterFields}
+                    collapsible={collapseFilters}
                     actions={
                         savedFiltersPageKey ? (
                             <SavedFiltersMenu

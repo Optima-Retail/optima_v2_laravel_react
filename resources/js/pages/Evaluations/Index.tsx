@@ -214,7 +214,7 @@ export default function EvaluationsIndex({ filters, evaluationStatusOptions, can
                         column: filters.sort || 'id',
                         dir: filters.direction === 'asc' ? 'asc' : 'desc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         evaluation_status_id: filters.evaluation_status_id,

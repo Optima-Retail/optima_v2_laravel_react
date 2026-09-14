@@ -52,7 +52,6 @@ export function SavedFiltersMenu({
     const [items, setItems] = useState<SavedFilterItem[]>([]);
     const [name, setName] = useState('');
     const [error, setError] = useState<string | null>(null);
-    const defaultAppliedRef = useRef(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -71,36 +70,6 @@ export function SavedFiltersMenu({
             setLoading(false);
         }
     }, [pageKey, t]);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        void (async () => {
-            const data = await load();
-
-            if (cancelled || defaultAppliedRef.current) {
-                return;
-            }
-
-            defaultAppliedRef.current = true;
-
-            if (hasMeaningfulFilters(currentFilters)) {
-                return;
-            }
-
-            const defaultFilter = data.find((item) => item.is_default);
-
-            if (defaultFilter) {
-                onApply(mergeAppliedFilters(fieldNames, defaultFilter.filters));
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
-        // Apply default once on mount for this page.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pageKey]);
 
     useEffect(() => {
         if (!open) {
@@ -243,13 +212,25 @@ export function SavedFiltersMenu({
                                         <button
                                             type="button"
                                             className={cn(
-                                                'rounded p-1 text-ink-muted hover:bg-surface hover:text-ink',
-                                                item.is_default && 'text-brand',
+                                                'rounded p-1 transition-colors',
+                                                item.is_default
+                                                    ? 'text-amber-500 hover:text-amber-600'
+                                                    : 'text-ink-muted hover:bg-surface hover:text-ink',
                                             )}
-                                            title={t('savedFilters.setDefault')}
+                                            title={
+                                                item.is_default
+                                                    ? t('savedFilters.clearDefault')
+                                                    : t('savedFilters.setDefault')
+                                            }
                                             onClick={() => void handleToggleDefault(item)}
                                         >
-                                            <Star className="size-3.5" aria-hidden />
+                                            <Star
+                                                className={cn(
+                                                    'size-3.5',
+                                                    item.is_default && 'fill-amber-400 text-amber-500',
+                                                )}
+                                                aria-hidden
+                                            />
                                         </button>
                                         <button
                                             type="button"

@@ -41,7 +41,7 @@ final class FormTemplateController extends Controller
                 'sort' => $request->string('sort')->trim()->toString() ?: 'id',
                 'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
                 'per_page' => (string) ListQuery::perPage([
-                    'per_page' => $request->integer('per_page', 12),
+                    'per_page' => $request->integer('per_page', 25),
                 ]),
             ],
             'typeOptions' => $this->templates->typeOptions(),
@@ -96,7 +96,7 @@ final class FormTemplateController extends Controller
 
         return Inertia::render('FormTemplates/Edit', [
             'template' => $this->templates->toFormData($formTemplate),
-            ...$this->formOptions($owner),
+            ...$this->formOptions($owner, $formTemplate),
             'can' => [
                 'delete' => $request->user()?->can('delete', $formTemplate) ?? false,
             ],
@@ -125,15 +125,35 @@ final class FormTemplateController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function formOptions($owner): array
+    private function formOptions($owner, ?FormTemplate $template = null): array
     {
+        $establishmentIds = [];
+
+        if ($template !== null) {
+            $template->loadMissing(['establishments:id']);
+
+            if ($template->establishment_id !== null) {
+                $establishmentIds[] = (int) $template->establishment_id;
+            }
+
+            $establishmentIds = array_values(array_unique(array_merge(
+                $establishmentIds,
+                $template->establishments->pluck('id')->map(fn ($id) => (int) $id)->all(),
+            )));
+        }
+
         return [
             'typeOptions' => $this->templates->typeOptions(),
             'languageOptions' => $this->templates->languageOptions(),
             'workOrderTypeOptions' => $this->templates->workOrderTypeOptions(),
             'brandOptions' => $this->templates->brandOptions(),
-            'customerOptions' => $this->templates->customerOptions($owner),
-            'establishmentOptions' => $this->templates->establishmentOptions($owner),
+            'customerOptions' => $this->templates->customerOptions(
+                $owner,
+                $template?->company_relationship_id !== null
+                    ? (int) $template->company_relationship_id
+                    : null,
+            ),
+            'establishmentOptions' => $this->templates->establishmentOptions($owner, $establishmentIds),
             'bibleOptions' => $this->bibles->options(),
         ];
     }

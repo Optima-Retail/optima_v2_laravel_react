@@ -1,7 +1,8 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { CompanyMark, CompanyOptionLabel } from '@/components/companies/CompanyOptionLabel';
 import { cn } from '@/support/cn';
 import { optionColorStyle } from '@/support/color';
 
@@ -10,7 +11,17 @@ export type SelectOption = {
     label: string;
     /** Catalog color (statuses, priorities, types, …) — paints the option row. */
     color?: string | null;
+    /** When set (including null), renders a company logo mark beside the label. */
+    logo_url?: string | null;
 };
+
+function optionContent(option: SelectOption): ReactNode {
+    if ('logo_url' in option) {
+        return <CompanyOptionLabel name={option.label} logoUrl={option.logo_url} />;
+    }
+
+    return option.label;
+}
 
 type SearchableSelectProps = {
     id?: string;
@@ -239,7 +250,7 @@ export function SearchableSelect({
                                       onClick={() => select(option.value)}
                                       style={colorStyle}
                                       className={cn(
-                                          'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+                                          'flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm transition-colors',
                                           colorStyle
                                               ? highlighted
                                                   ? 'ring-2 ring-inset ring-brand/50'
@@ -252,7 +263,7 @@ export function SearchableSelect({
                                   >
                                       <span
                                           className={cn(
-                                              'inline-flex size-4 items-center justify-center rounded border',
+                                              'inline-flex size-4 shrink-0 items-center justify-center rounded border',
                                               active
                                                   ? 'border-brand bg-brand text-white'
                                                   : colorStyle
@@ -262,7 +273,7 @@ export function SearchableSelect({
                                       >
                                           {active ? <Check className="size-3" aria-hidden /> : null}
                                       </span>
-                                      {option.label}
+                                      {optionContent(option)}
                                   </button>
                               </li>
                           );
@@ -277,7 +288,8 @@ export function SearchableSelect({
         <div ref={rootRef} className={cn('relative', className)}>
             <div
                 className={cn(
-                    'flex h-8 w-full items-center gap-1.5 rounded-lg border px-2.5 text-sm shadow-sm transition',
+                    'flex w-full items-center gap-1.5 rounded-lg border px-2.5 text-sm shadow-sm transition',
+                    !open && selected && 'logo_url' in selected ? 'h-10' : 'h-8',
                     'focus-within:border-brand focus-within:outline-none focus-within:ring-2 focus-within:ring-brand/20',
                     !triggerColorStyle && 'bg-surface',
                     disabled && 'cursor-not-allowed opacity-60',
@@ -286,6 +298,9 @@ export function SearchableSelect({
                 style={triggerColorStyle}
                 onClick={() => openList()}
             >
+                {!open && selected && 'logo_url' in selected ? (
+                    <CompanyMark name={selected.label} logoUrl={selected.logo_url} size="sm" />
+                ) : null}
                 <input
                     ref={inputRef}
                     id={id}

@@ -39,7 +39,7 @@ final class TabulatorQuery
             'sort' => $sort,
             'direction' => $direction,
             'per_page' => ListQuery::perPage([
-                'per_page' => $request->integer('size', $request->integer('per_page', 12)),
+                'per_page' => $request->integer('size', $request->integer('per_page', 25)),
             ]),
             'page' => max(1, $request->integer('page', 1)),
         ];

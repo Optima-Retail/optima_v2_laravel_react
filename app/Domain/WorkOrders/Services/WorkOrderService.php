@@ -4,25 +4,30 @@ declare(strict_types=1);
 
 namespace App\Domain\WorkOrders\Services;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\Config\NumberingPatterns\Services\NumberingPatternService;
 use App\Domain\Config\TasksToPerform\Enums\TaskDocumentType;
 use App\Domain\QualityScores\Services\QualityScoreProcessor;
+use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
 use App\Models\Article;
 use App\Models\ClientPriority;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
+use App\Models\Contract;
 use App\Models\Establishment;
 use App\Models\Requester;
 use App\Models\TaskToPerform;
+use App\Models\User;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderLine;
 use App\Models\WorkOrderStatus;
 use App\Models\WorkOrderTechnician;
 use App\Models\WorkOrderType;
+use App\Policies\EstimatePolicy;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +40,8 @@ final class WorkOrderService
         private readonly WorkOrderConfirmationService $confirmation,
         private readonly NumberingPatternService $numbering,
         private readonly QualityScoreProcessor $qualityScores,
+        private readonly StatusChangeHistoryService $statusChanges,
+        private readonly WorkOrderStatusCatalog $statuses,
     ) {}
 
     /**
@@ -58,7 +65,13 @@ final class WorkOrderService
     /**
      * @return list<array{id: int, label: string, company_id: int}>
      */
-    public function establishmentOptions(Company $owner): array
+    /**
+     * Active establishments for selects. Keep `$includeIds` so edit still shows saved inactive values.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, company_id: int}>
+     */
+    public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
         $ids = $this->accessibleCompanyIds($owner);
 
@@ -66,8 +79,20 @@ final class WorkOrderService
             return [];
         }
 
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
         return Establishment::query()
             ->whereIn('company_id', $ids)
+            ->where(function ($query) use ($includeIds): void {
+                $query->where('is_active', true);
+
+                if ($includeIds !== []) {
+                    $query->orWhereIn('id', $includeIds);
+                }
+            })
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'company_id'])
             ->map(fn (Establishment $establishment): array => [
@@ -82,22 +107,130 @@ final class WorkOrderService
     }
 
     /**
-     * @return list<array{id: int, label: string, color: string|null}>
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string}>
      */
-    public function statusOptions(WorkOrderStage $kind): array
+    public function contractOptions(Company $owner, array $includeIds = []): array
     {
-        return WorkOrderStatus::query()
-            ->kind($kind)
-            ->orderBy('lifecycle')
-            ->orderBy('id')
-            ->get(['id', 'name', 'color'])
-            ->map(fn (WorkOrderStatus $status): array => [
-                'id' => $status->id,
-                'label' => $status->name,
-                'color' => $status->color,
-            ])
+        $companyIds = $this->accessibleCompanyIds($owner);
+
+        if ($companyIds === []) {
+            return [];
+        }
+
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        return Contract::query()
+            ->where(function ($query) use ($companyIds, $includeIds): void {
+                $query->whereIn('company_id', $companyIds);
+
+                if ($includeIds !== []) {
+                    $query->orWhereIn('id', $includeIds);
+                }
+            })
+            ->orderByDesc('id')
+            ->get(['id', 'code', 'description', 'work_order_subject'])
+            ->map(function (Contract $contract): array {
+                $label = $contract->code
+                    ?: $contract->description
+                    ?: $contract->work_order_subject
+                    ?: '#'.$contract->id;
+
+                if ($contract->code && filled($contract->description)) {
+                    $label = $contract->code.' — '.$contract->description;
+                }
+
+                return [
+                    'id' => (int) $contract->id,
+                    'label' => $label,
+                ];
+            })
             ->values()
             ->all();
+    }
+
+    /**
+     * Prefill helpers when creating a document from `?contract_id=`.
+     *
+     * @return array{contract_id: int|null, establishment_id: int|null, subject: string|null}
+     */
+    public function defaultsFromContract(
+        Company $owner,
+        ?int $requestedContractId,
+        ?int $requestedEstablishmentId = null,
+    ): array {
+        $contractId = null;
+
+        if ($requestedContractId !== null && $requestedContractId > 0) {
+            $allowed = collect($this->contractOptions($owner))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $contractId = in_array($requestedContractId, $allowed, true) ? $requestedContractId : null;
+        }
+
+        $establishmentId = null;
+
+        if ($requestedEstablishmentId !== null && $requestedEstablishmentId > 0) {
+            $allowedEstablishments = collect($this->establishmentOptions($owner))
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $establishmentId = in_array($requestedEstablishmentId, $allowedEstablishments, true)
+                ? $requestedEstablishmentId
+                : null;
+        }
+
+        $subject = null;
+
+        if ($contractId !== null) {
+            $contract = Contract::query()
+                ->with(['establishments' => fn ($query) => $query->select('establishments.id')])
+                ->find($contractId);
+
+            $subject = filled($contract?->work_order_subject) ? (string) $contract->work_order_subject : null;
+
+            if ($establishmentId === null && $contract !== null) {
+                $linkedIds = $contract->establishments->pluck('id')->map(fn ($id) => (int) $id)->all();
+                $allowedEstablishments = collect($this->establishmentOptions($owner))
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+                $candidates = array_values(array_intersect($linkedIds, $allowedEstablishments));
+
+                if (count($candidates) === 1) {
+                    $establishmentId = $candidates[0];
+                }
+            }
+        }
+
+        return [
+            'contract_id' => $contractId,
+            'establishment_id' => $establishmentId,
+            'subject' => $subject,
+        ];
+    }
+
+    /**
+     * @return list<array{
+     *     id: int,
+     *     label: string,
+     *     color: string|null,
+     *     is_open: bool,
+     *     confirms_estimate: bool,
+     *     rejects_to_estimate: bool,
+     *     requires_confirmation: bool,
+     *     requires_justification: bool
+     * }>
+     */
+    public function statusOptions(WorkOrderStage $kind, ?int $currentStatusId = null): array
+    {
+        return $this->statuses->options($kind, $currentStatusId);
     }
 
     /**
@@ -181,9 +314,10 @@ final class WorkOrderService
     public function technicianOptions(Company $owner): array
     {
         return CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename')
+            ->with('relatedCompany:id,name,tradename,logo,is_active')
             ->where('owner_company_id', $owner->id)
             ->where('kind', CompanyRelationshipKind::Technician->value)
+            ->whereHas('relatedCompany', fn ($query) => $query->where('is_active', true))
             ->orderBy('id')
             ->get()
             ->map(function (CompanyRelationship $relationship): array {
@@ -191,10 +325,7 @@ final class WorkOrderService
                     ?: $relationship->relatedCompany?->name
                     ?: '#'.$relationship->id;
 
-                return [
-                    'id' => $relationship->id,
-                    'label' => $name,
-                ];
+                return $relationship->toSelectOption($name);
             })
             ->values()
             ->all();
@@ -219,30 +350,11 @@ final class WorkOrderService
 
     public function defaultStatusId(WorkOrderStage $stage): ?int
     {
-        $preferred = $stage === WorkOrderStage::Estimate
-            ? WorkOrder::DEFAULT_ESTIMATE_STATUS_ID
-            : WorkOrder::DEFAULT_WORK_ORDER_STATUS_ID;
-
-        $match = WorkOrderStatus::query()
-            ->kind($stage)
-            ->whereKey($preferred)
-            ->value('id');
-
-        if ($match !== null) {
-            return (int) $match;
-        }
-
-        $open = WorkOrderStatus::query()
-            ->kind($stage)
-            ->orderBy('lifecycle')
-            ->orderBy('id')
-            ->value('id');
-
-        return $open !== null ? (int) $open : null;
+        return $this->statuses->defaultId($stage);
     }
 
     /**
-     * @param  array{search?: string|null, stage?: string|null, pending?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
+     * @param  array{search?: string|null, stage?: string|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, WorkOrder>
      */
     public function paginateForOwner(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator
@@ -250,6 +362,8 @@ final class WorkOrderService
         $search = trim((string) ($filters['search'] ?? ''));
         $stage = trim((string) ($filters['stage'] ?? ''));
         $pending = trim((string) ($filters['pending'] ?? ''));
+        $establishmentId = (int) ($filters['establishment_id'] ?? 0);
+        $contractId = (int) ($filters['contract_id'] ?? 0);
         $createdFrom = trim((string) ($filters['created_from'] ?? ''));
         $createdTo = trim((string) ($filters['created_to'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
@@ -262,9 +376,23 @@ final class WorkOrderService
         $companyIds = $this->accessibleCompanyIds($owner);
 
         return WorkOrder::query()
-            ->with(['establishment', 'status', 'responsibleUser', 'type'])
+            ->with([
+                'establishment',
+                'status',
+                'responsibleUser',
+                'type',
+                'priority',
+                'technicians' => fn ($query) => $query->where('is_selected', true),
+                'technicians.technician.relatedCompany',
+            ])
             ->whereHas('establishment', function ($query) use ($companyIds): void {
                 $query->whereIn('company_id', $companyIds);
+            })
+            ->when($establishmentId > 0, function ($query) use ($establishmentId): void {
+                $query->where('establishment_id', $establishmentId);
+            })
+            ->when($contractId > 0, function ($query) use ($contractId): void {
+                $query->where('contract_id', $contractId);
             })
             ->when($stage !== '' && in_array($stage, WorkOrderStage::values(), true), function ($query) use ($stage): void {
                 $query->where('stage', $stage);
@@ -295,13 +423,77 @@ final class WorkOrderService
     }
 
     /**
-     * @param  array{search?: string|null, stage?: string|null, pending?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
+     * @param  array{search?: string|null, stage?: string|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     public function paginateForWeb(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator
     {
         return $this->paginateForOwner($owner, $filters, $perPage)
             ->through(fn (WorkOrder $workOrder): array => $this->toListItem($workOrder));
+    }
+
+    /**
+     * Aggregate totals for an establishment (legacy `components.totales` for ots/presupuestos).
+     *
+     * @return array{count: int, total_amount: float, cost_amount: float, margin_percentage: float}
+     */
+    public function totalsForEstablishment(Company $owner, int $establishmentId, WorkOrderStage $stage): array
+    {
+        $companyIds = $this->accessibleCompanyIds($owner);
+
+        $row = WorkOrder::query()
+            ->where('establishment_id', $establishmentId)
+            ->where('stage', $stage->value)
+            ->whereHas('establishment', function ($query) use ($companyIds): void {
+                $query->whereIn('company_id', $companyIds);
+            })
+            ->selectRaw('COUNT(*) as quantity')
+            ->selectRaw('COALESCE(SUM(COALESCE(total_euros, total_amount, 0)), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(COALESCE(cost_amount, 0)), 0) as cost_amount')
+            ->first();
+
+        return $this->formatTotalsRow($row);
+    }
+
+    /**
+     * Aggregate totals for work orders linked to a contract.
+     *
+     * @return array{count: int, total_amount: float, cost_amount: float, margin_percentage: float}
+     */
+    public function totalsForContract(Company $owner, int $contractId, WorkOrderStage $stage): array
+    {
+        $companyIds = $this->accessibleCompanyIds($owner);
+
+        $row = WorkOrder::query()
+            ->where('contract_id', $contractId)
+            ->where('stage', $stage->value)
+            ->whereHas('establishment', function ($query) use ($companyIds): void {
+                $query->whereIn('company_id', $companyIds);
+            })
+            ->selectRaw('COUNT(*) as quantity')
+            ->selectRaw('COALESCE(SUM(COALESCE(total_euros, total_amount, 0)), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(COALESCE(cost_amount, 0)), 0) as cost_amount')
+            ->first();
+
+        return $this->formatTotalsRow($row);
+    }
+
+    /**
+     * @param  object{quantity?: mixed, total_amount?: mixed, cost_amount?: mixed}|null  $row
+     * @return array{count: int, total_amount: float, cost_amount: float, margin_percentage: float}
+     */
+    private function formatTotalsRow(?object $row): array
+    {
+        $total = round((float) ($row?->total_amount ?? 0), 2);
+        $cost = round((float) ($row?->cost_amount ?? 0), 2);
+        $margin = $total > 0.0 ? round((($total - $cost) / $total) * 100, 2) : 0.0;
+
+        return [
+            'count' => (int) ($row?->quantity ?? 0),
+            'total_amount' => $total,
+            'cost_amount' => $cost,
+            'margin_percentage' => $margin,
+        ];
     }
 
     /**
@@ -330,11 +522,28 @@ final class WorkOrderService
             $workOrder = WorkOrder::query()->create($attributes);
             $this->syncChildren($workOrder, $data);
 
-            if ((int) $workOrder->status_id === WorkOrder::APPROVED_ESTIMATE_STATUS_ID && $workOrder->isEstimate()) {
-                $this->confirmation->confirm($workOrder, null, $owner);
+            $createdStatusId = $workOrder->status_id !== null ? (int) $workOrder->status_id : null;
+            $this->statusChanges->record(
+                ChatDocumentType::WorkOrder,
+                (int) $workOrder->id,
+                null,
+                $createdStatusId,
+            );
+
+            if ($this->statuses->statusConfirmsEstimate($workOrder->status_id !== null ? (int) $workOrder->status_id : null) && $workOrder->isEstimate()) {
+                $this->confirmation->confirm($workOrder, $this->statuses->postConfirmDefaultId(), $owner);
+                $confirmed = $workOrder->fresh() ?? $workOrder;
+                $this->statusChanges->record(
+                    ChatDocumentType::WorkOrder,
+                    (int) $confirmed->id,
+                    $createdStatusId,
+                    $confirmed->status_id !== null ? (int) $confirmed->status_id : null,
+                );
             }
 
             $fresh = $workOrder->fresh($this->defaultRelations()) ?? $workOrder;
+            $this->applyStatusSideEffects($fresh, $createdStatusId ?? 0, true);
+            $fresh = $fresh->fresh($this->defaultRelations()) ?? $fresh;
             $this->qualityScores->handleEstimateSent($fresh, null);
 
             return $fresh;
@@ -345,16 +554,39 @@ final class WorkOrderService
      * @param  array<string, mixed>  $data
      * @return array{work_order: WorkOrder, cloned_estimate: WorkOrder|null}
      */
-    public function update(Company $owner, WorkOrder $workOrder, array $data): array
+    public function update(Company $owner, WorkOrder $workOrder, array $data, ?User $actor = null): array
     {
-        return DB::transaction(function () use ($owner, $workOrder, $data): array {
+        return DB::transaction(function () use ($owner, $workOrder, $data, $actor): array {
             $workOrder->loadMissing('status');
             $newStatusId = (int) $data['status_id'];
             $oldStatusId = (int) $workOrder->status_id;
             $previousSentAt = $workOrder->sent_at?->toDateTimeString();
             $wasOpen = (bool) ($workOrder->status?->is_open ?? true);
-            $approving = $workOrder->isEstimate() && $newStatusId === WorkOrder::APPROVED_ESTIMATE_STATUS_ID;
-            $rejecting = $workOrder->isConfirmedWorkOrder() && $newStatusId === WorkOrder::REJECTED_TO_ESTIMATE_STATUS_ID;
+            $fieldsLocked = ! $wasOpen && ! $this->actorCanUpdateClosed($actor, $workOrder);
+            $approving = $workOrder->isEstimate() && $this->statuses->statusConfirmsEstimate($newStatusId);
+            $rejecting = $workOrder->isConfirmedWorkOrder() && $this->statuses->statusRejectsToEstimate($newStatusId);
+
+            if ($newStatusId !== $oldStatusId && ! $this->statuses->canTransition($oldStatusId, $newStatusId)) {
+                throw ValidationException::withMessages([
+                    'status_id' => 'This status change is not allowed.',
+                ]);
+            }
+
+            $justification = trim((string) ($data['status_justification'] ?? ''));
+
+            if ($newStatusId !== $oldStatusId) {
+                $edge = $this->statuses->transition($oldStatusId, $newStatusId);
+
+                if ($edge?->requires_justification && mb_strlen($justification) < 10) {
+                    throw ValidationException::withMessages([
+                        'status_justification' => 'A justification of at least 10 characters is required.',
+                    ]);
+                }
+            }
+
+            if ($fieldsLocked) {
+                $this->assertClosedFieldsUnchanged($workOrder, $data);
+            }
 
             $attributes = $this->attributes($data, $workOrder->stage);
 
@@ -362,13 +594,26 @@ final class WorkOrderService
                 unset($attributes['status_id']);
             }
 
-            $workOrder->update($attributes);
-            $this->syncChildren($workOrder, $data);
+            if ($fieldsLocked) {
+                $attributes = array_intersect_key($attributes, ['status_id' => true]);
+            }
+
+            if ($attributes !== []) {
+                $workOrder->update($attributes);
+            }
+
+            if (! $fieldsLocked) {
+                $this->syncChildren($workOrder, $data);
+            }
 
             $clone = null;
 
             if ($approving) {
-                $this->confirmation->confirm($workOrder->fresh() ?? $workOrder, null, $owner);
+                $this->confirmation->confirm(
+                    $workOrder->fresh() ?? $workOrder,
+                    $this->statuses->postConfirmDefaultId(),
+                    $owner,
+                );
             } elseif ($rejecting) {
                 $clone = $this->rejectToEstimate($owner, $workOrder->fresh() ?? $workOrder);
             } elseif ($newStatusId !== $oldStatusId) {
@@ -377,14 +622,27 @@ final class WorkOrderService
             }
 
             $fresh = $workOrder->fresh($this->defaultRelations()) ?? $workOrder;
+            $this->applyStatusSideEffects($fresh, $oldStatusId, $wasOpen);
+            $fresh = $fresh->fresh($this->defaultRelations()) ?? $fresh;
 
-            if (
-                $fresh->isEstimate()
-                && (int) $fresh->status_id === 5
-                && $fresh->sent_at === null
-            ) {
-                $fresh->forceFill(['sent_at' => now()])->save();
-                $fresh = $fresh->fresh($this->defaultRelations()) ?? $fresh;
+            $finalStatusId = $fresh->status_id !== null ? (int) $fresh->status_id : null;
+            $this->statusChanges->record(
+                ChatDocumentType::WorkOrder,
+                (int) $fresh->id,
+                $oldStatusId,
+                $finalStatusId,
+                $actor,
+                $justification !== '' ? $justification : null,
+            );
+
+            if ($clone !== null) {
+                $this->statusChanges->record(
+                    ChatDocumentType::WorkOrder,
+                    (int) $clone->id,
+                    null,
+                    $clone->status_id !== null ? (int) $clone->status_id : null,
+                    $actor,
+                );
             }
 
             $this->qualityScores->handleEstimateSent($fresh, $previousSentAt);
@@ -416,11 +674,17 @@ final class WorkOrderService
             ]);
         }
 
-        $estimateStatusId = $this->defaultStatusId(WorkOrderStage::Estimate)
-            ?? WorkOrder::DEFAULT_ESTIMATE_STATUS_ID;
+        $estimateStatusId = $this->defaultStatusId(WorkOrderStage::Estimate);
+        $rejectedStatusId = $this->statuses->rejectsToEstimateId();
+
+        if ($estimateStatusId === null || $rejectedStatusId === null) {
+            throw ValidationException::withMessages([
+                'status_id' => 'Configure default and reject-to-estimate statuses first.',
+            ]);
+        }
 
         $workOrder->forceFill([
-            'status_id' => WorkOrder::REJECTED_TO_ESTIMATE_STATUS_ID,
+            'status_id' => $rejectedStatusId,
         ])->save();
 
         $clone = $workOrder->replicate([
@@ -466,7 +730,7 @@ final class WorkOrderService
      */
     public function toFormData(WorkOrder $workOrder): array
     {
-        $workOrder->loadMissing(['lines', 'technicians', 'collaborators', 'sourceWorkOrder:id,code,subject']);
+        $workOrder->loadMissing(['status', 'lines', 'technicians', 'collaborators', 'sourceWorkOrder:id,code,subject']);
 
         return [
             'id' => $workOrder->id,
@@ -483,10 +747,12 @@ final class WorkOrderService
             'source_work_order_label' => $workOrder->sourceWorkOrder?->code
                 ?: $workOrder->sourceWorkOrder?->subject,
             'status_id' => $workOrder->status_id,
+            'status_is_open' => (bool) ($workOrder->status?->is_open ?? true),
             'work_order_type_id' => $workOrder->work_order_type_id,
             'client_priority_id' => $workOrder->client_priority_id,
             'is_urgent' => $workOrder->is_urgent,
             'establishment_id' => $workOrder->establishment_id,
+            'contract_id' => $workOrder->contract_id,
             'billing_company_id' => $workOrder->billing_company_id,
             'responsible_user_id' => $workOrder->responsible_user_id,
             'requester_id' => $workOrder->requester_id,
@@ -517,6 +783,21 @@ final class WorkOrderService
      */
     public function toListItem(WorkOrder $workOrder): array
     {
+        $totalEuros = $workOrder->total_euros !== null
+            ? (float) $workOrder->total_euros
+            : ($workOrder->total_amount !== null ? (float) $workOrder->total_amount : null);
+        $costAmount = $workOrder->cost_amount !== null ? (float) $workOrder->cost_amount : null;
+        $marginPercentage = null;
+
+        if ($totalEuros !== null && $totalEuros > 0.0 && $costAmount !== null) {
+            $marginPercentage = round((($totalEuros - $costAmount) / $totalEuros) * 100, 2);
+        }
+
+        $selectedTechnician = $workOrder->relationLoaded('technicians')
+            ? $workOrder->technicians->firstWhere('is_selected', true) ?? $workOrder->technicians->first()
+            : null;
+        $technicianCompany = $selectedTechnician?->technician?->relatedCompany;
+
         return [
             'id' => $workOrder->id,
             'code' => $workOrder->code,
@@ -527,9 +808,19 @@ final class WorkOrderService
             'establishment_name' => $workOrder->establishment?->name,
             'status_name' => $workOrder->status?->name,
             'status_color' => $workOrder->status?->color,
+            'priority_name' => $workOrder->priority?->name,
+            'priority_color' => $workOrder->priority?->color,
             'type_name' => $workOrder->type?->name,
+            'type_color' => $workOrder->type?->color,
             'responsible_user_name' => $workOrder->responsibleUser?->name,
+            'technician_name' => $technicianCompany?->tradename ?: $technicianCompany?->name,
             'is_urgent' => $workOrder->is_urgent,
+            'total_euros' => $totalEuros,
+            'cost_amount' => $costAmount,
+            'margin_percentage' => $marginPercentage,
+            'intervention_at' => $workOrder->intervention_at?->toIso8601String(),
+            'expected_close_at' => $workOrder->expected_close_at?->toIso8601String(),
+            'closed_at' => $workOrder->closed_at?->toIso8601String(),
             'created_at' => $workOrder->created_at?->toIso8601String(),
         ];
     }
@@ -543,8 +834,8 @@ final class WorkOrderService
         $statusId = isset($data['status_id']) ? (int) $data['status_id'] : null;
 
         if ($statusId !== null && ! (
-            ($stage === WorkOrderStage::Estimate && $statusId === WorkOrder::APPROVED_ESTIMATE_STATUS_ID)
-            || ($stage === WorkOrderStage::WorkOrder && $statusId === WorkOrder::REJECTED_TO_ESTIMATE_STATUS_ID)
+            ($stage === WorkOrderStage::Estimate && $this->statuses->statusConfirmsEstimate($statusId))
+            || ($stage === WorkOrderStage::WorkOrder && $this->statuses->statusRejectsToEstimate($statusId))
         )) {
             $this->assertStatusMatchesStage($stage, $statusId);
         }
@@ -560,6 +851,7 @@ final class WorkOrderService
             'client_priority_id' => $data['client_priority_id'] ?? null,
             'is_urgent' => (bool) ($data['is_urgent'] ?? false),
             'establishment_id' => $data['establishment_id'] ?? null,
+            'contract_id' => $data['contract_id'] ?? null,
             'billing_company_id' => $data['billing_company_id'] ?? null,
             'responsible_user_id' => $data['responsible_user_id'] ?? null,
             'requester_id' => $data['requester_id'] ?? null,
@@ -569,6 +861,91 @@ final class WorkOrderService
             'intervention_at' => $data['intervention_at'] ?? null,
             'due_at' => $data['due_at'] ?? null,
         ];
+    }
+
+    private function applyStatusSideEffects(WorkOrder $workOrder, int $oldStatusId, bool $wasOpen): void
+    {
+        $statusId = $workOrder->status_id !== null ? (int) $workOrder->status_id : null;
+        $payload = [];
+
+        if (
+            $workOrder->isEstimate()
+            && $this->statuses->statusSetsSentAt($statusId)
+            && $workOrder->sent_at === null
+        ) {
+            $payload['sent_at'] = now();
+        }
+
+        $isOpen = $this->statuses->isOpen($statusId);
+
+        if (! $isOpen && $workOrder->closed_at === null) {
+            $payload['closed_at'] = now();
+        }
+
+        if ($isOpen && ! $wasOpen) {
+            $payload['closed_at'] = null;
+        }
+
+        if ($payload !== []) {
+            $workOrder->forceFill($payload)->save();
+        }
+    }
+
+    private function actorCanUpdateClosed(?User $actor, WorkOrder $workOrder): bool
+    {
+        if ($actor === null) {
+            return false;
+        }
+
+        if ($workOrder->isEstimate()) {
+            return app(EstimatePolicy::class)->updateClosed($actor, $workOrder);
+        }
+
+        return $actor->can('updateClosed', $workOrder);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function assertClosedFieldsUnchanged(WorkOrder $workOrder, array $data): void
+    {
+        $comparisons = [
+            'subject' => $workOrder->subject,
+            'reference' => $workOrder->reference,
+            'purchase_order' => $workOrder->purchase_order,
+            'notes' => $workOrder->notes,
+            'internal_notes' => $workOrder->internal_notes,
+            'establishment_id' => $workOrder->establishment_id !== null ? (int) $workOrder->establishment_id : null,
+            'contract_id' => $workOrder->contract_id !== null ? (int) $workOrder->contract_id : null,
+            'work_order_type_id' => $workOrder->work_order_type_id !== null ? (int) $workOrder->work_order_type_id : null,
+            'client_priority_id' => $workOrder->client_priority_id !== null ? (int) $workOrder->client_priority_id : null,
+            'responsible_user_id' => $workOrder->responsible_user_id !== null ? (int) $workOrder->responsible_user_id : null,
+            'requester_id' => $workOrder->requester_id !== null ? (int) $workOrder->requester_id : null,
+        ];
+
+        $errors = [];
+
+        foreach ($comparisons as $key => $current) {
+            if (! array_key_exists($key, $data)) {
+                continue;
+            }
+
+            $incoming = $data[$key];
+            $incoming = $incoming === '' ? null : $incoming;
+            $current = $current === '' ? null : $current;
+
+            if ($incoming != $current) {
+                $errors[$key] = 'This document is closed and cannot be edited.';
+            }
+        }
+
+        if (array_key_exists('is_urgent', $data) && (bool) $data['is_urgent'] !== (bool) $workOrder->is_urgent) {
+            $errors['is_urgent'] = 'This document is closed and cannot be edited.';
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     /**

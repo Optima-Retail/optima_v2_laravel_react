@@ -206,8 +206,9 @@ export function tabulatorBadge(
 /** Soft-colored pill using a custom hex (e.g. contract status colors). */
 export function tabulatorColorBadge(label: string, color: string): string {
     const safeColor = escapeHtml(color);
+    const safeLabel = escapeHtml(label);
 
-    return `<span class="inline-flex items-center gap-1.5 rounded-md border border-line px-1.5 py-0.5 text-xs font-semibold text-ink" style="background-color: color-mix(in srgb, ${safeColor} 18%, white)"><span class="inline-block size-2 shrink-0 rounded-full" style="background-color: ${safeColor}"></span>${escapeHtml(label)}</span>`;
+    return `<span class="inline-flex max-w-full items-center gap-1.5 rounded-md border border-line px-1.5 py-0.5 text-xs font-semibold text-ink" style="background-color: color-mix(in srgb, ${safeColor} 18%, white)" title="${safeLabel}"><span class="inline-block size-2 shrink-0 rounded-full" style="background-color: ${safeColor}"></span><span class="whitespace-nowrap">${safeLabel}</span></span>`;
 }
 
 export function tabulatorStatusBadge(

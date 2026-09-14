@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
+use App\Models\Concerns\CreatesDocumentChat;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TechnicianRequest extends Model
 {
+    use CreatesDocumentChat;
     use SoftDeletes;
 
     /**
@@ -156,5 +160,18 @@ class TechnicianRequest extends Model
             'technician_request_id',
             'company_relationship_id',
         )->withTimestamps();
+    }
+
+    /**
+     * @return HasOne<TechnicianRequestChat, $this>
+     */
+    public function chat(): HasOne
+    {
+        return $this->hasOne(TechnicianRequestChat::class);
+    }
+
+    public function chatDocumentType(): ChatDocumentType
+    {
+        return ChatDocumentType::TechnicianRequest;
     }
 }

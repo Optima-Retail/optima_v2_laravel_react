@@ -33,7 +33,7 @@ final class ClientPriorityController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'level',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,7 +73,7 @@ final class ClientPriorityController extends Controller
 
     public function store(StoreClientPriorityRequest $request): RedirectResponse
     {
-        $this->clientPriorities->create([
+        $record = $this->clientPriorities->create([
             'name' => $request->string('name')->toString(),
             'code' => $request->input('code'),
             'color' => $request->input('color'),
@@ -81,7 +81,7 @@ final class ClientPriorityController extends Controller
         ]);
 
         return redirect()
-            ->route('config.client-priorities.index')
+            ->route('config.client-priorities.edit', $record)
             ->with('success', 'client_priority_created_successfully');
     }
 
@@ -107,7 +107,7 @@ final class ClientPriorityController extends Controller
         ]);
 
         return redirect()
-            ->route('config.client-priorities.index')
+            ->route('config.client-priorities.edit', $clientPriority)
             ->with('success', 'client_priority_updated_successfully');
     }
 

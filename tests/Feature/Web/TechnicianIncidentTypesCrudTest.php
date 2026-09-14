@@ -42,7 +42,7 @@ final class TechnicianIncidentTypesCrudTest extends TestCase
                 'due_days' => 1,
                 'send_mail_to_technician' => false,
             ])
-            ->assertRedirect(route('config.technician-incident-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'technician_incident_type_created_successfully');
 
         $type = TechnicianIncidentType::query()->where('name', 'Feedback')->firstOrFail();
@@ -60,7 +60,7 @@ final class TechnicianIncidentTypesCrudTest extends TestCase
                 'due_days' => 3,
                 'send_mail_to_technician' => true,
             ])
-            ->assertRedirect(route('config.technician-incident-types.index'))
+            ->assertRedirect(route('config.technician-incident-types.edit', $type))
             ->assertSessionHas('success', 'technician_incident_type_updated_successfully');
 
         $this->assertDatabaseHas('technician_incident_types', [

@@ -33,7 +33,7 @@ final class JobTitleController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class JobTitleController extends Controller
 
     public function store(StoreJobTitleRequest $request): RedirectResponse
     {
-        $this->jobTitles->create($request->validated());
+        $record = $this->jobTitles->create($request->validated());
 
         return redirect()
-            ->route('config.job-titles.index')
+            ->route('config.job-titles.edit', $record)
             ->with('success', 'job_title_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class JobTitleController extends Controller
         $this->jobTitles->update($jobTitle, $request->validated());
 
         return redirect()
-            ->route('config.job-titles.index')
+            ->route('config.job-titles.edit', $jobTitle)
             ->with('success', 'job_title_updated_successfully');
     }
 

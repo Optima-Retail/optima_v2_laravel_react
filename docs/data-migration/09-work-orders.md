@@ -73,7 +73,7 @@ Related QCoins tables (not children of a single WO row, but written when estimat
 | `ot_visita`, `planificacion_lineas`, `peticiones`, `prl_tickets`, `avisos_app` | Other domains |
 | `costes_ots`, `facturas_venta_lineas` | Invoices not in v2 |
 | `chats` / `lineas_chats` | Messaging later (follow technician incidents if needed) |
-| `historial_cambios_estados` | Status audit later |
+| `historial_cambios_estados` | Status audit → `status_change_histories` |
 | `technician_workorder` | Dropped 2023 |
 | `ot_tecnico_articulos` | **Never existed** |
 

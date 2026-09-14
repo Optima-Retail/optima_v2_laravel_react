@@ -69,7 +69,7 @@ final class TechnicianGlobalServiceTypesCrudTest extends TestCase
                 'collaborator_ids' => [],
                 'priority_ids' => [],
             ])
-            ->assertRedirect(route('suppliers.index'));
+            ->assertRedirect(route('suppliers.edit', $relationship));
 
         $this->assertDatabaseHas('technician_global_service_types', [
             'company_relationship_id' => $relationship->id,

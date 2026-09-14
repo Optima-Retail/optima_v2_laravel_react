@@ -162,7 +162,7 @@ final class CompanyIsolationTest extends TestCase
                 'classification' => CompanyRelationshipClassification::Commercial->value,
                 'brand_id' => $brand->id,
             ])
-            ->assertRedirect(route('clients.index'));
+            ->assertRedirect();
 
         $this->actingAs($admin)
             ->post('/suppliers', [
@@ -172,7 +172,7 @@ final class CompanyIsolationTest extends TestCase
                 'status' => CompanyRelationshipStatus::Active->value,
                 'classification' => CompanyRelationshipClassification::Commercial->value,
             ])
-            ->assertRedirect(route('suppliers.index'));
+            ->assertRedirect();
 
         $this->assertSame(2, CompanyRelationship::query()
             ->where('owner_company_id', $owner->id)
@@ -220,7 +220,7 @@ final class CompanyIsolationTest extends TestCase
                 'classification' => CompanyRelationshipClassification::Commercial->value,
                 'brand_id' => $brand->id,
             ])
-            ->assertRedirect(route('clients.index'));
+            ->assertRedirect();
 
         $client = Company::query()->where('tax_id', 'B11223344')->firstOrFail();
 

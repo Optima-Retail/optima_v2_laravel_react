@@ -8,16 +8,18 @@ import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { workOrderStatusesService } from '@/services';
+import type { UserOption } from '@/support/types/domain/common';
 import type { WorkOrderStatusFormData } from '@/support/types/domain/work-order-status';
 
 type EditWorkOrderStatusProps = {
     workOrderStatus: WorkOrderStatusFormData;
+    targetOptions: UserOption[];
     can: {
         delete: boolean;
     };
 };
 
-export default function EditWorkOrderStatus({ workOrderStatus, can }: EditWorkOrderStatusProps) {
+export default function EditWorkOrderStatus({ workOrderStatus, targetOptions, can }: EditWorkOrderStatusProps) {
     const { t } = useTranslation();
     const form = useForm({
         name: workOrderStatus.name,
@@ -25,6 +27,16 @@ export default function EditWorkOrderStatus({ workOrderStatus, can }: EditWorkOr
         color: workOrderStatus.color ?? '#a9cef0',
         lifecycle: workOrderStatus.lifecycle ?? '',
         is_open: workOrderStatus.is_open,
+        is_default: workOrderStatus.is_default,
+        confirms_estimate: workOrderStatus.confirms_estimate,
+        rejects_to_estimate: workOrderStatus.rejects_to_estimate,
+        is_post_confirm_default: workOrderStatus.is_post_confirm_default,
+        sets_sent_at: workOrderStatus.sets_sent_at,
+        transitions: workOrderStatus.transitions.map((row) => ({
+            to_status_id: String(row.to_status_id),
+            requires_confirmation: row.requires_confirmation,
+            requires_justification: row.requires_justification,
+        })),
     });
 
     function submit(event: FormEvent) {
@@ -64,6 +76,7 @@ export default function EditWorkOrderStatus({ workOrderStatus, can }: EditWorkOr
                     values={form.data}
                     errors={form.errors}
                     processing={form.processing}
+                    targetOptions={targetOptions}
                     onChange={(key, value) =>
                         form.setData((data) => ({
                             ...data,

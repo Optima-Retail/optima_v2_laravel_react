@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
+use App\Models\Concerns\CreatesDocumentChat;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Evaluation extends Model
 {
+    use CreatesDocumentChat;
     use SoftDeletes;
 
     /**
@@ -68,5 +72,18 @@ class Evaluation extends Model
     public function responsibleUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'responsible_user_id');
+    }
+
+    /**
+     * @return HasOne<EvaluationChat, $this>
+     */
+    public function chat(): HasOne
+    {
+        return $this->hasOne(EvaluationChat::class);
+    }
+
+    public function chatDocumentType(): ChatDocumentType
+    {
+        return ChatDocumentType::Evaluation;
     }
 }

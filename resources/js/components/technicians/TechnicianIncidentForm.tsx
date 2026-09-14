@@ -2,8 +2,10 @@ import type { FormEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
-import type { UserOption } from '@/support/types/domain/common';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 
 export type TechnicianIncidentFormValues = {
     technician_id: string;
@@ -18,7 +20,7 @@ type TechnicianIncidentFormProps = {
     processing: boolean;
     typeOptions: UserOption[];
     userOptions: UserOption[];
-    technicianOptions: UserOption[];
+    technicianOptions: CompanyOption[];
     technicianLocked?: boolean;
     onChange: (key: keyof TechnicianIncidentFormValues, value: string) => void;
     onSubmit: (event: FormEvent) => void;
@@ -51,20 +53,15 @@ export function TechnicianIncidentForm({
                 error={errors.technician_id}
                 required
             >
-                <Select
+                <SearchableSelect
                     id="technician_id"
                     value={values.technician_id}
                     invalid={Boolean(errors.technician_id)}
                     disabled={technicianLocked}
-                    onChange={(event) => onChange('technician_id', event.target.value)}
-                >
-                    <option value="">{t('common.select')}</option>
-                    {technicianOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                            {option.label}
-                        </option>
-                    ))}
-                </Select>
+                    emptyLabel={t('common.select')}
+                    onChange={(value) => onChange('technician_id', value)}
+                    options={toCompanySelectOptions(technicianOptions)}
+                />
             </Field>
 
             <Field

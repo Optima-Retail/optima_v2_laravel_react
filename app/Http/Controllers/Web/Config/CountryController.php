@@ -33,7 +33,7 @@ final class CountryController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class CountryController extends Controller
 
     public function store(StoreCountryRequest $request): RedirectResponse
     {
-        $this->countries->create($request->validated());
+        $record = $this->countries->create($request->validated());
 
         return redirect()
-            ->route('config.countries.index')
+            ->route('config.countries.edit', $record)
             ->with('success', 'country_created_successfully');
     }
 
@@ -98,7 +98,7 @@ final class CountryController extends Controller
         $this->countries->update($country, $request->validated());
 
         return redirect()
-            ->route('config.countries.index')
+            ->route('config.countries.edit', $country)
             ->with('success', 'country_updated_successfully');
     }
 

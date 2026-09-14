@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Schema;
  *
  * Skipped (dead or other domains): notification flags, OOH, plantilla/informe FKs,
  * FileMaker ids, ot_padre boolean, tiempo_enviado, visits, chat, invoices, nora.
- * `ots.iteracion_id` → `contract_iteration_id` added in 2026_09_13_160200 (after contract_iterations).
+ * `ots.iteracion_id` → `contract_iteration_id` added in create_contract_iterations_table (after contract_iterations).
  */
 return new class extends Migration
 {

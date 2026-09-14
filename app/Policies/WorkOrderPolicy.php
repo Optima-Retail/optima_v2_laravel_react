@@ -37,6 +37,13 @@ final class WorkOrderPolicy
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
 
+    public function updateClosed(User $user, WorkOrder $workOrder): bool
+    {
+        return $workOrder->isConfirmedWorkOrder()
+            && $this->allows($user, 'update-closed')
+            && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
+    }
+
     public function delete(User $user, WorkOrder $workOrder): bool
     {
         return $workOrder->isConfirmedWorkOrder()

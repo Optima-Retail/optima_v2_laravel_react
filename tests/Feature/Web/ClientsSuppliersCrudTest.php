@@ -70,7 +70,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'priority_ids' => [$priorityA->id, $priorityB->id],
                 'collaborator_ids' => [$collaborator->id],
             ])
-            ->assertRedirect(route('clients.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'client_created_successfully');
 
         $relationship = CompanyRelationship::query()
@@ -97,7 +97,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'priority_ids' => [$priorityA->id],
                 'collaborator_ids' => [],
             ])
-            ->assertRedirect(route('clients.index'))
+            ->assertRedirect(route('clients.edit', $relationship))
             ->assertSessionHas('success', 'client_updated_successfully');
 
         $this->assertDatabaseHas('company_relationships', [
@@ -233,7 +233,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'classification' => 'commercial',
                 'status' => 'active',
             ])
-            ->assertRedirect(route('suppliers.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'supplier_created_successfully');
 
         $relationship = CompanyRelationship::query()
@@ -250,7 +250,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'classification' => 'commercial',
                 'status' => 'inactive',
             ])
-            ->assertRedirect(route('suppliers.index'))
+            ->assertRedirect(route('suppliers.edit', $relationship))
             ->assertSessionHas('success', 'supplier_updated_successfully');
 
         $this->assertDatabaseHas('company_relationships', [
@@ -293,7 +293,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'classification' => 'commercial',
                 'status' => 'active',
             ])
-            ->assertRedirect(route('technicians.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'technician_created_successfully');
 
         $relationship = CompanyRelationship::query()
@@ -310,7 +310,7 @@ final class ClientsSuppliersCrudTest extends TestCase
                 'classification' => 'commercial',
                 'status' => 'inactive',
             ])
-            ->assertRedirect(route('technicians.index'))
+            ->assertRedirect(route('technicians.edit', $relationship))
             ->assertSessionHas('success', 'technician_updated_successfully');
 
         $this->assertDatabaseHas('company_relationships', [

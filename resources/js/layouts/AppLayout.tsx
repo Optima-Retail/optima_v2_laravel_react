@@ -1,4 +1,4 @@
-import type { PropsWithChildren } from 'react';
+import type { PropsWithChildren, ReactNode } from 'react';
 import { usePage } from '@inertiajs/react';
 import { ConfirmModal } from '@/components/feedback/ConfirmModal';
 import { ToastHost } from '@/components/feedback/ToastHost';
@@ -13,9 +13,11 @@ import type { SharedPageProps } from '@/types';
 type AppLayoutProps = PropsWithChildren<{
     title?: string;
     breadcrumbs?: BreadcrumbItem[];
+    /** Full-height right rail (e.g. document chat). Rendered outside the padded scroll area. */
+    aside?: ReactNode;
 }>;
 
-export function AppLayout({ children, title, breadcrumbs }: AppLayoutProps) {
+export function AppLayout({ children, title, breadcrumbs, aside }: AppLayoutProps) {
     const page = usePage<SharedPageProps>();
     const crumbs = breadcrumbs ?? breadcrumbsFromUrl(page.url, title);
     const showConfigSidebar = isConfigRoute(page.url);
@@ -34,6 +36,7 @@ export function AppLayout({ children, title, breadcrumbs }: AppLayoutProps) {
                                 {children}
                             </div>
                         </div>
+                        {aside ?? null}
                     </main>
                 </div>
                 <LocaleSync />

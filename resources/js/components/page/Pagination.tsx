@@ -9,7 +9,7 @@ import {
 import { cn } from '@/support/cn';
 import type { Paginated } from '@/support/pagination';
 
-export const PER_PAGE_OPTIONS = ['10', '12', '25', '50', '100'] as const;
+export const PER_PAGE_OPTIONS = ['10', '25', '50', '100'] as const;
 
 type PaginationProps<T> = {
     paginator: Paginated<T>;
@@ -37,7 +37,7 @@ export function Pagination<T>({
     const lastPage = paginator.last_page;
     const from = paginator.from ?? (paginator.data.length > 0 ? 1 : 0);
     const to = paginator.to ?? paginator.data.length;
-    const currentPerPage = perPage ?? String(paginator.per_page ?? 12);
+    const currentPerPage = perPage ?? String(paginator.per_page ?? 25);
     const pageItems = buildPageWindow(currentPage, lastPage);
     const prevUrl = resolveAdjacentUrl(paginator, 'prev');
     const nextUrl = resolveAdjacentUrl(paginator, 'next');

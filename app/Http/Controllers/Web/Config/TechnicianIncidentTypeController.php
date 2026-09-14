@@ -33,7 +33,7 @@ final class TechnicianIncidentTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,14 +73,14 @@ final class TechnicianIncidentTypeController extends Controller
 
     public function store(StoreTechnicianIncidentTypeRequest $request): RedirectResponse
     {
-        $this->technicianIncidentTypes->create([
+        $record = $this->technicianIncidentTypes->create([
             'name' => $request->string('name')->toString(),
             'due_days' => $request->integer('due_days'),
             'send_mail_to_technician' => $request->boolean('send_mail_to_technician'),
         ]);
 
         return redirect()
-            ->route('config.technician-incident-types.index')
+            ->route('config.technician-incident-types.edit', $record)
             ->with('success', 'technician_incident_type_created_successfully');
     }
 
@@ -107,7 +107,7 @@ final class TechnicianIncidentTypeController extends Controller
         ]);
 
         return redirect()
-            ->route('config.technician-incident-types.index')
+            ->route('config.technician-incident-types.edit', $technicianIncidentType)
             ->with('success', 'technician_incident_type_updated_successfully');
     }
 

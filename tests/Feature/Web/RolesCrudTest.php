@@ -44,7 +44,7 @@ final class RolesCrudTest extends TestCase
                 'name' => 'support',
                 'permissions' => ['users.view', 'roles.view'],
             ])
-            ->assertRedirect(route('config.roles.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'role_created_successfully');
 
         $role = Role::query()->where('name', 'support')->firstOrFail();
@@ -77,7 +77,7 @@ final class RolesCrudTest extends TestCase
                 'name' => 'support',
                 'permissions' => ['users.view'],
             ])
-            ->assertRedirect(route('config.roles.index'))
+            ->assertRedirect(route('config.roles.edit', $role))
             ->assertSessionHas('success', 'role_updated_successfully');
 
         $this->assertFalse($role->fresh()->hasPermissionTo('roles.view'));

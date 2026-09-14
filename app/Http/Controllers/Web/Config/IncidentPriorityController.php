@@ -33,7 +33,7 @@ final class IncidentPriorityController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,14 +73,14 @@ final class IncidentPriorityController extends Controller
 
     public function store(StoreIncidentPriorityRequest $request): RedirectResponse
     {
-        $this->incidentPriorities->create([
+        $record = $this->incidentPriorities->create([
             'name' => $request->string('name')->toString(),
             'color' => $request->input('color'),
             'resolution_time_hours' => $request->integer('resolution_time_hours'),
         ]);
 
         return redirect()
-            ->route('config.incident-priorities.index')
+            ->route('config.incident-priorities.edit', $record)
             ->with('success', 'incident_priority_created_successfully');
     }
 
@@ -105,7 +105,7 @@ final class IncidentPriorityController extends Controller
         ]);
 
         return redirect()
-            ->route('config.incident-priorities.index')
+            ->route('config.incident-priorities.edit', $incidentPriority)
             ->with('success', 'incident_priority_updated_successfully');
     }
 

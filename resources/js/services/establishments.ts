@@ -29,6 +29,25 @@ export const establishmentsService = {
         router.delete(`${base}/${id}`, options);
     },
 
+    storeAttachment(id: number, file: File, isPrivate = false, options: Record<string, unknown> = {}) {
+        const data = new FormData();
+        data.append('file', file);
+        data.append('is_private', isPrivate ? '1' : '0');
+
+        router.post(`${base}/${id}/attachments`, data, {
+            forceFormData: true,
+            preserveScroll: true,
+            ...options,
+        });
+    },
+
+    destroyAttachment(establishmentId: number, attachmentId: number, options: Record<string, unknown> = {}) {
+        router.delete(`${base}/${establishmentId}/attachments/${attachmentId}`, {
+            preserveScroll: true,
+            ...options,
+        });
+    },
+
     visitPage,
 
     createPath: `${base}/create`,

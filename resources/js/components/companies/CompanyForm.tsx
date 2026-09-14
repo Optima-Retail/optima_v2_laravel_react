@@ -1,4 +1,5 @@
-import { useMemo, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type FormEvent, type ReactNode } from 'react';
+import { ExternalLink, ImagePlus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -8,8 +9,20 @@ import { Select } from '@/components/ui/Select';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
+import { clampDecimalPlaces } from '@/support/coordinates';
 import type { UserOption } from '@/support/types/domain/common';
 import type { ProvinceOption } from '@/support/types/domain/province';
+
+function googleMapsUrl(latitude: string, longitude: string): string | null {
+    const lat = Number(latitude);
+    const lng = Number(longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || latitude.trim() === '' || longitude.trim() === '') {
+        return null;
+    }
+
+    return `https://www.google.com/maps?q=${encodeURIComponent(`${lat},${lng}`)}`;
+}
 
 export type CompanyFormValues = {
     name: string;
@@ -34,6 +47,8 @@ export type CompanyFormValues = {
     latitude: string;
     longitude: string;
     legacy_erp_id: string;
+    logo: File | null;
+    remove_logo: boolean;
 };
 
 type CompanyFormProps = {
@@ -44,7 +59,8 @@ type CompanyFormProps = {
     provinceOptions: ProvinceOption[];
     brandOptions: UserOption[];
     languageOptions: UserOption[];
-    onChange: (key: keyof CompanyFormValues, value: string | boolean) => void;
+    currentLogoUrl?: string | null;
+    onChange: (key: keyof CompanyFormValues, value: string | boolean | File | null) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
     submitIcon?: ReactNode;
@@ -63,6 +79,7 @@ export function CompanyForm({
     provinceOptions,
     brandOptions,
     languageOptions,
+    currentLogoUrl = null,
     onChange,
     onSubmit,
     submitLabel,
@@ -71,6 +88,7 @@ export function CompanyForm({
     usersPanel,
 }: CompanyFormProps) {
     const { t } = useTranslation();
+    const logoInputRef = useRef<HTMLInputElement>(null);
 
     const filteredProvinceOptions = useMemo(() => {
         if (!values.country_id) {
@@ -94,12 +112,79 @@ export function CompanyForm({
         return items;
     }, [t, usersPanel]);
 
+    const objectUrl = useMemo(
+        () => (values.logo ? URL.createObjectURL(values.logo) : null),
+        [values.logo],
+    );
+
+    useEffect(() => {
+        return () => {
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+    }, [objectUrl]);
+
+    const previewUrl = objectUrl ?? (values.remove_logo ? null : currentLogoUrl);
+    const mapsUrl = googleMapsUrl(values.latitude, values.longitude);
+
     return (
         <FieldHelpScope table="companies">
-        <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
+        <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8" encType="multipart/form-data">
             <Tabs items={tabItems} defaultValue="identity">
                 <TabPanel id="identity">
                     <div className="grid gap-5 sm:grid-cols-2">
+                <Field label={t('companies.logo')} htmlFor="logo" error={errors.logo} className="sm:col-span-2">
+                    <div className="flex flex-wrap items-center gap-4">
+                        <div className="flex size-16 items-center justify-center overflow-hidden rounded-xl border border-line bg-canvas">
+                            {previewUrl ? (
+                                <img src={previewUrl} alt="" className="size-full object-contain" />
+                            ) : (
+                                <ImagePlus className="size-5 text-ink-muted" aria-hidden />
+                            )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <input
+                                ref={logoInputRef}
+                                id="logo"
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                                className="hidden"
+                                onChange={(event) => {
+                                    const file = event.target.files?.[0] ?? null;
+                                    onChange('logo', file);
+                                    if (file) {
+                                        onChange('remove_logo', false);
+                                    }
+                                }}
+                            />
+                            <Button type="button" variant="secondary" onClick={() => logoInputRef.current?.click()}>
+                                <ImagePlus className="size-4" aria-hidden />
+                                {t('companies.chooseLogo')}
+                            </Button>
+                            {(previewUrl || values.logo) && (
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => {
+                                        onChange('logo', null);
+                                        onChange('remove_logo', true);
+                                        if (logoInputRef.current) {
+                                            logoInputRef.current.value = '';
+                                        }
+                                    }}
+                                >
+                                    <Trash2 className="size-4" aria-hidden />
+                                    {t('companies.removeLogo')}
+                                </Button>
+                            )}
+                            <span className="text-sm text-ink-muted">
+                                {values.logo?.name ?? (previewUrl ? t('companies.logoSelected') : t('companies.noLogoSelected'))}
+                            </span>
+                        </div>
+                    </div>
+                </Field>
+
                 <Field label={t('common.name')} htmlFor="name" error={errors.name} className="sm:col-span-2" required>
                     <Input
                         id="name"
@@ -338,7 +423,7 @@ export function CompanyForm({
                                 step="any"
                                 value={values.latitude}
                                 invalid={Boolean(errors.latitude)}
-                                onChange={(event) => onChange('latitude', event.target.value)}
+                                onChange={(event) => onChange('latitude', clampDecimalPlaces(event.target.value))}
                             />
                         </Field>
 
@@ -349,9 +434,23 @@ export function CompanyForm({
                                 step="any"
                                 value={values.longitude}
                                 invalid={Boolean(errors.longitude)}
-                                onChange={(event) => onChange('longitude', event.target.value)}
+                                onChange={(event) => onChange('longitude', clampDecimalPlaces(event.target.value))}
                             />
                         </Field>
+
+                        {mapsUrl ? (
+                            <div className="sm:col-span-2">
+                                <a
+                                    href={mapsUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:text-brand-strong"
+                                >
+                                    <ExternalLink className="size-3.5 shrink-0" aria-hidden />
+                                    {t('companies.viewOnGoogleMaps')}
+                                </a>
+                            </div>
+                        ) : null}
 
                         <Field label={t('companies.legacyErpId')} htmlFor="legacy_erp_id" error={errors.legacy_erp_id}>
                             <Input

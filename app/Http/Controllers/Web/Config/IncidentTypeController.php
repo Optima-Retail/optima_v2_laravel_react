@@ -34,7 +34,7 @@ final class IncidentTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -76,10 +76,10 @@ final class IncidentTypeController extends Controller
 
     public function store(StoreIncidentTypeRequest $request): RedirectResponse
     {
-        $this->incidentTypes->create($request->validated());
+        $record = $this->incidentTypes->create($request->validated());
 
         return redirect()
-            ->route('config.incident-types.index')
+            ->route('config.incident-types.edit', $record)
             ->with('success', 'incident_type_created_successfully');
     }
 
@@ -101,7 +101,7 @@ final class IncidentTypeController extends Controller
         $this->incidentTypes->update($incidentType, $request->validated());
 
         return redirect()
-            ->route('config.incident-types.index')
+            ->route('config.incident-types.edit', $incidentType)
             ->with('success', 'incident_type_updated_successfully');
     }
 

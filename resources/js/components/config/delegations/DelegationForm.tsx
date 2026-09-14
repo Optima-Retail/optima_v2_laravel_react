@@ -5,7 +5,8 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
-import type { UserOption } from '@/support/types/domain/common';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type DelegationFormValues = {
@@ -25,7 +26,7 @@ type DelegationFormProps = {
     values: DelegationFormValues;
     errors: Partial<Record<keyof DelegationFormValues, string>>;
     processing: boolean;
-    companyOptions: UserOption[];
+    companyOptions: CompanyOption[];
     currencyOptions: UserOption[];
     countryOptions: UserOption[];
     seriesOptions: UserOption[];
@@ -81,10 +82,7 @@ export function DelegationForm({
                         invalid={Boolean(errors.company_id)}
                         onChange={(value) => onChange('company_id', value)}
                         emptyLabel={t('common.none')}
-                        options={companyOptions.map((option) => ({
-                            value: String(option.id),
-                            label: option.label,
-                        }))}
+                        options={toCompanySelectOptions(companyOptions)}
                     />
                 </Field>
 

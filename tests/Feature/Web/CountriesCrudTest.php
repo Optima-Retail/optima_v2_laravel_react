@@ -49,7 +49,7 @@ final class CountriesCrudTest extends TestCase
                 'iso_code' => 'ES',
                 'timezone_id' => $timezone->id,
             ])
-            ->assertRedirect(route('config.countries.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'country_created_successfully');
 
         $country = Country::query()->where('iso_code', 'ES')->firstOrFail();
@@ -87,7 +87,7 @@ final class CountriesCrudTest extends TestCase
                 'iso_code' => 'ES',
                 'timezone_id' => $timezone->id,
             ])
-            ->assertRedirect(route('config.countries.index'))
+            ->assertRedirect(route('config.countries.edit', $country))
             ->assertSessionHas('success', 'country_updated_successfully');
 
         $this->assertDatabaseHas('countries', [

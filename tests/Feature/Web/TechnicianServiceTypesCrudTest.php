@@ -143,7 +143,7 @@ final class TechnicianServiceTypesCrudTest extends TestCase
 
         $this->actingAs($admin)
             ->put("/suppliers/{$relationship->id}", $payload)
-            ->assertRedirect(route('suppliers.index'));
+            ->assertRedirect(route('suppliers.edit', $relationship));
 
         $this->assertDatabaseHas('technician_service_types', [
             'company_relationship_id' => $relationship->id,

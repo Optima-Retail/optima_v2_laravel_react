@@ -66,7 +66,7 @@ final class TechnicianAlternativeDelegationsCrudTest extends TestCase
                 'collaborator_ids' => [],
                 'priority_ids' => [],
             ])
-            ->assertRedirect(route('technicians.index'));
+            ->assertRedirect(route('technicians.edit', $relationship));
 
         $this->assertDatabaseHas('technician_alternative_delegations', [
             'company_relationship_id' => $relationship->id,
@@ -99,7 +99,7 @@ final class TechnicianAlternativeDelegationsCrudTest extends TestCase
                 'collaborator_ids' => [],
                 'priority_ids' => [],
             ])
-            ->assertRedirect(route('technicians.index'));
+            ->assertRedirect(route('technicians.edit', $relationship));
 
         $this->assertSoftDeleted('technician_alternative_delegations', [
             'company_relationship_id' => $relationship->id,

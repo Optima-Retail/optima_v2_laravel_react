@@ -89,19 +89,21 @@ final class DelegationService
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function companyOptions(): array
+    public function companyOptions(?int $includeId = null): array
     {
         return Company::query()
+            ->where(function ($query) use ($includeId): void {
+                $query->where('is_active', true);
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
             ->orderBy('name')
-            ->get(['id', 'name', 'tax_id'])
-            ->map(fn (Company $company): array => [
-                'id' => $company->id,
-                'label' => $company->tax_id
-                    ? "{$company->name} ({$company->tax_id})"
-                    : $company->name,
-            ])
+            ->get(['id', 'name', 'tax_id', 'logo'])
+            ->map(fn (Company $company): array => $company->toSelectOption())
             ->values()
             ->all();
     }
@@ -143,9 +145,16 @@ final class DelegationService
     /**
      * @return list<array{id: int, label: string}>
      */
-    public function seriesOptions(): array
+    public function seriesOptions(?int $includeId = null): array
     {
         return Series::query()
+            ->where(function ($query) use ($includeId): void {
+                $query->where('is_selectable', true);
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
             ->orderBy('key')
             ->get(['id', 'key'])
             ->map(fn (Series $series): array => [

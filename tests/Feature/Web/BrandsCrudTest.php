@@ -49,7 +49,7 @@ final class BrandsCrudTest extends TestCase
                 'is_quality_control_contactable' => true,
                 'send_debt_reminders' => true,
             ])
-            ->assertRedirect(route('brands.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'brand_created_successfully');
 
         $brand = Brand::query()->where('name', 'ACME')->firstOrFail();
@@ -87,7 +87,7 @@ final class BrandsCrudTest extends TestCase
                 'is_quality_control_contactable' => false,
                 'send_debt_reminders' => false,
             ])
-            ->assertRedirect(route('brands.index'))
+            ->assertRedirect(route('brands.edit', $brand))
             ->assertSessionHas('success', 'brand_updated_successfully');
 
         $this->assertDatabaseHas('brands', [

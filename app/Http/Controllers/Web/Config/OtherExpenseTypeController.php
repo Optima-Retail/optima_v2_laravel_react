@@ -33,7 +33,7 @@ final class OtherExpenseTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class OtherExpenseTypeController extends Controller
 
     public function store(StoreOtherExpenseTypeRequest $request): RedirectResponse
     {
-        $this->otherExpenseTypes->create($request->validated());
+        $record = $this->otherExpenseTypes->create($request->validated());
 
         return redirect()
-            ->route('config.other-expense-types.index')
+            ->route('config.other-expense-types.edit', $record)
             ->with('success', 'other_expense_type_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class OtherExpenseTypeController extends Controller
         $this->otherExpenseTypes->update($otherExpenseType, $request->validated());
 
         return redirect()
-            ->route('config.other-expense-types.index')
+            ->route('config.other-expense-types.edit', $otherExpenseType)
             ->with('success', 'other_expense_type_updated_successfully');
     }
 

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domain\Config\Users\Services;
 
-use App\Domain\Companies\Services\CompanyService;
 use App\Domain\Companies\Support\ActiveCompany;
 use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Models\Brand;
+use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Role;
 use App\Models\Team;
@@ -134,25 +134,6 @@ final class UserService
     {
         $companyIds = array_values(array_unique(array_filter($companyIds)));
 
-        if ($actor !== null) {
-            $actorIds = $actor->companies()
-                ->wherePivot('is_active', true)
-                ->pluck('companies.id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-
-            $outside = $user->companies()
-                ->whereNotIn('companies.id', $actorIds === [] ? [0] : $actorIds)
-                ->pluck('companies.id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-
-            $companyIds = array_values(array_unique([
-                ...$outside,
-                ...array_values(array_intersect($companyIds, $actorIds)),
-            ]));
-        }
-
         $currentIds = $user->companies()->pluck('companies.id')->map(fn ($id) => (int) $id)->all();
 
         $toDetach = array_diff($currentIds, $companyIds);
@@ -232,13 +213,9 @@ final class UserService
      */
     public function formOptions(?User $editing = null, ?User $actor = null): array
     {
-        $companyOptions = [];
-
-        if ($actor !== null) {
-            $companyOptions = app(CompanyService::class)->membershipOptionsForUser($actor);
-        }
-
         $owner = app(ActiveCompany::class)->forUser($actor);
+        $editing?->loadMissing('companies');
+        $companyIncludeIds = $editing?->companies->pluck('id')->map(fn ($id) => (int) $id)->all() ?? [];
 
         return [
             'users' => CompanyMemberUsers::options(
@@ -270,7 +247,19 @@ final class UserService
                 ->map(fn (Brand $brand): array => ['id' => $brand->id, 'label' => $brand->name])
                 ->values()
                 ->all(),
-            'companies' => $companyOptions,
+            'companies' => Company::query()
+                ->where(function ($query) use ($companyIncludeIds): void {
+                    $query->where('is_active', true);
+
+                    if ($companyIncludeIds !== []) {
+                        $query->orWhereIn('id', $companyIncludeIds);
+                    }
+                })
+                ->orderBy('name')
+                ->get(['id', 'name', 'tax_id', 'logo'])
+                ->map(fn (Company $company): array => $company->toSelectOption())
+                ->values()
+                ->all(),
         ];
     }
 

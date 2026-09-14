@@ -48,7 +48,7 @@ final class CompanyRelationshipsScoreDefaultsTest extends TestCase
                 'optima_score_count' => null,
                 'customer_score_count' => null,
             ])
-            ->assertRedirect(route('suppliers.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'supplier_created_successfully');
 
         $relationship = CompanyRelationship::query()

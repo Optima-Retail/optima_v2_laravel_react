@@ -64,7 +64,7 @@ final class FieldHelpsCrudTest extends TestCase
                     ],
                 ],
             ])
-            ->assertRedirect(route('config.field-helps.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'field_help_created_successfully');
 
         $fieldHelp = FieldHelp::query()->where('key', 'companies.tax_id')->firstOrFail();
@@ -94,7 +94,7 @@ final class FieldHelpsCrudTest extends TestCase
                     ],
                 ],
             ])
-            ->assertRedirect(route('config.field-helps.index'))
+            ->assertRedirect(route('config.field-helps.edit', $fieldHelp))
             ->assertSessionHas('success', 'field_help_updated_successfully');
 
         $this->assertDatabaseHas('field_helps', [

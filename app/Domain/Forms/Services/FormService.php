@@ -101,7 +101,10 @@ final class FormService
                 'public_id' => Str::lower(Str::random(16)),
                 'name' => $data['name'] ?? $template?->name,
                 'form_type_id' => $data['form_type_id'] ?? $template?->form_type_id,
-                'form_status_id' => $data['form_status_id'] ?? FormStatus::query()->orderBy('id')->value('id'),
+                'form_status_id' => $data['form_status_id'] ?? FormStatus::query()
+                    ->where('is_active', true)
+                    ->orderBy('id')
+                    ->value('id'),
                 'language_id' => $data['language_id'] ?? $template?->language_id,
                 'user_id' => $user->id,
                 'form_template_id' => $template?->id,
@@ -219,7 +222,7 @@ final class FormService
         };
     }
 
-/**
+    /**
      * @return array<string, mixed>
      */
     public function toPublicData(Form $form): array
@@ -354,11 +357,22 @@ final class FormService
     }
 
     /**
+     * Active form statuses for selects. Keep `$includeId` so edit still shows a saved inactive value.
+     *
      * @return list<array{id: int, label: string}>
      */
-    public function statusOptions(): array
+    public function statusOptions(?int $includeId = null): array
     {
-        return FormStatus::query()->orderBy('id')->get(['id', 'name'])
+        return FormStatus::query()
+            ->where(function ($query) use ($includeId): void {
+                $query->where('is_active', true);
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
+            ->orderBy('id')
+            ->get(['id', 'name'])
             ->map(fn (FormStatus $status): array => ['id' => $status->id, 'label' => $status->name])
             ->values()->all();
     }
@@ -390,15 +404,14 @@ final class FormService
     public function technicianOptions(Company $owner): array
     {
         return CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename')
+            ->with('relatedCompany:id,name,tradename,logo')
             ->where('owner_company_id', $owner->id)
             ->where('kind', CompanyRelationshipKind::Technician->value)
             ->limit(300)
             ->get()
-            ->map(fn (CompanyRelationship $rel): array => [
-                'id' => $rel->id,
-                'label' => (string) ($rel->relatedCompany?->name ?? $rel->relatedCompany?->tradename ?? '#'.$rel->id),
-            ])
+            ->map(fn (CompanyRelationship $rel): array => $rel->toSelectOption(
+                (string) ($rel->relatedCompany?->name ?? $rel->relatedCompany?->tradename ?? '#'.$rel->id),
+            ))
             ->values()->all();
     }
 
@@ -411,7 +424,7 @@ final class FormService
             'type:id,name',
             'status:id,name',
             'workOrder:id,code,subject',
-            'companyRelationship.relatedCompany:id,name,tradename',
+            'companyRelationship.relatedCompany:id,name,tradename,logo',
         ]);
 
         if ($owner === null) {

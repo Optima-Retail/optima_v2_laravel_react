@@ -6,6 +6,7 @@ const base = '/brands';
 export type BrandClientRow = {
     id: number;
     related_company_name: string | null;
+    related_company_logo_url: string | null;
     status: string;
     owner_company_name: string | null;
 };

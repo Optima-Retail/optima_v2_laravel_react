@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Web\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Web\Chats\DocumentChatController;
 use App\Http\Controllers\Web\Companies\CompanyController;
 use App\Http\Controllers\Web\Companies\CompanyMemberController;
 use App\Http\Controllers\Web\CompanyRelationships\CompanyRelationshipController;
@@ -98,6 +99,21 @@ Route::middleware('auth')->group(function (): void {
         ->whereNumber('saved_filter')
         ->name('saved-filters.default');
 
+    Route::prefix('document-chats/{type}/{document}')->where([
+        'type' => 'work_order|incident|evaluation|technician_request|technician',
+        'document' => '[0-9]+',
+    ])->group(function (): void {
+        Route::get('/messages', [DocumentChatController::class, 'messages'])->name('document-chats.messages');
+        Route::post('/messages', [DocumentChatController::class, 'storeMessage'])->name('document-chats.messages.store');
+        Route::post('/messages/attachments', [DocumentChatController::class, 'storeAttachment'])->name('document-chats.attachments.store');
+        Route::post('/read', [DocumentChatController::class, 'markRead'])->name('document-chats.read');
+        Route::post('/mute', [DocumentChatController::class, 'mute'])->name('document-chats.mute');
+        Route::delete('/mute', [DocumentChatController::class, 'unmute'])->name('document-chats.unmute');
+        Route::get('/attachments/{attachment}/download', [DocumentChatController::class, 'downloadAttachment'])
+            ->whereNumber('attachment')
+            ->name('document-chats.attachments.download');
+    });
+
     Route::middleware('permission:companies.view')->group(function (): void {
         Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
         Route::get('/companies/data', [CompanyController::class, 'data'])->name('companies.data');
@@ -137,6 +153,10 @@ Route::middleware('auth')->group(function (): void {
                 ->name('technicians.vehicles');
             Route::get('/technicians/{relationship}/service-types', [CompanyRelationshipController::class, 'technicianServiceTypes'])
                 ->name('technicians.service-types');
+            Route::get('/technicians/{relationship}/rates', [CompanyRelationshipController::class, 'technicianRates'])
+                ->name('technicians.rates');
+            Route::get('/technicians/{relationship}/ratings', [CompanyRelationshipController::class, 'technicianRatings'])
+                ->name('technicians.ratings');
         });
 
         Route::middleware('permission:company_relationships.create')->group(function (): void {
@@ -168,6 +188,12 @@ Route::middleware('auth')->group(function (): void {
             Route::put('/technicians/{relationship}/service-types', [CompanyRelationshipController::class, 'syncTechnicianServiceTypes'])
                 ->middleware('permission:technician_service_types.create|technician_service_types.update|technician_service_types.delete')
                 ->name('technicians.service-types.sync');
+            Route::put('/technicians/{relationship}/rates', [CompanyRelationshipController::class, 'syncTechnicianRates'])
+                ->middleware('permission:company_relationships.update')
+                ->name('technicians.rates.sync');
+            Route::post('/technicians/{relationship}/ratings', [CompanyRelationshipController::class, 'storeTechnicianRating'])
+                ->middleware('permission:company_relationships.update')
+                ->name('technicians.ratings.store');
         });
 
         Route::middleware('permission:company_relationships.delete')->group(function (): void {
@@ -259,6 +285,26 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:establishments.update')->group(function (): void {
             Route::get('/establishments/{establishment}/edit', [EstablishmentController::class, 'edit'])->name('establishments.edit');
             Route::put('/establishments/{establishment}', [EstablishmentController::class, 'update'])->name('establishments.update');
+        });
+
+        Route::middleware('permission:establishments.upload-attachments')->group(function (): void {
+            Route::post('/establishments/{establishment}/attachments', [EstablishmentController::class, 'storeAttachment'])
+                ->whereNumber('establishment')
+                ->name('establishments.attachments.store');
+        });
+
+        Route::middleware('permission:establishments.download-attachments')->group(function (): void {
+            Route::get('/establishments/{establishment}/attachments/{attachment}/download', [EstablishmentController::class, 'downloadAttachment'])
+                ->whereNumber('establishment')
+                ->whereNumber('attachment')
+                ->name('establishments.attachments.download');
+        });
+
+        Route::middleware('permission:establishments.delete-attachments')->group(function (): void {
+            Route::delete('/establishments/{establishment}/attachments/{attachment}', [EstablishmentController::class, 'destroyAttachment'])
+                ->whereNumber('establishment')
+                ->whereNumber('attachment')
+                ->name('establishments.attachments.destroy');
         });
 
         Route::middleware('permission:establishments.delete')->group(function (): void {

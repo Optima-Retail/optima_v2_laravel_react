@@ -21,6 +21,7 @@ final class StoreCompanyRequest extends FormRequest
 
         $this->merge([
             'is_active' => $this->boolean('is_active', true),
+            'remove_logo' => $this->boolean('remove_logo'),
         ]);
     }
 

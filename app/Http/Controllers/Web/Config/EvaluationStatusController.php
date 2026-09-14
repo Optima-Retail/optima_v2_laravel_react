@@ -33,7 +33,7 @@ final class EvaluationStatusController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'lifecycle',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,7 +73,7 @@ final class EvaluationStatusController extends Controller
 
     public function store(StoreEvaluationStatusRequest $request): RedirectResponse
     {
-        $this->evaluationStatuses->create([
+        $record = $this->evaluationStatuses->create([
             'name' => $request->string('name')->toString(),
             'color' => $request->input('color'),
             'lifecycle' => $request->input('lifecycle'),
@@ -81,7 +81,7 @@ final class EvaluationStatusController extends Controller
         ]);
 
         return redirect()
-            ->route('config.evaluation-statuses.index')
+            ->route('config.evaluation-statuses.edit', $record)
             ->with('success', 'evaluation_status_created_successfully');
     }
 
@@ -107,7 +107,7 @@ final class EvaluationStatusController extends Controller
         ]);
 
         return redirect()
-            ->route('config.evaluation-statuses.index')
+            ->route('config.evaluation-statuses.edit', $evaluationStatus)
             ->with('success', 'evaluation_status_updated_successfully');
     }
 

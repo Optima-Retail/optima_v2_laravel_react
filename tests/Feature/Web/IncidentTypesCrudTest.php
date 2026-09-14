@@ -54,7 +54,7 @@ final class IncidentTypesCrudTest extends TestCase
                 'color' => '#FFFFFF',
                 'default_priority_id' => 2,
             ])
-            ->assertRedirect(route('config.incident-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'incident_type_created_successfully');
 
         $type = IncidentType::query()->where('name', 'CX')->firstOrFail();
@@ -86,7 +86,7 @@ final class IncidentTypesCrudTest extends TestCase
                 'color' => '#FFFFFF',
                 'default_priority_id' => 1,
             ])
-            ->assertRedirect(route('config.incident-types.index'))
+            ->assertRedirect(route('config.incident-types.edit', $type))
             ->assertSessionHas('success', 'incident_type_updated_successfully');
 
         $this->assertDatabaseHas('incident_types', [

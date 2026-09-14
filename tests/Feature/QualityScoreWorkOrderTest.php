@@ -35,7 +35,7 @@ final class QualityScoreWorkOrderTest extends TestCase
     {
         $responsible = User::factory()->create(['quality_score' => 0]);
         $pending = $this->makeStatus(1, WorkOrderStage::Estimate, true);
-        $sent = $this->makeStatus(5, WorkOrderStage::Estimate, true);
+        $sent = $this->makeStatus(5, WorkOrderStage::Estimate, true, ['sets_sent_at' => true]);
         $establishment = Establishment::factory()->create();
 
         $estimate = WorkOrder::factory()->create([
@@ -111,7 +111,10 @@ final class QualityScoreWorkOrderTest extends TestCase
         ]);
     }
 
-    private function makeStatus(int $id, WorkOrderStage $kind, bool $isOpen): WorkOrderStatus
+    /**
+     * @param  array<string, bool>  $flags
+     */
+    private function makeStatus(int $id, WorkOrderStage $kind, bool $isOpen, array $flags = []): WorkOrderStatus
     {
         $status = new WorkOrderStatus;
         $status->forceFill([
@@ -120,6 +123,7 @@ final class QualityScoreWorkOrderTest extends TestCase
             'kind' => $kind,
             'lifecycle' => 1,
             'is_open' => $isOpen,
+            'sets_sent_at' => $flags['sets_sent_at'] ?? false,
         ])->save();
 
         return $status;

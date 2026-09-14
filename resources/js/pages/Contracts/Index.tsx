@@ -237,7 +237,7 @@ export default function ContractsIndex({ filters, contractStatusOptions, can }: 
                         column: filters.sort || 'id',
                         dir: filters.direction === 'asc' ? 'asc' : 'desc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         contract_status_id: filters.contract_status_id,

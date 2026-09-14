@@ -27,6 +27,9 @@ export default function EditTechnicianIncidentStatus({
         color: technicianIncidentStatus.color ?? '#a9cef0',
         lifecycle: technicianIncidentStatus.lifecycle ?? '',
         is_open: technicianIncidentStatus.is_open,
+        is_default: technicianIncidentStatus.is_default,
+        marks_verified: technicianIncidentStatus.marks_verified,
+        sets_response_date: technicianIncidentStatus.sets_response_date,
     });
 
     function submit(event: FormEvent) {

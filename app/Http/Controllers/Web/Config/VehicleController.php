@@ -33,7 +33,7 @@ final class VehicleController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'brand',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -75,10 +75,10 @@ final class VehicleController extends Controller
 
     public function store(StoreVehicleRequest $request): RedirectResponse
     {
-        $this->vehicles->create($request->validated());
+        $record = $this->vehicles->create($request->validated());
 
         return redirect()
-            ->route('config.vehicles.index')
+            ->route('config.vehicles.edit', $record)
             ->with('success', 'vehicle_created_successfully');
     }
 
@@ -100,7 +100,7 @@ final class VehicleController extends Controller
         $this->vehicles->update($vehicle, $request->validated());
 
         return redirect()
-            ->route('config.vehicles.index')
+            ->route('config.vehicles.edit', $vehicle)
             ->with('success', 'vehicle_updated_successfully');
     }
 

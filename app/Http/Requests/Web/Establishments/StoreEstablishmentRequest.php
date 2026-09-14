@@ -44,6 +44,14 @@ final class StoreEstablishmentRequest extends FormRequest
                 (array) $this->input('collaborator_ids', []),
                 fn (mixed $id): bool => $id !== '' && $id !== null,
             )),
+            'blocked_technician_ids' => array_values(array_filter(
+                (array) $this->input('blocked_technician_ids', []),
+                fn (mixed $id): bool => $id !== '' && $id !== null,
+            )),
+            'favorite_technician_ids' => array_values(array_filter(
+                (array) $this->input('favorite_technician_ids', []),
+                fn (mixed $id): bool => $id !== '' && $id !== null,
+            )),
         ]);
     }
 

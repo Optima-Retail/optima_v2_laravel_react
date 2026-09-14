@@ -44,7 +44,7 @@ final class CurrenciesCrudTest extends TestCase
                 'name' => 'Euro',
                 'code' => 'EUR',
             ])
-            ->assertRedirect(route('config.currencies.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'currency_created_successfully');
 
         $currency = Currency::query()->where('code', 'EUR')->firstOrFail();
@@ -74,7 +74,7 @@ final class CurrenciesCrudTest extends TestCase
                 'name' => 'Euro (€)',
                 'code' => 'EUR',
             ])
-            ->assertRedirect(route('config.currencies.index'))
+            ->assertRedirect(route('config.currencies.edit', $currency))
             ->assertSessionHas('success', 'currency_updated_successfully');
 
         $this->assertDatabaseHas('currencies', [

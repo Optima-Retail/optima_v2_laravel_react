@@ -6,13 +6,18 @@ namespace App\Domain\Companies\Services;
 
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyMemberUsers;
+use App\Domain\Companies\Support\Coordinates;
 use App\Models\Company;
+use App\Models\CompanyRelationship;
 use App\Models\Delegation;
 use App\Models\Establishment;
+use App\Models\EstablishmentFormTemplate;
 use App\Models\EstablishmentType;
+use App\Models\FormTemplate;
 use App\Models\Language;
 use App\Models\Series;
 use App\Models\Timezone;
+use App\Models\WorkOrderType;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
@@ -37,9 +42,14 @@ final class EstablishmentService
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function clientCompanyOptions(Company $owner): array
+    /**
+     * Client companies for selects (active only). Keep `$includeId` for edit forms.
+     *
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function clientCompanyOptions(Company $owner, ?int $includeId = null): array
     {
         $ids = $this->accessibleCompanyIds($owner);
 
@@ -49,14 +59,16 @@ final class EstablishmentService
 
         return Company::query()
             ->whereIn('id', $ids)
+            ->where(function ($query) use ($includeId): void {
+                $query->where('is_active', true);
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
             ->orderBy('name')
-            ->get(['id', 'name', 'tax_id'])
-            ->map(fn (Company $company): array => [
-                'id' => $company->id,
-                'label' => $company->tax_id
-                    ? "{$company->name} ({$company->tax_id})"
-                    : $company->name,
-            ])
+            ->get(['id', 'name', 'tax_id', 'logo'])
+            ->map(fn (Company $company): array => $company->toSelectOption())
             ->values()
             ->all();
     }
@@ -111,8 +123,18 @@ final class EstablishmentService
         return DB::transaction(function () use ($data): Establishment {
             $establishment = Establishment::query()->create($this->attributes($data));
             $establishment->collaborators()->sync($data['collaborator_ids'] ?? []);
+            $establishment->blacklistedTechnicians()->sync($data['blocked_technician_ids'] ?? []);
+            $establishment->favoriteTechnicians()->sync($data['favorite_technician_ids'] ?? []);
 
-            return $establishment->load(['company', 'country', 'timezone', 'delegation', 'collaborators']);
+            return $establishment->load([
+                'company',
+                'country',
+                'timezone',
+                'delegation',
+                'collaborators',
+                'blacklistedTechnicians',
+                'favoriteTechnicians',
+            ]);
         });
     }
 
@@ -124,8 +146,21 @@ final class EstablishmentService
         return DB::transaction(function () use ($establishment, $data): Establishment {
             $establishment->update($this->attributes($data));
             $establishment->collaborators()->sync($data['collaborator_ids'] ?? []);
+            $establishment->blacklistedTechnicians()->sync($data['blocked_technician_ids'] ?? []);
+            $establishment->favoriteTechnicians()->sync($data['favorite_technician_ids'] ?? []);
+            $this->syncFormTemplateLinks($establishment, $data['form_template_links'] ?? null);
 
-            return $establishment->fresh(['company', 'country', 'timezone', 'billingCompany', 'delegation', 'collaborators']) ?? $establishment;
+            return $establishment->fresh([
+                'company',
+                'country',
+                'timezone',
+                'billingCompany',
+                'delegation',
+                'collaborators',
+                'blacklistedTechnicians',
+                'favoriteTechnicians',
+                'formTemplateLinks',
+            ]) ?? $establishment;
         });
     }
 
@@ -137,6 +172,9 @@ final class EstablishmentService
 
         DB::transaction(function () use ($establishment): void {
             $establishment->collaborators()->detach();
+            $establishment->blacklistedTechnicians()->detach();
+            $establishment->favoriteTechnicians()->detach();
+            $establishment->formTemplateLinks()->delete();
             $establishment->softDeleteSafely();
         });
     }
@@ -208,9 +246,16 @@ final class EstablishmentService
     /**
      * @return list<array{id: int, label: string}>
      */
-    public function seriesOptions(): array
+    public function seriesOptions(?int $includeId = null): array
     {
         return Series::query()
+            ->where(function ($query) use ($includeId): void {
+                $query->where('is_selectable', true);
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
             ->orderBy('key')
             ->get(['id', 'key'])
             ->map(fn (Series $series): array => [
@@ -231,17 +276,89 @@ final class EstablishmentService
     }
 
     /**
+     * Technician company relationships owned by the active company.
+     *
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function technicianOptions(Company $owner): array
+    {
+        return CompanyRelationship::query()
+            ->with('relatedCompany:id,name,tradename,logo,is_active')
+            ->where('owner_company_id', $owner->id)
+            ->where('kind', CompanyRelationshipKind::Technician->value)
+            ->whereHas('relatedCompany', fn ($query) => $query->where('is_active', true))
+            ->orderBy('id')
+            ->get()
+            ->map(fn (CompanyRelationship $relationship): array => $relationship->toSelectOption())
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    public function workOrderTypeOptions(): array
+    {
+        return WorkOrderType::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'code'])
+            ->map(fn (WorkOrderType $type): array => [
+                'id' => $type->id,
+                'label' => $type->code ? "{$type->name} ({$type->code})" : $type->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    public function formTemplateOptions(Company $owner): array
+    {
+        return FormTemplate::query()
+            ->where('company_id', $owner->id)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (FormTemplate $template): array => [
+                'id' => $template->id,
+                'label' => $template->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, form_template_id: int, work_order_type_id: int}>
+     */
+    public function formTemplateLinksFor(Establishment $establishment): array
+    {
+        return $establishment->formTemplateLinks()
+            ->orderBy('id')
+            ->get(['id', 'form_template_id', 'work_order_type_id'])
+            ->map(fn (EstablishmentFormTemplate $link): array => [
+                'id' => $link->id,
+                'form_template_id' => (int) $link->form_template_id,
+                'work_order_type_id' => (int) $link->work_order_type_id,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toFormData(Establishment $establishment): array
     {
-        $establishment->loadMissing('collaborators');
+        $establishment->loadMissing(['collaborators', 'blacklistedTechnicians', 'favoriteTechnicians']);
 
         return [
             'id' => $establishment->id,
             'company_id' => $establishment->company_id,
             'name' => $establishment->name,
             'collaborator_ids' => $establishment->collaborators->pluck('id')->values()->all(),
+            'blocked_technician_ids' => $establishment->blacklistedTechnicians->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+            'favorite_technician_ids' => $establishment->favoriteTechnicians->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+            'form_template_links' => $this->formTemplateLinksFor($establishment),
             'code' => $establishment->code,
             'store_code' => $establishment->store_code,
             'alternate_store_code' => $establishment->alternate_store_code,
@@ -271,8 +388,8 @@ final class EstablishmentService
             'is_quality_control_contactable' => $establishment->is_quality_control_contactable,
             'has_parking' => $establishment->has_parking,
             'is_ulez_zone' => $establishment->is_ulez_zone,
-            'latitude' => $establishment->latitude,
-            'longitude' => $establishment->longitude,
+            'latitude' => Coordinates::format($establishment->latitude),
+            'longitude' => Coordinates::format($establishment->longitude),
             'tax_rate' => $establishment->tax_rate,
             'tax_included' => $establishment->tax_included,
             'legacy_erp_id' => $establishment->legacy_erp_id,
@@ -292,6 +409,7 @@ final class EstablishmentService
     {
         return Establishment::query()
             ->where('company_id', $companyId)
+            ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'city', 'is_active'])
             ->map(fn (Establishment $establishment): array => [
@@ -328,7 +446,12 @@ final class EstablishmentService
      */
     private function attributes(array $data): array
     {
-        $data = Arr::except($data, ['collaborator_ids']);
+        $data = Arr::except($data, [
+            'collaborator_ids',
+            'blocked_technician_ids',
+            'favorite_technician_ids',
+            'form_template_links',
+        ]);
 
         foreach ([
             'code', 'store_code', 'alternate_store_code', 'phone', 'email', 'emails', 'recipient_emails',
@@ -344,5 +467,43 @@ final class EstablishmentService
         }
 
         return $data;
+    }
+
+    /**
+     * @param  list<array{id?: int|null, form_template_id: int|string, work_order_type_id: int|string}>|null  $links
+     */
+    private function syncFormTemplateLinks(Establishment $establishment, ?array $links): void
+    {
+        if ($links === null) {
+            return;
+        }
+
+        $rows = [];
+
+        foreach ($links as $link) {
+            $formTemplateId = (int) ($link['form_template_id'] ?? 0);
+            $workOrderTypeId = (int) ($link['work_order_type_id'] ?? 0);
+
+            if ($formTemplateId < 1 || $workOrderTypeId < 1) {
+                continue;
+            }
+
+            $key = $formTemplateId.':'.$workOrderTypeId;
+
+            if (isset($rows[$key])) {
+                continue;
+            }
+
+            $rows[$key] = [
+                'form_template_id' => $formTemplateId,
+                'work_order_type_id' => $workOrderTypeId,
+            ];
+        }
+
+        $establishment->formTemplateLinks()->delete();
+
+        foreach ($rows as $attrs) {
+            $establishment->formTemplateLinks()->create($attrs);
+        }
     }
 }

@@ -303,6 +303,7 @@ final class CompanyRelationshipService
                 ->values()
                 ->all(),
             'seriesOptions' => Series::query()
+                ->where('is_selectable', true)
                 ->orderBy('key')
                 ->get(['id', 'key'])
                 ->map(fn (Series $series): array => [

@@ -254,8 +254,9 @@ final class ArticleService
     {
         /** @var Collection<int, CompanyRelationship> $relationships */
         $relationships = CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename')
+            ->with('relatedCompany:id,name,tradename,logo,is_active')
             ->where('kind', CompanyRelationshipKind::Customer->value)
+            ->whereHas('relatedCompany', fn ($query) => $query->where('is_active', true))
             ->orderBy('id')
             ->get();
 
@@ -266,10 +267,7 @@ final class ArticleService
                     ? "{$company->name} ({$company->tradename})"
                     : ($company?->name ?? "#{$relationship->id}");
 
-                return [
-                    'id' => $relationship->id,
-                    'label' => $label,
-                ];
+                return $relationship->toSelectOption($label);
             })
             ->values()
             ->all();

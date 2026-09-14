@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\CompanyRelationships;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
+use App\Domain\Chats\Services\DocumentChatService;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Services\CompanyRelationshipService;
 use App\Domain\Companies\Services\CompanyScheduleService;
 use App\Domain\Companies\Services\CompanyService;
 use App\Domain\Companies\Services\EstablishmentService;
+use App\Domain\Companies\Services\TechnicianRateService;
+use App\Domain\Companies\Services\TechnicianRatingService;
 use App\Domain\Config\Articles\Services\ArticleService;
 use App\Domain\Config\ClientRates\Services\ClientRateService;
 use App\Domain\Config\TechnicianServiceTypes\Services\TechnicianServiceTypeService;
@@ -16,12 +20,14 @@ use App\Domain\Config\Vehicles\Services\VehicleService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\CompanyRelationships\StoreCompanyRelationshipRequest;
+use App\Http\Requests\Web\CompanyRelationships\StoreTechnicianRatingRequest;
 use App\Http\Requests\Web\CompanyRelationships\SyncClientArticlesRequest;
 use App\Http\Requests\Web\CompanyRelationships\SyncClientRatesRequest;
 use App\Http\Requests\Web\CompanyRelationships\SyncTechnicianServiceTypesRequest;
 use App\Http\Requests\Web\CompanyRelationships\SyncTechnicianVehiclesRequest;
 use App\Http\Requests\Web\CompanyRelationships\UpdateCompanyRelationshipRequest;
 use App\Http\Requests\Web\CompanyRelationships\UpdateCompanyScheduleRequest;
+use App\Http\Requests\Web\CompanyRelationships\UpsertTechnicianRatesRequest;
 use App\Models\Article;
 use App\Models\ClientRate;
 use App\Models\CompanyRelationship;
@@ -57,7 +63,10 @@ final class CompanyRelationshipController extends Controller
         private readonly ArticleService $articles,
         private readonly VehicleService $vehicles,
         private readonly ClientRateService $clientRates,
+        private readonly TechnicianRateService $technicianRates,
+        private readonly TechnicianRatingService $technicianRatings,
         private readonly TechnicianServiceTypeService $technicianServiceTypes,
+        private readonly DocumentChatService $chats,
     ) {}
 
     public function indexClients(Request $request): Response
@@ -131,14 +140,14 @@ final class CompanyRelationshipController extends Controller
         $data = $request->validated();
         $data['kind'] = CompanyRelationshipKind::Customer->value;
 
-        $this->relationships->create(
+        $record = $this->relationships->create(
             $this->activeCompany($request),
             $data,
             $request->user(),
         );
 
         return redirect()
-            ->route('clients.index')
+            ->route('clients.edit', $record)
             ->with('success', 'client_created_successfully');
     }
 
@@ -147,14 +156,14 @@ final class CompanyRelationshipController extends Controller
         $data = $request->validated();
         $data['kind'] = CompanyRelationshipKind::Supplier->value;
 
-        $this->relationships->create(
+        $record = $this->relationships->create(
             $this->activeCompany($request),
             $data,
             $request->user(),
         );
 
         return redirect()
-            ->route('suppliers.index')
+            ->route('suppliers.edit', $record)
             ->with('success', 'supplier_created_successfully');
     }
 
@@ -163,14 +172,14 @@ final class CompanyRelationshipController extends Controller
         $data = $request->validated();
         $data['kind'] = CompanyRelationshipKind::Technician->value;
 
-        $this->relationships->create(
+        $record = $this->relationships->create(
             $this->activeCompany($request),
             $data,
             $request->user(),
         );
 
         return redirect()
-            ->route('technicians.index')
+            ->route('technicians.edit', $record)
             ->with('success', 'technician_created_successfully');
     }
 
@@ -186,7 +195,10 @@ final class CompanyRelationshipController extends Controller
         return Inertia::render('Clients/Edit', [
             'relationship' => $this->relationships->toFormData($relationship),
             'schedule' => $this->schedules->toFormData($relationship->relatedCompany?->schedule),
-            'companyOptions' => $this->companies->companyOptions($owner->id),
+            'companyOptions' => $this->companies->companyOptions(
+                $owner->id,
+                $relationship->related_company_id !== null ? (int) $relationship->related_company_id : null,
+            ),
             'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
             'can' => [
                 'delete' => $request->user()?->can('delete', $relationship) ?? false,
@@ -218,7 +230,10 @@ final class CompanyRelationshipController extends Controller
 
         return Inertia::render('Suppliers/Edit', [
             'relationship' => $this->relationships->toFormData($relationship),
-            'companyOptions' => $this->companies->companyOptions($owner->id),
+            'companyOptions' => $this->companies->companyOptions(
+                $owner->id,
+                $relationship->related_company_id !== null ? (int) $relationship->related_company_id : null,
+            ),
             'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
             'can' => [
                 'delete' => $request->user()?->can('delete', $relationship) ?? false,
@@ -232,16 +247,26 @@ final class CompanyRelationshipController extends Controller
         $this->authorize('update', $relationship);
 
         $owner = $this->activeCompany($request);
+        $user = $request->user();
+
+        $this->chats->ensureChat(ChatDocumentType::Technician, (int) $relationship->id);
 
         return Inertia::render('Technicians/Edit', [
             'relationship' => $this->relationships->toFormData($relationship),
-            'companyOptions' => $this->companies->companyOptions($owner->id),
+            'companyOptions' => $this->companies->companyOptions(
+                $owner->id,
+                $relationship->related_company_id !== null ? (int) $relationship->related_company_id : null,
+            ),
             'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
             'initialTab' => $request->string('tab')->trim()->toString() ?: 'general',
             'selectedIncidentId' => $request->integer('incident') ?: null,
+            'chat' => $user !== null
+                ? $this->chats->payload(ChatDocumentType::Technician, (int) $relationship->id, $user)
+                : null,
             'can' => [
-                'delete' => $request->user()?->can('delete', $relationship) ?? false,
-                'viewIncidents' => $request->user()?->can('technician_incidents.view') ?? false,
+                'delete' => $user?->can('delete', $relationship) ?? false,
+                'viewIncidents' => $user?->can('technician_incidents.view') ?? false,
+                'post_chat' => $user?->can('update', $relationship) ?? false,
             ],
         ]);
     }
@@ -256,7 +281,7 @@ final class CompanyRelationshipController extends Controller
         $this->relationships->update($relationship, $data, $request->user());
 
         return redirect()
-            ->route('clients.index')
+            ->route('clients.edit', $relationship)
             ->with('success', 'client_updated_successfully');
     }
 
@@ -270,7 +295,7 @@ final class CompanyRelationshipController extends Controller
         $this->relationships->update($relationship, $data, $request->user());
 
         return redirect()
-            ->route('suppliers.index')
+            ->route('suppliers.edit', $relationship)
             ->with('success', 'supplier_updated_successfully');
     }
 
@@ -284,7 +309,7 @@ final class CompanyRelationshipController extends Controller
         $this->relationships->update($relationship, $data, $request->user());
 
         return redirect()
-            ->route('technicians.index')
+            ->route('technicians.edit', $relationship)
             ->with('success', 'technician_updated_successfully');
     }
 
@@ -425,6 +450,53 @@ final class CompanyRelationshipController extends Controller
         ]);
     }
 
+    public function technicianRates(CompanyRelationship $relationship): JsonResponse
+    {
+        $this->assertKind($relationship, [CompanyRelationshipKind::Technician->value]);
+        $this->authorize('view', $relationship);
+
+        return response()->json([
+            'data' => $this->technicianRates->forTechnician($relationship),
+        ]);
+    }
+
+    public function syncTechnicianRates(
+        UpsertTechnicianRatesRequest $request,
+        CompanyRelationship $relationship,
+    ): JsonResponse {
+        $this->assertKind($relationship, [CompanyRelationshipKind::Technician->value]);
+        $this->authorize('update', $relationship);
+
+        return response()->json([
+            'data' => $this->technicianRates->upsert($relationship, $request->validated()),
+        ]);
+    }
+
+    public function technicianRatings(CompanyRelationship $relationship): JsonResponse
+    {
+        $this->assertKind($relationship, [CompanyRelationshipKind::Technician->value]);
+        $this->authorize('view', $relationship);
+
+        return response()->json([
+            'data' => $this->technicianRatings->forTechnician($relationship),
+        ]);
+    }
+
+    public function storeTechnicianRating(
+        StoreTechnicianRatingRequest $request,
+        CompanyRelationship $relationship,
+    ): JsonResponse {
+        $this->assertKind($relationship, [CompanyRelationshipKind::Technician->value]);
+        $this->authorize('update', $relationship);
+
+        /** @var array{score: int, notes?: string|null, source: string, work_order_id?: int|null} $data */
+        $data = $request->validated();
+
+        return response()->json([
+            'data' => $this->technicianRatings->upsert($relationship, $data),
+        ], 201);
+    }
+
     public function technicianServiceTypes(CompanyRelationship $relationship): JsonResponse
     {
         $this->assertKind($relationship, [CompanyRelationshipKind::Technician->value]);
@@ -467,7 +539,7 @@ final class CompanyRelationshipController extends Controller
             'created_to' => $request->string('created_to')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
-            'per_page' => $request->integer('per_page', 12),
+            'per_page' => $request->integer('per_page', 25),
         ];
 
         return Inertia::render($component, [

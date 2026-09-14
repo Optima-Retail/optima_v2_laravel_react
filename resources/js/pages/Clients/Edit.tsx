@@ -10,13 +10,13 @@ import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { clientsService } from '@/services';
 import { relationshipFormValuesFromData } from '@/support/relationshipForm';
-import type { UserOption } from '@/support/types/domain/common';
+import type { CompanyOption } from '@/support/types/domain/common';
 import type { CompanyRelationshipFormData, RelationshipFormOptions } from '@/support/types/domain/company-relationship';
 
 type EditClientProps = {
     relationship: CompanyRelationshipFormData;
     schedule: CompanyScheduleValues;
-    companyOptions: UserOption[];
+    companyOptions: CompanyOption[];
     formOptions: RelationshipFormOptions;
     can: {
         delete: boolean;

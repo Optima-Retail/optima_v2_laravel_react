@@ -33,7 +33,7 @@ final class TechnicianRequestPriorityController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,14 +73,14 @@ final class TechnicianRequestPriorityController extends Controller
 
     public function store(StoreTechnicianRequestPriorityRequest $request): RedirectResponse
     {
-        $this->technicianRequestPriorities->create([
+        $record = $this->technicianRequestPriorities->create([
             'name' => $request->string('name')->toString(),
             'key' => $request->string('key')->toString(),
             'color' => $request->input('color'),
         ]);
 
         return redirect()
-            ->route('config.technician-request-priorities.index')
+            ->route('config.technician-request-priorities.edit', $record)
             ->with('success', 'technician_request_priority_created_successfully');
     }
 
@@ -107,7 +107,7 @@ final class TechnicianRequestPriorityController extends Controller
         ]);
 
         return redirect()
-            ->route('config.technician-request-priorities.index')
+            ->route('config.technician-request-priorities.edit', $technicianRequestPriority)
             ->with('success', 'technician_request_priority_updated_successfully');
     }
 

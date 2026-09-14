@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Incidents\Services;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
 use App\Domain\Incidents\Support\IncidentLineStatusRules;
+use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
 use App\Models\Incident;
 use App\Models\IncidentLine;
 use App\Models\IncidentStatus;
@@ -17,6 +19,7 @@ final class IncidentLineService
 {
     public function __construct(
         private readonly IncidentLineStatusRules $lineStatusRules,
+        private readonly StatusChangeHistoryService $statusChanges,
     ) {}
 
     /**
@@ -35,6 +38,10 @@ final class IncidentLineService
 
         return DB::transaction(function () use ($incident, $user, $data): IncidentLine {
             $incident->loadMissing(['lines' => fn ($query) => $query->orderByDesc('ended_at')->orderByDesc('id')]);
+
+            $oldStatusId = $incident->incident_status_id !== null
+                ? (int) $incident->incident_status_id
+                : null;
 
             $previous = $incident->lines->first();
             $startedAt = $previous?->ended_at ?? $incident->created_at ?? now();
@@ -72,6 +79,14 @@ final class IncidentLineService
                 ->sum('duration_minutes')) * 60;
 
             $incident->save();
+
+            $this->statusChanges->record(
+                ChatDocumentType::Incident,
+                (int) $incident->id,
+                $oldStatusId,
+                (int) $data['incident_status_id'],
+                $user,
+            );
 
             return $line->load(['user', 'status']);
         });

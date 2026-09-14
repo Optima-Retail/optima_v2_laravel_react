@@ -1,11 +1,31 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import {
+    useEffect,
+    useId,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+    type CSSProperties,
+    type KeyboardEvent,
+    type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { CompanyMark, CompanyOptionLabel } from '@/components/companies/CompanyOptionLabel';
 import { cn } from '@/support/cn';
 import { optionColorStyle } from '@/support/color';
 import type { SelectOption } from '@/components/ui/SearchableSelect';
 
 export type MultiSelectOption = SelectOption;
+
+function optionContent(option: SelectOption): ReactNode {
+    if ('logo_url' in option) {
+        return <CompanyOptionLabel name={option.label} logoUrl={option.logo_url} size="sm" />;
+    }
+
+    return option.label;
+}
 
 type MultiSelectProps = {
     id?: string;
@@ -17,6 +37,8 @@ type MultiSelectProps = {
     disabled?: boolean;
     className?: string;
 };
+
+const LIST_MAX_HEIGHT = 224;
 
 export function MultiSelect({
     id,
@@ -32,7 +54,9 @@ export function MultiSelect({
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
+    const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
     const rootRef = useRef<HTMLDivElement>(null);
+    const listRef = useRef<HTMLUListElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const listId = useId();
     const resolvedPlaceholder = placeholder ?? t('common.select');
@@ -52,12 +76,56 @@ export function MultiSelect({
         return options.filter((option) => option.label.toLowerCase().includes(needle));
     }, [options, query]);
 
+    function updateMenuPosition() {
+        const rect = rootRef.current?.getBoundingClientRect();
+        if (!rect) {
+            return;
+        }
+
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+        const openUpward = spaceBelow < LIST_MAX_HEIGHT && spaceAbove > spaceBelow;
+        const maxHeight = Math.min(
+            LIST_MAX_HEIGHT,
+            Math.max(openUpward ? spaceAbove - 8 : spaceBelow - 8, 96),
+        );
+
+        setMenuStyle({
+            position: 'fixed',
+            left: rect.left,
+            width: rect.width,
+            zIndex: 100,
+            maxHeight,
+            ...(openUpward
+                ? { bottom: window.innerHeight - rect.top + 4, top: 'auto' }
+                : { top: rect.bottom + 4, bottom: 'auto' }),
+        });
+    }
+
+    useLayoutEffect(() => {
+        if (!open) {
+            return;
+        }
+
+        updateMenuPosition();
+        window.addEventListener('resize', updateMenuPosition);
+        window.addEventListener('scroll', updateMenuPosition, true);
+
+        return () => {
+            window.removeEventListener('resize', updateMenuPosition);
+            window.removeEventListener('scroll', updateMenuPosition, true);
+        };
+    }, [open, filtered.length, selected.length]);
+
     useEffect(() => {
         function onPointerDown(event: MouseEvent) {
-            if (!rootRef.current?.contains(event.target as Node)) {
-                setOpen(false);
-                setQuery('');
+            const target = event.target as Node;
+            if (rootRef.current?.contains(target) || listRef.current?.contains(target)) {
+                return;
             }
+
+            setOpen(false);
+            setQuery('');
         }
 
         document.addEventListener('mousedown', onPointerDown);
@@ -143,6 +211,71 @@ export function MultiSelect({
 
     const activeOption = filtered[activeIndex];
 
+    const list = open
+        ? createPortal(
+              <ul
+                  ref={listRef}
+                  id={listId}
+                  role="listbox"
+                  aria-multiselectable="true"
+                  style={menuStyle}
+                  className="overflow-auto rounded-xl border border-line bg-surface py-1 shadow-lg"
+              >
+                  {filtered.length === 0 ? (
+                      <li className="px-3 py-2 text-sm text-ink-muted">{t('common.noResults')}</li>
+                  ) : (
+                      filtered.map((option, index) => {
+                          const active = value.includes(option.value);
+                          const highlighted = index === activeIndex;
+                          const colorStyle = optionColorStyle(option.color);
+
+                          return (
+                              <li
+                                  key={option.value}
+                                  id={`${listId}-${option.value}`}
+                                  role="option"
+                                  aria-selected={active}
+                              >
+                                  <button
+                                      type="button"
+                                      onMouseEnter={() => setActiveIndex(index)}
+                                      onClick={() => toggle(option.value)}
+                                      style={colorStyle}
+                                      className={cn(
+                                          'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
+                                          colorStyle
+                                              ? highlighted
+                                                  ? 'ring-2 ring-inset ring-brand/50'
+                                                  : ''
+                                              : cn(
+                                                    highlighted ? 'bg-canvas' : '',
+                                                    active ? 'text-brand' : 'text-ink hover:bg-canvas',
+                                                ),
+                                      )}
+                                  >
+                                      <span
+                                          className={cn(
+                                              'inline-flex size-4 shrink-0 items-center justify-center rounded border',
+                                              active
+                                                  ? 'border-brand bg-brand text-white'
+                                                  : colorStyle
+                                                    ? 'border-black/20 bg-white/70'
+                                                    : 'border-line bg-surface',
+                                          )}
+                                      >
+                                          {active ? <Check className="size-3" aria-hidden /> : null}
+                                      </span>
+                                      {optionContent(option)}
+                                  </button>
+                              </li>
+                          );
+                      })
+                  )}
+              </ul>,
+              document.body,
+          )
+        : null;
+
     return (
         <div ref={rootRef} className={cn('relative', className)}>
             <div
@@ -166,7 +299,10 @@ export function MultiSelect({
                                 !colorStyle && 'bg-brand-soft text-brand',
                             )}
                         >
-                            {option.label}
+                            {'logo_url' in option ? (
+                                <CompanyMark name={option.label} logoUrl={option.logo_url} size="xs" />
+                            ) : null}
+                            <span className="max-w-40 truncate">{option.label}</span>
                             <button
                                 type="button"
                                 disabled={disabled}
@@ -214,65 +350,7 @@ export function MultiSelect({
                 />
             </div>
 
-            {open ? (
-                <ul
-                    id={listId}
-                    role="listbox"
-                    aria-multiselectable="true"
-                    className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-xl border border-line bg-surface py-1 shadow-lg"
-                >
-                    {filtered.length === 0 ? (
-                        <li className="px-3 py-2 text-sm text-ink-muted">{t('common.noResults')}</li>
-                    ) : (
-                        filtered.map((option, index) => {
-                            const active = value.includes(option.value);
-                            const highlighted = index === activeIndex;
-                            const colorStyle = optionColorStyle(option.color);
-
-                            return (
-                                <li
-                                    key={option.value}
-                                    id={`${listId}-${option.value}`}
-                                    role="option"
-                                    aria-selected={active}
-                                >
-                                    <button
-                                        type="button"
-                                        onMouseEnter={() => setActiveIndex(index)}
-                                        onClick={() => toggle(option.value)}
-                                        style={colorStyle}
-                                        className={cn(
-                                            'flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors',
-                                            colorStyle
-                                                ? highlighted
-                                                    ? 'ring-2 ring-inset ring-brand/50'
-                                                    : ''
-                                                : cn(
-                                                      highlighted ? 'bg-canvas' : '',
-                                                      active ? 'text-brand' : 'text-ink hover:bg-canvas',
-                                                  ),
-                                        )}
-                                    >
-                                        <span
-                                            className={cn(
-                                                'inline-flex size-4 items-center justify-center rounded border',
-                                                active
-                                                    ? 'border-brand bg-brand text-white'
-                                                    : colorStyle
-                                                      ? 'border-black/20 bg-white/70'
-                                                      : 'border-line bg-surface',
-                                            )}
-                                        >
-                                            {active ? <Check className="size-3" aria-hidden /> : null}
-                                        </span>
-                                        {option.label}
-                                    </button>
-                                </li>
-                            );
-                        })
-                    )}
-                </ul>
-            ) : null}
+            {list}
         </div>
     );
 }

@@ -34,8 +34,8 @@ export function Field({
     const resolvedHelp = resolveFieldHelpKey(helpField, htmlFor, helpTable, scope?.table);
 
     return (
-        <div className={cn('space-y-1', className)}>
-            <label htmlFor={htmlFor} className="mb-1.5 inline-flex items-center gap-0 text-sm font-semibold text-ink">
+        <div className={cn('flex flex-col gap-1.5', className)}>
+            <label htmlFor={htmlFor} className="inline-flex items-center gap-0 text-sm font-semibold text-ink">
                 {label}
                 {required ? (
                     <span className="ml-0.5 text-danger" title={t('common.required')} aria-hidden>

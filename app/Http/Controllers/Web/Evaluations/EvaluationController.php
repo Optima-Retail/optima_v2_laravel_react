@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Evaluations;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
+use App\Domain\Chats\Services\DocumentChatService;
 use App\Domain\Evaluations\Services\EvaluationService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
@@ -25,6 +27,7 @@ final class EvaluationController extends Controller
 
     public function __construct(
         private readonly EvaluationService $evaluations,
+        private readonly DocumentChatService $chats,
     ) {}
 
     public function index(Request $request): Response
@@ -39,7 +42,7 @@ final class EvaluationController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -94,9 +97,16 @@ final class EvaluationController extends Controller
                 $evaluation->evaluation_status_id !== null ? (int) $evaluation->evaluation_status_id : null,
             ),
             'userOptions' => $this->evaluations->userOptions($owner),
-            'establishmentOptions' => $this->evaluations->establishmentOptions($owner),
+            'establishmentOptions' => $this->evaluations->establishmentOptions(
+                $owner,
+                $evaluation->establishment_id !== null ? [(int) $evaluation->establishment_id] : [],
+            ),
+            'chat' => $user !== null
+                ? $this->chats->payload(ChatDocumentType::Evaluation, (int) $evaluation->id, $user)
+                : null,
             'can' => [
                 'delete' => $user?->can('delete', $evaluation) ?? false,
+                'post_chat' => $user?->can('update', $evaluation) ?? false,
             ],
         ]);
     }
@@ -106,7 +116,7 @@ final class EvaluationController extends Controller
         $this->evaluations->update($evaluation, $request->validated());
 
         return redirect()
-            ->route('evaluations.index')
+            ->route('evaluations.edit', $evaluation)
             ->with('success', 'evaluation_updated_successfully');
     }
 

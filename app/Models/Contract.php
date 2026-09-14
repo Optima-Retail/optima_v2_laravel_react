@@ -109,4 +109,12 @@ class Contract extends Model
     {
         return $this->hasMany(ContractInvoicingAggregation::class);
     }
+
+    /**
+     * @return HasMany<WorkOrder, $this>
+     */
+    public function workOrders(): HasMany
+    {
+        return $this->hasMany(WorkOrder::class);
+    }
 }

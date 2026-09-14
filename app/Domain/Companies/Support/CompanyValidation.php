@@ -16,6 +16,35 @@ use Illuminate\Validation\Rule;
 
 final class CompanyValidation
 {
+    /** Max digits after the decimal separator for latitude / longitude. */
+    public const COORDINATE_DECIMAL_PLACES = 16;
+
+    /**
+     * @return list<string>
+     */
+    public static function latitudeRules(): array
+    {
+        return [
+            'nullable',
+            'numeric',
+            'between:-90,90',
+            'regex:/^-?\d+(\.\d{1,'.self::COORDINATE_DECIMAL_PLACES.'})?$/',
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function longitudeRules(): array
+    {
+        return [
+            'nullable',
+            'numeric',
+            'between:-180,180',
+            'regex:/^-?\d+(\.\d{1,'.self::COORDINATE_DECIMAL_PLACES.'})?$/',
+        ];
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -48,10 +77,12 @@ final class CompanyValidation
             'postal_code' => ['nullable', 'string', 'max:20'],
             'employee_count' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
+            'logo' => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp,gif,svg'],
+            'remove_logo' => ['sometimes', 'boolean'],
             'brand_id' => ['nullable', 'integer', Rule::exists('brands', 'id')->whereNull('deleted_at')],
             'language_id' => ['nullable', 'integer', Rule::exists('languages', 'id')->whereNull('deleted_at')],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'latitude' => self::latitudeRules(),
+            'longitude' => self::longitudeRules(),
             'legacy_erp_id' => ['nullable', 'string', 'max:64'],
         ];
     }
@@ -101,6 +132,24 @@ final class CompanyValidation
             'responsible_user_id' => ['nullable', 'integer', $memberUser],
             'collaborator_ids' => ['nullable', 'array'],
             'collaborator_ids.*' => ['integer', 'distinct', $memberUser],
+            'blocked_technician_ids' => ['nullable', 'array'],
+            'blocked_technician_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('company_relationships', 'id')
+                    ->where('owner_company_id', $owner?->id ?? 0)
+                    ->where('kind', CompanyRelationshipKind::Technician->value)
+                    ->whereNull('deleted_at'),
+            ],
+            'favorite_technician_ids' => ['nullable', 'array'],
+            'favorite_technician_ids.*' => [
+                'integer',
+                'distinct',
+                Rule::exists('company_relationships', 'id')
+                    ->where('owner_company_id', $owner?->id ?? 0)
+                    ->where('kind', CompanyRelationshipKind::Technician->value)
+                    ->whereNull('deleted_at'),
+            ],
             'is_active' => ['required', 'boolean'],
             'is_client_priority' => ['nullable', 'boolean'],
             'is_reviewed' => ['nullable', 'boolean'],
@@ -110,8 +159,8 @@ final class CompanyValidation
             'is_quality_control_contactable' => ['nullable', 'boolean'],
             'has_parking' => ['nullable', 'boolean'],
             'is_ulez_zone' => ['nullable', 'boolean'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
+            'latitude' => self::latitudeRules(),
+            'longitude' => self::longitudeRules(),
             'tax_rate' => ['nullable', 'numeric'],
             'tax_included' => ['nullable', 'boolean'],
             'legacy_erp_id' => ['nullable', 'string', 'max:64'],

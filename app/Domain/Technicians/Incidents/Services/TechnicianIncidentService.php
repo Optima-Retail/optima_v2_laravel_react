@@ -6,6 +6,7 @@ namespace App\Domain\Technicians\Incidents\Services;
 
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyMemberUsers;
+use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\TechnicianIncident;
@@ -15,18 +16,17 @@ use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 final class TechnicianIncidentService
 {
-    /** Legacy EstadosTecnicoIncidenciaEnum::ABIERTA */
-    private const OPEN_STATUS_ID = 96;
-
-    /** Legacy EstadosTecnicoIncidenciaEnum::VERIFICADA */
-    private const VERIFIED_STATUS_ID = 155;
-
     /** Legacy TecnicoIncidenciaTipoEnum::NEGOCIACION */
     public const NEGOTIATION_TYPE_ID = 2;
+
+    public function __construct(
+        private readonly StatusChangeHistoryService $statusChanges,
+    ) {}
 
     /**
      * @param  array{
@@ -126,22 +126,31 @@ final class TechnicianIncidentService
 
             $incident = TechnicianIncident::query()->create($this->attributes($data));
 
+            $this->statusChanges->recordTechnicianIncident(
+                (int) $incident->id,
+                null,
+                $incident->status_id !== null ? (int) $incident->status_id : null,
+                $actor,
+            );
+
             return $incident->load(['status', 'type', 'technician', 'requestedBy', 'respondedBy', 'verifiedBy']);
         });
     }
 
     /**
-     * Default status: legacy "Abierta" (id 96) when present, otherwise first open status.
+     * Default status from Config → Technician incident statuses (`is_default`),
+     * otherwise the earliest open status by lifecycle.
      */
     public function defaultOpenStatusId(): ?int
     {
-        $open = TechnicianIncidentStatus::query()
-            ->whereKey(self::OPEN_STATUS_ID)
-            ->where('is_open', true)
+        $default = TechnicianIncidentStatus::query()
+            ->default()
+            ->orderBy('lifecycle')
+            ->orderBy('id')
             ->value('id');
 
-        if ($open !== null) {
-            return (int) $open;
+        if ($default !== null) {
+            return (int) $default;
         }
 
         $fallback = TechnicianIncidentStatus::query()
@@ -151,6 +160,41 @@ final class TechnicianIncidentService
             ->value('id');
 
         return $fallback !== null ? (int) $fallback : null;
+    }
+
+    public function verifiedStatusId(): ?int
+    {
+        $id = TechnicianIncidentStatus::query()
+            ->marksVerified()
+            ->orderBy('lifecycle')
+            ->orderBy('id')
+            ->value('id');
+
+        return $id !== null ? (int) $id : null;
+    }
+
+    public function statusSetsResponseDate(?int $statusId): bool
+    {
+        if ($statusId === null) {
+            return false;
+        }
+
+        return TechnicianIncidentStatus::query()
+            ->whereKey($statusId)
+            ->setsResponseDate()
+            ->exists();
+    }
+
+    public function statusMarksVerified(?int $statusId): bool
+    {
+        if ($statusId === null) {
+            return false;
+        }
+
+        return TechnicianIncidentStatus::query()
+            ->whereKey($statusId)
+            ->marksVerified()
+            ->exists();
     }
 
     /**
@@ -184,16 +228,14 @@ final class TechnicianIncidentService
     public function technicianOptions(Company $owner): array
     {
         return CompanyRelationship::query()
-            ->with('relatedCompany:id,name')
+            ->with('relatedCompany:id,name,logo')
             ->where('owner_company_id', $owner->id)
             ->where('kind', CompanyRelationshipKind::Technician->value)
             ->orderBy('id')
             ->get()
-            ->map(fn (CompanyRelationship $relationship): array => [
-                'id' => $relationship->id,
-                'label' => $relationship->relatedCompany?->name
-                    ?? (string) $relationship->id,
-            ])
+            ->map(fn (CompanyRelationship $relationship): array => $relationship->toSelectOption(
+                $relationship->relatedCompany?->name ?? (string) $relationship->id,
+            ))
             ->sortBy(fn (array $option): string => mb_strtolower($option['label']))
             ->values()
             ->all();
@@ -205,10 +247,20 @@ final class TechnicianIncidentService
     public function update(TechnicianIncident $incident, array $data): TechnicianIncident
     {
         return DB::transaction(function () use ($incident, $data): TechnicianIncident {
+            $oldStatusId = $incident->status_id !== null ? (int) $incident->status_id : null;
+
             $incident->update($this->attributes($data));
 
-            return $incident->fresh(['status', 'type', 'technician', 'requestedBy', 'respondedBy', 'verifiedBy'])
+            $fresh = $incident->fresh(['status', 'type', 'technician', 'requestedBy', 'respondedBy', 'verifiedBy'])
                 ?? $incident;
+
+            $this->statusChanges->recordTechnicianIncident(
+                (int) $fresh->id,
+                $oldStatusId,
+                $fresh->status_id !== null ? (int) $fresh->status_id : null,
+            );
+
+            return $fresh;
         });
     }
 
@@ -224,6 +276,9 @@ final class TechnicianIncidentService
     }
 
     /**
+     * Active (`is_open`) statuses for technician incident forms.
+     * Optionally keep a current closed status so edit still shows the saved value.
+     *
      * @return list<array{id: int, label: string, color: string|null, is_open: bool}>
      */
     public function statusOptions(?int $includeId = null): array
@@ -231,7 +286,7 @@ final class TechnicianIncidentService
         return TechnicianIncidentStatus::query()
             ->withTrashed()
             ->where(function ($query) use ($includeId): void {
-                $query->whereNull('deleted_at');
+                $query->whereNull('deleted_at')->where('is_open', true);
 
                 if ($includeId !== null) {
                     $query->orWhereKey($includeId);
@@ -251,13 +306,55 @@ final class TechnicianIncidentService
             ->all();
     }
 
-    public function updateStatus(TechnicianIncident $incident, int $statusId): TechnicianIncident
+    public function updateStatus(TechnicianIncident $incident, int $statusId, ?User $actor = null): TechnicianIncident
     {
-        return DB::transaction(function () use ($incident, $statusId): TechnicianIncident {
-            $incident->update(['status_id' => $statusId]);
+        return DB::transaction(function () use ($incident, $statusId, $actor): TechnicianIncident {
+            $oldStatusId = $incident->status_id !== null ? (int) $incident->status_id : null;
+            $payload = ['status_id' => $statusId];
+            $leavingVerified = $this->statusMarksVerified($oldStatusId) && ! $this->statusMarksVerified($statusId);
+            $enteringVerified = $this->statusMarksVerified($statusId) && ! $this->statusMarksVerified($oldStatusId);
 
-            return $incident->fresh(['status', 'type', 'technician.relatedCompany', 'requestedBy', 'respondedBy', 'verifiedBy'])
+            // Leaving a marks_verified status clears verify metadata so verify can run again.
+            if ($leavingVerified) {
+                $payload['is_verified'] = false;
+                $payload['verified_by_id'] = null;
+                $payload['verified_at'] = null;
+            }
+
+            // Statuses with sets_response_date stamp responded_at when entered.
+            if (
+                $incident->responded_at === null
+                && $oldStatusId !== $statusId
+                && $this->statusSetsResponseDate($statusId)
+            ) {
+                $payload['responded_at'] = now()->toDateString();
+            }
+
+            // Entering a marks_verified status stamps verifier when not already set.
+            if (
+                $enteringVerified
+                && $incident->verified_by_id === null
+                && $incident->verified_at === null
+            ) {
+                $verifier = $actor ?? (Auth::user() instanceof User ? Auth::user() : null);
+                $payload['is_verified'] = true;
+                $payload['verified_by_id'] = $verifier?->id;
+                $payload['verified_at'] = now();
+            }
+
+            $incident->update($this->attributes($payload));
+
+            $fresh = $incident->fresh(['status', 'type', 'technician.relatedCompany', 'requestedBy', 'respondedBy', 'verifiedBy'])
                 ?? $incident;
+
+            $this->statusChanges->recordTechnicianIncident(
+                (int) $fresh->id,
+                $oldStatusId,
+                (int) $statusId,
+                $actor,
+            );
+
+            return $fresh;
         });
     }
 
@@ -277,12 +374,18 @@ final class TechnicianIncidentService
 
             $typeId = (int) $incident->technician_incident_type_id;
             $isNegotiation = $typeId === self::NEGOTIATION_TYPE_ID;
+            $oldStatusId = $incident->status_id !== null ? (int) $incident->status_id : null;
 
             $payload = [
                 'is_verified' => true,
                 'verified_by_id' => $actor->id,
                 'verified_at' => now(),
             ];
+
+            // Prod closes with fecha_respuesta before verify; v2 verify is the resolve action, so stamp it here.
+            if ($incident->responded_at === null) {
+                $payload['responded_at'] = now()->toDateString();
+            }
 
             if (array_key_exists('response_text', $data) && $data['response_text'] !== null) {
                 $payload['response_text'] = $data['response_text'];
@@ -305,18 +408,25 @@ final class TechnicianIncidentService
                 }
             }
 
-            $verifiedStatusId = TechnicianIncidentStatus::query()
-                ->whereKey(self::VERIFIED_STATUS_ID)
-                ->value('id');
+            $verifiedStatusId = $this->verifiedStatusId();
 
             if ($verifiedStatusId !== null) {
-                $payload['status_id'] = (int) $verifiedStatusId;
+                $payload['status_id'] = $verifiedStatusId;
             }
 
             $incident->update($this->attributes($payload));
 
-            return $incident->fresh(['status', 'type', 'technician.relatedCompany', 'requestedBy', 'respondedBy', 'verifiedBy'])
+            $fresh = $incident->fresh(['status', 'type', 'technician.relatedCompany', 'requestedBy', 'respondedBy', 'verifiedBy'])
                 ?? $incident;
+
+            $this->statusChanges->recordTechnicianIncident(
+                (int) $fresh->id,
+                $oldStatusId,
+                $fresh->status_id !== null ? (int) $fresh->status_id : null,
+                $actor,
+            );
+
+            return $fresh;
         });
     }
 

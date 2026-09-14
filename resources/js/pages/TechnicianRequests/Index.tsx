@@ -230,9 +230,9 @@ export default function TechnicianRequestsIndex({
                         can.create ? (
                             <Link
                                 href={technicianRequestsService.createPath}
-                                className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-3 text-sm font-medium text-white"
+                                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
                             >
-                                <Plus className="size-4" aria-hidden />
+                                <Plus className="size-3.5" aria-hidden />
                                 {t('common.newItem', { resource: t('technicianRequests.resource') })}
                             </Link>
                         ) : null
@@ -247,7 +247,7 @@ export default function TechnicianRequestsIndex({
                         column: filters.sort || 'id',
                         dir: filters.direction === 'asc' ? 'asc' : 'desc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         technician_request_status_id: filters.technician_request_status_id,

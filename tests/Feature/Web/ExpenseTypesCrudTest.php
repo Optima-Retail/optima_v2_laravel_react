@@ -40,7 +40,7 @@ final class ExpenseTypesCrudTest extends TestCase
             ->post('/config/expense-types', [
                 'name' => 'Colaboradores test',
             ])
-            ->assertRedirect(route('config.expense-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'expense_type_created_successfully');
 
         $type = ExpenseType::query()->where('name', 'Colaboradores test')->firstOrFail();
@@ -54,7 +54,7 @@ final class ExpenseTypesCrudTest extends TestCase
             ->put("/config/expense-types/{$type->id}", [
                 'name' => 'Colaboradores updated',
             ])
-            ->assertRedirect(route('config.expense-types.index'))
+            ->assertRedirect(route('config.expense-types.edit', $type))
             ->assertSessionHas('success', 'expense_type_updated_successfully');
 
         $this->assertDatabaseHas('expense_types', [

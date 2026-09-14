@@ -61,7 +61,7 @@ final class EstablishmentsCrudTest extends TestCase
                 'code' => 'EST-001',
                 'collaborator_ids' => [$admin->id],
             ])
-            ->assertRedirect(route('establishments.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'establishment_created_successfully');
 
         $establishment = Establishment::query()->where('code', 'EST-001')->firstOrFail();
@@ -78,7 +78,7 @@ final class EstablishmentsCrudTest extends TestCase
                 'code' => 'EST-001',
                 'collaborator_ids' => [],
             ])
-            ->assertRedirect(route('establishments.index'))
+            ->assertRedirect(route('establishments.edit', $establishment))
             ->assertSessionHas('success', 'establishment_updated_successfully');
 
         $this->assertDatabaseHas('establishments', [

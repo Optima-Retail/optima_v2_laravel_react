@@ -42,7 +42,7 @@ final class IndirectCostTypesCrudTest extends TestCase
                 'code' => 'cie',
                 'color' => '#FF5733',
             ])
-            ->assertRedirect(route('config.indirect-cost-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'indirect_cost_type_created_successfully');
 
         $type = IndirectCostType::query()->where('code', 'CIE')->firstOrFail();
@@ -59,7 +59,7 @@ final class IndirectCostTypesCrudTest extends TestCase
                 'code' => 'CIE2',
                 'color' => '#33FF57',
             ])
-            ->assertRedirect(route('config.indirect-cost-types.index'))
+            ->assertRedirect(route('config.indirect-cost-types.edit', $type))
             ->assertSessionHas('success', 'indirect_cost_type_updated_successfully');
 
         $this->assertDatabaseHas('indirect_cost_types', [

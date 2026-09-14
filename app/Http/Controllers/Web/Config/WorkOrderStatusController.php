@@ -34,7 +34,7 @@ final class WorkOrderStatusController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'lifecycle',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -54,7 +54,7 @@ final class WorkOrderStatusController extends Controller
 
         $filters = TabulatorQuery::fromRequest(
             $request,
-            allowedSorts: ['id', 'name', 'kind', 'lifecycle', 'is_open'],
+            allowedSorts: ['id', 'name', 'kind', 'lifecycle', 'is_open', 'is_default', 'confirms_estimate', 'rejects_to_estimate', 'is_post_confirm_default', 'sets_sent_at'],
             defaultSort: 'lifecycle',
             defaultDirection: 'asc',
             filterKeys: ['search', 'kind'],
@@ -74,16 +74,10 @@ final class WorkOrderStatusController extends Controller
 
     public function store(StoreWorkOrderStatusRequest $request): RedirectResponse
     {
-        $this->workOrderStatuses->create([
-            'name' => $request->string('name')->toString(),
-            'kind' => $request->string('kind')->toString(),
-            'color' => $request->input('color'),
-            'lifecycle' => $request->input('lifecycle'),
-            'is_open' => $request->boolean('is_open'),
-        ]);
+        $record = $this->workOrderStatuses->create($request->validated());
 
         return redirect()
-            ->route('config.work-order-statuses.index')
+            ->route('config.work-order-statuses.edit', $record)
             ->with('success', 'work_order_status_created_successfully');
     }
 
@@ -93,6 +87,7 @@ final class WorkOrderStatusController extends Controller
 
         return Inertia::render('Config/WorkOrderStatuses/Edit', [
             'workOrderStatus' => $this->workOrderStatuses->toFormData($workOrderStatus),
+            'targetOptions' => $this->workOrderStatuses->targetOptions($workOrderStatus),
             'can' => [
                 'delete' => $request->user()?->can('delete', $workOrderStatus) ?? false,
             ],
@@ -101,16 +96,10 @@ final class WorkOrderStatusController extends Controller
 
     public function update(UpdateWorkOrderStatusRequest $request, WorkOrderStatus $workOrderStatus): RedirectResponse
     {
-        $this->workOrderStatuses->update($workOrderStatus, [
-            'name' => $request->string('name')->toString(),
-            'kind' => $request->string('kind')->toString(),
-            'color' => $request->input('color'),
-            'lifecycle' => $request->input('lifecycle'),
-            'is_open' => $request->boolean('is_open'),
-        ]);
+        $this->workOrderStatuses->update($workOrderStatus, $request->validated());
 
         return redirect()
-            ->route('config.work-order-statuses.index')
+            ->route('config.work-order-statuses.edit', $workOrderStatus)
             ->with('success', 'work_order_status_updated_successfully');
     }
 

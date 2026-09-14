@@ -2,6 +2,7 @@ import { FormEvent, useMemo, useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Ban, Plus, Save, Trash2, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
 import {
     defaultTechnicianRequestFormValues,
     TechnicianRequestForm,
@@ -12,6 +13,9 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { technicianRequestsService } from '@/services';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { DocumentChatPayload } from '@/support/types/domain/chat';
+import type { CompanyOption } from '@/support/types/domain/common';
 
 type Option = { id: number; label: string; color?: string | null; kind?: string };
 
@@ -62,12 +66,14 @@ type EditTechnicianRequestProps = {
     countryOptions: Option[];
     serviceTypeOptions: Option[];
     workOrderOptions: Option[];
-    technicianOptions: Option[];
+    technicianOptions: CompanyOption[];
+    chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
         cancel: boolean;
         create_screening: boolean;
         manage_technicians: boolean;
+        post_chat: boolean;
     };
 };
 
@@ -89,6 +95,7 @@ export default function EditTechnicianRequest({
     serviceTypeOptions,
     workOrderOptions,
     technicianOptions,
+    chat,
     can,
 }: EditTechnicianRequestProps) {
     const { t } = useTranslation();
@@ -124,9 +131,9 @@ export default function EditTechnicianRequest({
     const availableTechnicians = useMemo(() => {
         const attached = new Set(technicianRequest.technicians.map((item) => item.id));
 
-        return technicianOptions
-            .filter((option) => !attached.has(option.id))
-            .map((option) => ({ value: String(option.id), label: option.label }));
+        return toCompanySelectOptions(
+            technicianOptions.filter((option) => !attached.has(option.id)),
+        );
     }, [technicianOptions, technicianRequest.technicians]);
 
     function submit(event: FormEvent) {
@@ -207,7 +214,19 @@ export default function EditTechnicianRequest({
     }
 
     return (
-        <AppLayout title={t('common.editItem', { name: technicianRequest.code || technicianRequest.id })}>
+        <AppLayout
+            title={t('common.editItem', { name: technicianRequest.code || technicianRequest.id })}
+            aside={
+                chat ? (
+                    <DocumentChatPanel
+                        documentType="technician_request"
+                        documentId={technicianRequest.id}
+                        initialChat={chat}
+                        canPost={can.post_chat}
+                    />
+                ) : null
+            }
+        >
             <Head title={t('common.editItem', { name: technicianRequest.code || technicianRequest.id })} />
             <div className="w-full space-y-6">
                 <PageHeader

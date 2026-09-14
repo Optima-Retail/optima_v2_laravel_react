@@ -43,7 +43,7 @@ final class EstablishmentTypesCrudTest extends TestCase
                 'code' => 'store',
                 'health_and_safety_delay_days' => 5,
             ])
-            ->assertRedirect(route('config.establishment-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'establishment_type_created_successfully');
 
         $establishmentType = EstablishmentType::query()->where('code', 'store')->firstOrFail();
@@ -61,7 +61,7 @@ final class EstablishmentTypesCrudTest extends TestCase
                 'code' => 'store',
                 'health_and_safety_delay_days' => 5,
             ])
-            ->assertRedirect(route('config.establishment-types.index'))
+            ->assertRedirect(route('config.establishment-types.edit', $establishmentType))
             ->assertSessionHas('success', 'establishment_type_updated_successfully');
 
         $this->assertDatabaseHas('establishment_types', [

@@ -21,8 +21,9 @@ export const contractsService = {
         form.post(base);
     },
 
-    update(id: number, form: InertiaFormPoster) {
-        form.put(`${base}/${id}`);
+    update(id: number, form: InertiaFormPoster, tab?: string) {
+        const query = tab && tab !== 'details' ? `?tab=${encodeURIComponent(tab)}` : '';
+        form.put(`${base}/${id}${query}`);
     },
 
     destroy(id: number, options: Record<string, unknown> = {}) {

@@ -6,12 +6,12 @@ import { defaultEstablishmentFormValues, EstablishmentForm } from '@/components/
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { establishmentsService } from '@/services';
-import type { UserOption } from '@/support/types/domain/common';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import type { ProvinceOption } from '@/support/types/domain/province';
 
 type CreateEstablishmentProps = {
     defaultCompanyId: number | null;
-    companyOptions: UserOption[];
+    companyOptions: CompanyOption[];
     countryOptions: UserOption[];
     provinceOptions: ProvinceOption[];
     timezoneOptions: UserOption[];
@@ -20,6 +20,7 @@ type CreateEstablishmentProps = {
     establishmentTypeOptions: UserOption[];
     seriesOptions: UserOption[];
     userOptions: UserOption[];
+    technicianOptions: CompanyOption[];
 };
 
 export default function CreateEstablishment({
@@ -33,6 +34,7 @@ export default function CreateEstablishment({
     establishmentTypeOptions,
     seriesOptions,
     userOptions,
+    technicianOptions,
 }: CreateEstablishmentProps) {
     const { t } = useTranslation();
     const form = useForm(
@@ -71,6 +73,7 @@ export default function CreateEstablishment({
                     establishmentTypeOptions={establishmentTypeOptions}
                     seriesOptions={seriesOptions}
                     userOptions={userOptions}
+                    technicianOptions={technicianOptions}
                     onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.createItem', { resource: t('establishments.resource') })}

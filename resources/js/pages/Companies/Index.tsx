@@ -62,6 +62,28 @@ export default function CompaniesIndex({ filters, can }: CompaniesIndexProps) {
                 titleFormatter,
             },
             {
+                title: t('companies.logo'),
+                field: 'logo_url',
+                width: 72,
+                headerSort: false,
+                hozAlign: 'center',
+                formatter: (cell: CellComponent) => {
+                    const company = cell.getRow().getData() as CompanyListItem;
+                    const url = company.logo_url;
+
+                    if (!url) {
+                        return t('common.emDash');
+                    }
+
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = company.name;
+                    img.className = 'mx-auto size-8 rounded object-contain';
+
+                    return img;
+                },
+            },
+            {
                 title: t('common.name'),
                 field: 'name',
                 minWidth: 160,
@@ -185,7 +207,7 @@ export default function CompaniesIndex({ filters, can }: CompaniesIndexProps) {
                         column: filters.sort || 'name',
                         dir: filters.direction === 'desc' ? 'desc' : 'asc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         kind: filters.kind,

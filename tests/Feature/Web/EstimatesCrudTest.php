@@ -13,6 +13,7 @@ use App\Models\Establishment;
 use App\Models\User;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderStatus;
+use App\Models\WorkOrderStatusTransition;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -71,7 +72,10 @@ final class EstimatesCrudTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Estimates/Edit')
-                ->where('estimate.subject', 'Replace filter'));
+                ->where('estimate.subject', 'Replace filter')
+                ->where('estimate.status_is_open', true)
+                ->where('fields_locked', false)
+                ->where('can.update_closed', true));
 
         $this->actingAs($admin)
             ->put("/estimates/{$estimate->id}", [
@@ -128,6 +132,186 @@ final class EstimatesCrudTest extends TestCase
         $this->assertSame($received->id, $estimate->status_id);
         $this->assertNotNull($estimate->confirmed_at);
         $this->assertStringContainsString('viene de PR26/00001', (string) $estimate->subject);
+        $this->assertNotSame(7, $approved->id);
+        $this->assertNotSame(14, $received->id);
+    }
+
+    public function test_entering_sent_and_closed_statuses_stamps_dates_without_legacy_ids(): void
+    {
+        [$admin, $establishment, $pending] = $this->seedContext();
+        $sent = $this->makeStatus(606, WorkOrderStage::Estimate, 'Sent to client', 5, true, ['sets_sent_at' => true]);
+        $closed = $this->makeStatus(505, WorkOrderStage::Estimate, 'Closed estimate', 9, false);
+
+        $estimate = WorkOrder::factory()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $pending->id,
+            'stage' => WorkOrderStage::Estimate,
+            'subject' => 'Stamp dates',
+            'code' => 'EST-SENT',
+        ]);
+
+        $this->actingAs($admin)
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Stamp dates',
+                'status_id' => $sent->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'EST-SENT',
+            ])
+            ->assertRedirect(route('estimates.edit', $estimate));
+
+        $estimate->refresh();
+        $this->assertNotNull($estimate->sent_at);
+        $this->assertNull($estimate->closed_at);
+        $this->assertNotSame(5, $sent->id);
+
+        $this->actingAs($admin)
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Stamp dates',
+                'status_id' => $closed->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'EST-SENT',
+            ])
+            ->assertRedirect(route('estimates.edit', $estimate));
+
+        $estimate->refresh();
+        $this->assertNotNull($estimate->closed_at);
+
+        $this->actingAs($admin)
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Stamp dates reopened',
+                'status_id' => $pending->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'EST-SENT',
+            ])
+            ->assertRedirect(route('estimates.edit', $estimate));
+
+        $estimate->refresh();
+        $this->assertNull($estimate->closed_at);
+        $this->assertSame('Stamp dates reopened', $estimate->subject);
+    }
+
+    public function test_closed_estimate_rejects_field_changes_without_update_closed(): void
+    {
+        [$admin, $establishment, $pending, , , , $company] = $this->seedContext();
+        $closed = $this->makeStatus(505, WorkOrderStage::Estimate, 'Closed estimate', 9, false);
+
+        $estimate = WorkOrder::factory()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $closed->id,
+            'stage' => WorkOrderStage::Estimate,
+            'subject' => 'Locked quote',
+            'code' => 'EST-LOCK',
+        ]);
+
+        $editor = User::factory()->create();
+        $editor->givePermissionTo(['estimates.view', 'estimates.update', 'estimates.create']);
+        $this->attachToCompany($editor, $company);
+
+        $this->actingAs($editor)
+            ->from("/estimates/{$estimate->id}/edit")
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Hacked subject',
+                'status_id' => $closed->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'EST-LOCK',
+            ])
+            ->assertRedirect("/estimates/{$estimate->id}/edit")
+            ->assertSessionHasErrors('subject');
+
+        $estimate->refresh();
+        $this->assertSame('Locked quote', $estimate->subject);
+
+        $this->actingAs($editor)
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Locked quote',
+                'status_id' => $pending->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'EST-LOCK',
+            ])
+            ->assertRedirect(route('estimates.edit', $estimate));
+
+        $estimate->refresh();
+        $this->assertSame($pending->id, $estimate->status_id);
+        $this->assertSame('Locked quote', $estimate->subject);
+
+        $this->actingAs($admin)
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Admin can edit closed',
+                'status_id' => $closed->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'EST-LOCK',
+            ])
+            ->assertRedirect(route('estimates.edit', $estimate));
+
+        $estimate->refresh();
+        $this->assertSame('Admin can edit closed', $estimate->subject);
+    }
+
+    public function test_forbidden_status_transition_is_rejected_and_justification_is_required(): void
+    {
+        [$admin, $establishment, $pending] = $this->seedContext();
+        $sent = $this->makeStatus(606, WorkOrderStage::Estimate, 'Sent to client', 5, true, ['sets_sent_at' => true]);
+        $other = $this->makeStatus(707, WorkOrderStage::Estimate, 'Other estimate', 8, true);
+
+        WorkOrderStatusTransition::query()->create([
+            'from_status_id' => $pending->id,
+            'to_status_id' => $sent->id,
+            'requires_confirmation' => false,
+            'requires_justification' => true,
+        ]);
+
+        $estimate = WorkOrder::factory()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $pending->id,
+            'stage' => WorkOrderStage::Estimate,
+            'subject' => 'Transition check',
+            'code' => 'EST-TR',
+        ]);
+
+        $this->actingAs($admin)
+            ->from("/estimates/{$estimate->id}/edit")
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Transition check',
+                'status_id' => $other->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'EST-TR',
+            ])
+            ->assertRedirect("/estimates/{$estimate->id}/edit")
+            ->assertSessionHasErrors('status_id');
+
+        $this->actingAs($admin)
+            ->from("/estimates/{$estimate->id}/edit")
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Transition check',
+                'status_id' => $sent->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'EST-TR',
+            ])
+            ->assertRedirect("/estimates/{$estimate->id}/edit")
+            ->assertSessionHasErrors('status_justification');
+
+        $this->actingAs($admin)
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Transition check',
+                'status_id' => $sent->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'EST-TR',
+                'status_justification' => 'Client asked to send this quote.',
+            ])
+            ->assertRedirect(route('estimates.edit', $estimate));
+
+        $estimate->refresh();
+        $this->assertSame($sent->id, $estimate->status_id);
+        $this->assertNotNull($estimate->sent_at);
     }
 
     public function test_estimate_routes_reject_confirmed_work_orders(): void
@@ -159,7 +343,7 @@ final class EstimatesCrudTest extends TestCase
     }
 
     /**
-     * @return array{0: User, 1: Establishment, 2: WorkOrderStatus, 3: WorkOrderStatus, 4: WorkOrderStatus, 5: WorkOrderStatus}
+     * @return array{0: User, 1: Establishment, 2: WorkOrderStatus, 3: WorkOrderStatus, 4: WorkOrderStatus, 5: WorkOrderStatus, 6: Company}
      */
     private function seedContext(): array
     {
@@ -177,32 +361,36 @@ final class EstimatesCrudTest extends TestCase
         ]);
 
         $pending = $this->makeStatus(
-            WorkOrder::DEFAULT_ESTIMATE_STATUS_ID,
+            101,
             WorkOrderStage::Estimate,
             'Pendiente',
             1,
             true,
+            ['is_default' => true],
         );
         $approved = $this->makeStatus(
-            WorkOrder::APPROVED_ESTIMATE_STATUS_ID,
+            202,
             WorkOrderStage::Estimate,
             'Aprobado',
             6,
             false,
+            ['confirms_estimate' => true],
         );
         $received = $this->makeStatus(
-            WorkOrder::DEFAULT_CONFIRMED_STATUS_ID,
+            303,
             WorkOrderStage::WorkOrder,
             'Recibida - OK por Organizar',
             2,
             true,
+            ['is_post_confirm_default' => true],
         );
         $rejected = $this->makeStatus(
-            WorkOrder::REJECTED_TO_ESTIMATE_STATUS_ID,
+            404,
             WorkOrderStage::WorkOrder,
             'Rechazada - Presupuesto',
             2,
             false,
+            ['rejects_to_estimate' => true],
         );
 
         $establishment = Establishment::query()->create([
@@ -211,15 +399,19 @@ final class EstimatesCrudTest extends TestCase
             'code' => 'S1',
         ]);
 
-        return [$admin, $establishment, $pending, $approved, $received, $rejected];
+        return [$admin, $establishment, $pending, $approved, $received, $rejected, $company];
     }
 
+    /**
+     * @param  array<string, bool>  $flags
+     */
     private function makeStatus(
         int $id,
         WorkOrderStage $kind,
         string $name,
         int $lifecycle,
         bool $isOpen,
+        array $flags = [],
     ): WorkOrderStatus {
         $status = new WorkOrderStatus;
         $status->forceFill([
@@ -228,6 +420,11 @@ final class EstimatesCrudTest extends TestCase
             'kind' => $kind,
             'lifecycle' => $lifecycle,
             'is_open' => $isOpen,
+            'is_default' => $flags['is_default'] ?? false,
+            'confirms_estimate' => $flags['confirms_estimate'] ?? false,
+            'rejects_to_estimate' => $flags['rejects_to_estimate'] ?? false,
+            'is_post_confirm_default' => $flags['is_post_confirm_default'] ?? false,
+            'sets_sent_at' => $flags['sets_sent_at'] ?? false,
         ])->save();
 
         return $status;

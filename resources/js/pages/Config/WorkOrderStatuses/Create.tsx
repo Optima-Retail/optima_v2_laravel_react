@@ -15,6 +15,16 @@ export default function CreateWorkOrderStatus() {
         color: '#a9cef0',
         lifecycle: 1,
         is_open: true,
+        is_default: false,
+        confirms_estimate: false,
+        rejects_to_estimate: false,
+        is_post_confirm_default: false,
+        sets_sent_at: false,
+        transitions: [] as Array<{
+            to_status_id: string;
+            requires_confirmation: boolean;
+            requires_justification: boolean;
+        }>,
     });
 
     function submit(event: FormEvent) {

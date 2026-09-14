@@ -45,7 +45,7 @@ final class GlobalServiceTypesCrudTest extends TestCase
                 'code' => 'OBRAS',
                 'color' => '#fcba03',
             ])
-            ->assertRedirect(route('config.global-service-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'global_service_type_created_successfully');
 
         $type = GlobalServiceType::query()->where('code', 'OBRAS')->firstOrFail();
@@ -63,7 +63,7 @@ final class GlobalServiceTypesCrudTest extends TestCase
                 'code' => 'OBRAS',
                 'color' => '#fcba03',
             ])
-            ->assertRedirect(route('config.global-service-types.index'))
+            ->assertRedirect(route('config.global-service-types.edit', $type))
             ->assertSessionHas('success', 'global_service_type_updated_successfully');
 
         $this->assertDatabaseHas('global_service_types', [

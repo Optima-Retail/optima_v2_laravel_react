@@ -56,6 +56,7 @@ export default function ComplimentTypesIndex({ filters, can }: ComplimentTypesIn
                 field: 'id',
                 width: 88,
                 headerSort: true,
+                cssClass: 'cell-muted',
                 titleFormatter,
             },
             {
@@ -126,22 +127,23 @@ export default function ComplimentTypesIndex({ filters, can }: ComplimentTypesIn
         <AppLayout title={t('complimentTypes.title')}>
             <Head title={t('complimentTypes.title')} />
             <div className="space-y-6">
-                <TypesConfigTabs activeId="compliment" />
                 <PageHeader
-                    title={t('complimentTypes.title')}
+                    title={t('nav.types')}
                     description={t('complimentTypes.description')}
                     actions={
                         can.create ? (
                             <Link
                                 href={complimentTypesService.createPath}
-                                className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-3 text-sm font-medium text-white"
+                                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
                             >
-                                <Plus className="size-4" aria-hidden />
+                                <Plus className="size-3.5" aria-hidden />
                                 {t('common.newItem', { resource: t('complimentTypes.resource') })}
                             </Link>
                         ) : null
                     }
                 />
+
+                <TypesConfigTabs activeId="compliment" />
 
                 <RemoteDataTable<ComplimentTypeListItem>
                     ref={tableRef}
@@ -151,7 +153,7 @@ export default function ComplimentTypesIndex({ filters, can }: ComplimentTypesIn
                         column: filters.sort || 'name',
                         dir: filters.direction === 'desc' ? 'desc' : 'asc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                     }}

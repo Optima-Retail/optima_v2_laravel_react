@@ -4,14 +4,18 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
+use App\Models\Concerns\CreatesDocumentChat;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Incident extends Model
 {
+    use CreatesDocumentChat;
     use SoftDeletes;
 
     /**
@@ -149,5 +153,18 @@ class Incident extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(IncidentLine::class);
+    }
+
+    /**
+     * @return HasOne<IncidentChat, $this>
+     */
+    public function chat(): HasOne
+    {
+        return $this->hasOne(IncidentChat::class);
+    }
+
+    public function chatDocumentType(): ChatDocumentType
+    {
+        return ChatDocumentType::Incident;
     }
 }

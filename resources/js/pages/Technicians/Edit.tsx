@@ -2,6 +2,7 @@ import { FormEvent } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
 import { PageHeader } from '@/components/page/PageHeader';
 import { RelationshipForm } from '@/components/relationships/RelationshipForm';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +10,7 @@ import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { techniciansService } from '@/services';
 import { relationshipFormValuesFromData } from '@/support/relationshipForm';
+import type { DocumentChatPayload } from '@/support/types/domain/chat';
 import type { UserOption } from '@/support/types/domain/common';
 import type { CompanyRelationshipFormData, RelationshipFormOptions } from '@/support/types/domain/company-relationship';
 
@@ -18,9 +20,11 @@ type EditTechnicianProps = {
     formOptions: RelationshipFormOptions;
     initialTab?: string;
     selectedIncidentId?: number | null;
+    chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
         viewIncidents?: boolean;
+        post_chat: boolean;
     };
 };
 
@@ -30,6 +34,7 @@ export default function EditTechnician({
     formOptions,
     initialTab = 'general',
     selectedIncidentId = null,
+    chat,
     can,
 }: EditTechnicianProps) {
     const { t } = useTranslation();
@@ -57,7 +62,19 @@ export default function EditTechnician({
     }
 
     return (
-        <AppLayout title={t('common.editResource', { resource: t('technicians.resource') })}>
+        <AppLayout
+            title={t('common.editResource', { resource: t('technicians.resource') })}
+            aside={
+                chat ? (
+                    <DocumentChatPanel
+                        documentType="technician"
+                        documentId={relationship.id}
+                        initialChat={chat}
+                        canPost={can.post_chat}
+                    />
+                ) : null
+            }
+        >
             <Head title={t('common.editItem', { name: displayName })} />
             <div className="w-full space-y-6">
                 <PageHeader

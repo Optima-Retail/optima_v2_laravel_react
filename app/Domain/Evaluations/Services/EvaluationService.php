@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domain\Evaluations\Services;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyMemberUsers;
+use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
 use App\Models\Company;
 use App\Models\Establishment;
 use App\Models\Evaluation;
@@ -17,6 +19,10 @@ use Illuminate\Support\Str;
 
 final class EvaluationService
 {
+    public function __construct(
+        private readonly StatusChangeHistoryService $statusChanges,
+    ) {}
+
     /**
      * Client company IDs linked to the owner (kind = customer).
      *
@@ -38,7 +44,13 @@ final class EvaluationService
      *
      * @return list<array{id: int, label: string, company_id: int}>
      */
-    public function establishmentOptions(Company $owner): array
+    /**
+     * Active establishments for selects. Keep `$includeIds` so edit still shows saved inactive values.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, company_id: int}>
+     */
+    public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
         $ids = $this->accessibleCompanyIds($owner);
 
@@ -46,8 +58,20 @@ final class EvaluationService
             return [];
         }
 
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
         return Establishment::query()
             ->whereIn('company_id', $ids)
+            ->where(function ($query) use ($includeIds): void {
+                $query->where('is_active', true);
+
+                if ($includeIds !== []) {
+                    $query->orWhereIn('id', $includeIds);
+                }
+            })
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'company_id'])
             ->map(fn (Establishment $establishment): array => [
@@ -192,6 +216,13 @@ final class EvaluationService
 
             $evaluation = Evaluation::query()->create($attributes);
 
+            $this->statusChanges->record(
+                ChatDocumentType::Evaluation,
+                (int) $evaluation->id,
+                null,
+                $evaluation->evaluation_status_id !== null ? (int) $evaluation->evaluation_status_id : null,
+            );
+
             return $evaluation->load(['establishment', 'status', 'responsibleUser']);
         });
     }
@@ -202,9 +233,22 @@ final class EvaluationService
     public function update(Evaluation $evaluation, array $data): Evaluation
     {
         return DB::transaction(function () use ($evaluation, $data): Evaluation {
+            $oldStatusId = $evaluation->evaluation_status_id !== null
+                ? (int) $evaluation->evaluation_status_id
+                : null;
+
             $evaluation->update($this->attributes($data));
 
-            return $evaluation->fresh(['establishment', 'status', 'responsibleUser']) ?? $evaluation;
+            $fresh = $evaluation->fresh(['establishment', 'status', 'responsibleUser']) ?? $evaluation;
+
+            $this->statusChanges->record(
+                ChatDocumentType::Evaluation,
+                (int) $fresh->id,
+                $oldStatusId,
+                $fresh->evaluation_status_id !== null ? (int) $fresh->evaluation_status_id : null,
+            );
+
+            return $fresh;
         });
     }
 

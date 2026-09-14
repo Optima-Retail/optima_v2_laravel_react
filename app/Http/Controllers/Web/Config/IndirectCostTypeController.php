@@ -33,7 +33,7 @@ final class IndirectCostTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class IndirectCostTypeController extends Controller
 
     public function store(StoreIndirectCostTypeRequest $request): RedirectResponse
     {
-        $this->indirectCostTypes->create($request->validated());
+        $record = $this->indirectCostTypes->create($request->validated());
 
         return redirect()
-            ->route('config.indirect-cost-types.index')
+            ->route('config.indirect-cost-types.edit', $record)
             ->with('success', 'indirect_cost_type_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class IndirectCostTypeController extends Controller
         $this->indirectCostTypes->update($indirectCostType, $request->validated());
 
         return redirect()
-            ->route('config.indirect-cost-types.index')
+            ->route('config.indirect-cost-types.edit', $indirectCostType)
             ->with('success', 'indirect_cost_type_updated_successfully');
     }
 

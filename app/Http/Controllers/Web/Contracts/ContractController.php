@@ -8,6 +8,8 @@ use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\Config\NumberingPatterns\Services\NumberingPatternService;
 use App\Domain\Contracts\Services\ContractAttachmentService;
 use App\Domain\Contracts\Services\ContractService;
+use App\Domain\WorkOrders\Enums\WorkOrderStage;
+use App\Domain\WorkOrders\Services\WorkOrderService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Contracts\StoreContractAttachmentRequest;
@@ -17,6 +19,7 @@ use App\Models\Contract;
 use App\Models\ContractAttachment;
 use App\Models\ContractStatus;
 use App\Models\NumberingPattern;
+use App\Models\WorkOrder;
 use App\Support\ListQuery;
 use App\Support\TabulatorQuery;
 use App\Support\TabulatorResponse;
@@ -36,6 +39,7 @@ final class ContractController extends Controller
         private readonly ContractService $contracts,
         private readonly ContractAttachmentService $attachments,
         private readonly NumberingPatternService $numberingPatterns,
+        private readonly WorkOrderService $workOrders,
     ) {}
 
     public function index(Request $request): Response
@@ -50,7 +54,7 @@ final class ContractController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -122,10 +126,10 @@ final class ContractController extends Controller
     public function store(StoreContractRequest $request): RedirectResponse
     {
         $owner = $this->activeCompany($request);
-        $this->contracts->create($owner, $request->validated());
+        $record = $this->contracts->create($owner, $request->validated());
 
         return redirect()
-            ->route('contracts.index')
+            ->route('contracts.edit', $record)
             ->with('success', 'contract_created_successfully');
     }
 
@@ -136,19 +140,29 @@ final class ContractController extends Controller
         $owner = $this->activeCompany($request);
         $user = $request->user();
         $canViewAttachments = $user?->can('viewAttachments', $contract) ?? false;
+        $canViewWorkOrders = $user?->can('viewAny', WorkOrder::class) ?? false;
 
         return Inertia::render('Contracts/Edit', [
             'contract' => $this->contracts->toFormData($contract),
             'attachments' => $canViewAttachments
                 ? $this->attachments->listForContract($contract)
                 : [],
-            'companyOptions' => $this->contracts->clientCompanyOptions($owner),
+            'workOrderTotals' => $canViewWorkOrders
+                ? $this->workOrders->totalsForContract($owner, (int) $contract->id, WorkOrderStage::WorkOrder)
+                : null,
+            'companyOptions' => $this->contracts->clientCompanyOptions(
+                $owner,
+                $contract->company_id !== null ? (int) $contract->company_id : null,
+            ),
             'contractStatusOptions' => $this->contracts->contractStatusOptions(
                 $contract->contract_status_id !== null ? (int) $contract->contract_status_id : null,
             ),
             'languageOptions' => $this->contracts->languageOptions(),
             'userOptions' => $this->contracts->userOptions($owner),
-            'establishmentOptions' => $this->contracts->establishmentOptions($owner),
+            'establishmentOptions' => $this->contracts->establishmentOptions(
+                $owner,
+                $contract->establishments->pluck('id')->map(fn ($id) => (int) $id)->all(),
+            ),
             'workOrderTypeOptions' => $this->contracts->workOrderTypeOptions(),
             'formTemplateOptions' => $this->contracts->formTemplateOptions($owner),
             'can' => [
@@ -157,6 +171,10 @@ final class ContractController extends Controller
                 'upload_attachments' => $user?->can('uploadAttachments', $contract) ?? false,
                 'download_attachments' => $user?->can('downloadAttachments', $contract) ?? false,
                 'delete_attachments' => $user?->can('deleteAttachments', $contract) ?? false,
+                'view_work_orders' => $canViewWorkOrders,
+                'create_work_orders' => $user?->can('create', WorkOrder::class) ?? false,
+                'update_work_orders' => $user?->can('work_orders.update') ?? false,
+                'delete_work_orders' => $user?->can('work_orders.delete') ?? false,
             ],
         ]);
     }
@@ -165,8 +183,13 @@ final class ContractController extends Controller
     {
         $this->contracts->update($contract, $request->validated());
 
+        $tab = $request->string('tab')->trim()->toString();
+
         return redirect()
-            ->route('contracts.index')
+            ->route('contracts.edit', array_filter([
+                'contract' => $contract,
+                'tab' => $tab !== '' && $tab !== 'details' ? $tab : null,
+            ]))
             ->with('success', 'contract_updated_successfully');
     }
 
@@ -195,11 +218,11 @@ final class ContractController extends Controller
             ->with('success', 'contract_attachment_uploaded_successfully');
     }
 
-    public function downloadAttachment(Contract $contract, ContractAttachment $attachment): StreamedResponse
+    public function downloadAttachment(Contract $contract, ContractAttachment $attachment, Request $request): StreamedResponse
     {
         $this->authorize('downloadAttachments', $contract);
 
-        return $this->attachments->stream($contract, $attachment);
+        return $this->attachments->stream($contract, $attachment, $request->boolean('inline'));
     }
 
     public function destroyAttachment(Contract $contract, ContractAttachment $attachment): RedirectResponse

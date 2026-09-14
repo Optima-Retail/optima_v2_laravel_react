@@ -2,35 +2,44 @@ import { FormEvent, useMemo, useState } from 'react';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { WorkOrderAttachmentsPanel } from '@/components/work-orders/WorkOrderAttachmentsPanel';
 import { defaultWorkOrderFormValues, WorkOrderForm } from '@/components/work-orders/WorkOrderForm';
 import { confirmAction } from '@/helpers/confirm';
+import { confirmWorkOrderStatusChange } from '@/helpers/workOrderStatusChange';
 import { AppLayout } from '@/layouts/AppLayout';
 import { estimatesService } from '@/services';
+import type { DocumentChatPayload } from '@/support/types/domain/chat';
 import type { UserOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type { WorkOrderAttachmentItem, WorkOrderFormData } from '@/support/types/domain/work-order';
+import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
 
 type EditEstimateProps = {
     estimate: WorkOrderFormData;
     attachments: WorkOrderAttachmentItem[];
-    statusOptions: UserOption[];
+    statusOptions: WorkOrderStatusOption[];
     typeOptions: UserOption[];
     priorityOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
+    contractOptions: UserOption[];
     requesterOptions: UserOption[];
     technicianOptions: UserOption[];
     articleOptions: UserOption[];
+    fields_locked?: boolean;
+    chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
+        update_closed: boolean;
         view_attachments: boolean;
         upload_attachments: boolean;
         download_attachments: boolean;
         delete_attachments: boolean;
+        post_chat: boolean;
     };
 };
 
@@ -53,10 +62,13 @@ export default function EditEstimate({
     priorityOptions,
     userOptions,
     establishmentOptions,
+    contractOptions,
     requesterOptions,
     technicianOptions,
     articleOptions,
+    chat,
     can,
+    fields_locked = false,
 }: EditEstimateProps) {
     const { t } = useTranslation();
     const { url } = usePage();
@@ -77,6 +89,7 @@ export default function EditEstimate({
             client_priority_id: estimate.client_priority_id ? String(estimate.client_priority_id) : '',
             is_urgent: estimate.is_urgent,
             establishment_id: estimate.establishment_id ? String(estimate.establishment_id) : '',
+            contract_id: estimate.contract_id ? String(estimate.contract_id) : '',
             responsible_user_id: estimate.responsible_user_id ? String(estimate.responsible_user_id) : '',
             requester_id: estimate.requester_id ? String(estimate.requester_id) : '',
             notes: estimate.notes ?? '',
@@ -120,18 +133,21 @@ export default function EditEstimate({
     async function submit(event: FormEvent) {
         event.preventDefault();
 
-        if (form.data.status_id === '7') {
-            const confirmed = await confirmAction({
-                title: t('estimates.approveTitle'),
-                message: t('estimates.approveMessage'),
-                confirmLabel: t('estimates.approveConfirm'),
-            });
+        const result = await confirmWorkOrderStatusChange({
+            t,
+            statusOptions,
+            currentStatusId: estimate.status_id ? String(estimate.status_id) : '',
+            nextStatusId: form.data.status_id,
+        });
 
-            if (!confirmed) {
-                return;
-            }
+        if (!result.confirmed) {
+            return;
         }
 
+        form.transform((data) => ({
+            ...data,
+            status_justification: result.justification || null,
+        }));
         estimatesService.update(estimate.id, form);
     }
 
@@ -153,7 +169,19 @@ export default function EditEstimate({
     }
 
     return (
-        <AppLayout title={t('common.editResource', { resource: t('estimates.resource') })}>
+        <AppLayout
+            title={t('common.editResource', { resource: t('estimates.resource') })}
+            aside={
+                chat ? (
+                    <DocumentChatPanel
+                        documentType="work_order"
+                        documentId={estimate.id}
+                        initialChat={chat}
+                        canPost={can.post_chat}
+                    />
+                ) : null
+            }
+        >
             <Head
                 title={t('common.editItem', {
                     name: estimate.subject || estimate.code || estimate.id,
@@ -177,11 +205,13 @@ export default function EditEstimate({
                             errors={form.errors}
                             processing={form.processing}
                             stageLocked
+                            fieldsLocked={fields_locked || (estimate.status_is_open === false && !can.update_closed)}
                             statusOptions={statusOptions}
                             typeOptions={typeOptions}
                             priorityOptions={priorityOptions}
                             userOptions={userOptions}
                             establishmentOptions={establishmentOptions}
+                            contractOptions={contractOptions}
                             requesterOptions={requesterOptions}
                             technicianOptions={technicianOptions}
                             articleOptions={articleOptions}

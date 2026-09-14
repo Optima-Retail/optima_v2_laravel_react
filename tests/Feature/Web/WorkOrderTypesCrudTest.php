@@ -47,7 +47,7 @@ final class WorkOrderTypesCrudTest extends TestCase
                 'code' => 'T07',
                 'color' => '#FFE897',
             ])
-            ->assertRedirect(route('config.work-order-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'work_order_type_created_successfully');
 
         $type = WorkOrderType::query()->where('code', 'T07')->firstOrFail();
@@ -78,7 +78,7 @@ final class WorkOrderTypesCrudTest extends TestCase
                 'code' => 'T07',
                 'color' => '#FFE897',
             ])
-            ->assertRedirect(route('config.work-order-types.index'))
+            ->assertRedirect(route('config.work-order-types.edit', $type))
             ->assertSessionHas('success', 'work_order_type_updated_successfully');
 
         $this->assertDatabaseHas('work_order_types', [
@@ -132,7 +132,7 @@ final class WorkOrderTypesCrudTest extends TestCase
                 'color' => '#2563eb',
                 'service_type_ids' => [$electric->id, $plumbing->id],
             ])
-            ->assertRedirect(route('config.work-order-types.index'))
+            ->assertRedirect(route('config.work-order-types.edit', $type))
             ->assertSessionHas('success', 'work_order_type_updated_successfully');
 
         $this->assertDatabaseHas('work_order_type_service_types', [
@@ -159,7 +159,7 @@ final class WorkOrderTypesCrudTest extends TestCase
                 'color' => '#2563eb',
                 'service_type_ids' => [$electric->id],
             ])
-            ->assertRedirect(route('config.work-order-types.index'));
+            ->assertRedirect(route('config.work-order-types.edit', $type));
 
         $this->assertDatabaseHas('work_order_type_service_types', [
             'work_order_type_id' => $type->id,

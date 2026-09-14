@@ -33,7 +33,7 @@ final class EstablishmentTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -71,10 +71,10 @@ final class EstablishmentTypeController extends Controller
 
     public function store(StoreEstablishmentTypeRequest $request): RedirectResponse
     {
-        $this->establishmentTypes->create($request->validated());
+        $record = $this->establishmentTypes->create($request->validated());
 
         return redirect()
-            ->route('config.establishment-types.index')
+            ->route('config.establishment-types.edit', $record)
             ->with('success', 'establishment_type_created_successfully');
     }
 
@@ -95,7 +95,7 @@ final class EstablishmentTypeController extends Controller
         $this->establishmentTypes->update($establishmentType, $request->validated());
 
         return redirect()
-            ->route('config.establishment-types.index')
+            ->route('config.establishment-types.edit', $establishmentType)
             ->with('success', 'establishment_type_updated_successfully');
     }
 

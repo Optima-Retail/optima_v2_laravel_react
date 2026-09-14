@@ -33,7 +33,7 @@ final class CostCenterController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class CostCenterController extends Controller
 
     public function store(StoreCostCenterRequest $request): RedirectResponse
     {
-        $this->costCenters->create($request->validated());
+        $record = $this->costCenters->create($request->validated());
 
         return redirect()
-            ->route('config.cost-centers.index')
+            ->route('config.cost-centers.edit', $record)
             ->with('success', 'cost_center_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class CostCenterController extends Controller
         $this->costCenters->update($costCenter, $request->validated());
 
         return redirect()
-            ->route('config.cost-centers.index')
+            ->route('config.cost-centers.edit', $costCenter)
             ->with('success', 'cost_center_updated_successfully');
     }
 

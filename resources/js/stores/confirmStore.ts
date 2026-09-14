@@ -9,24 +9,45 @@ export type ConfirmOptions = {
     confirmLabel?: string;
     cancelLabel?: string;
     tone?: ConfirmTone;
+    requireComment?: boolean;
+    minCommentLength?: number;
+    commentLabel?: string;
+    commentPlaceholder?: string;
 };
 
-type ConfirmState = {
+export type ConfirmResult = {
+    confirmed: boolean;
+    comment: string;
+};
+
+type NormalizedConfirmOptions = Required<
+    Pick<
+        ConfirmOptions,
+        | 'title'
+        | 'message'
+        | 'confirmLabel'
+        | 'cancelLabel'
+        | 'tone'
+        | 'requireComment'
+        | 'minCommentLength'
+        | 'commentLabel'
+        | 'commentPlaceholder'
+    >
+>;
+
+type ConfirmState = NormalizedConfirmOptions & {
     open: boolean;
-    title: string;
-    message: string;
-    confirmLabel: string;
-    cancelLabel: string;
-    tone: ConfirmTone;
-    resolve: ((confirmed: boolean) => void) | null;
-    ask: (options: string | ConfirmOptions) => Promise<boolean>;
-    close: (confirmed: boolean) => void;
+    resolve: ((result: ConfirmResult) => void) | null;
+    ask: (options: string | ConfirmOptions) => Promise<ConfirmResult>;
+    close: (confirmed: boolean, comment?: string) => void;
 };
 
-function normalizeOptions(options: string | ConfirmOptions): Required<ConfirmOptions> {
+function normalizeOptions(options: string | ConfirmOptions): NormalizedConfirmOptions {
     const confirmLabel = i18n.t('common.confirm');
     const cancelLabel = i18n.t('common.cancel');
     const title = i18n.t('confirm.title');
+    const commentLabel = i18n.t('confirm.commentLabel');
+    const commentPlaceholder = i18n.t('confirm.commentPlaceholder');
 
     if (typeof options === 'string') {
         return {
@@ -35,6 +56,10 @@ function normalizeOptions(options: string | ConfirmOptions): Required<ConfirmOpt
             confirmLabel,
             cancelLabel,
             tone: 'danger',
+            requireComment: false,
+            minCommentLength: 0,
+            commentLabel,
+            commentPlaceholder,
         };
     }
 
@@ -44,6 +69,10 @@ function normalizeOptions(options: string | ConfirmOptions): Required<ConfirmOpt
         confirmLabel: options.confirmLabel ?? confirmLabel,
         cancelLabel: options.cancelLabel ?? cancelLabel,
         tone: options.tone ?? 'danger',
+        requireComment: Boolean(options.requireComment),
+        minCommentLength: options.minCommentLength ?? (options.requireComment ? 10 : 0),
+        commentLabel: options.commentLabel ?? commentLabel,
+        commentPlaceholder: options.commentPlaceholder ?? commentPlaceholder,
     };
 }
 
@@ -54,12 +83,16 @@ export const useConfirmStore = create<ConfirmState>((set, get) => ({
     confirmLabel: '',
     cancelLabel: '',
     tone: 'danger',
+    requireComment: false,
+    minCommentLength: 0,
+    commentLabel: '',
+    commentPlaceholder: '',
     resolve: null,
     ask: (options) =>
-        new Promise<boolean>((resolve) => {
+        new Promise<ConfirmResult>((resolve) => {
             const current = get().resolve;
             if (current) {
-                current(false);
+                current({ confirmed: false, comment: '' });
             }
 
             const normalized = normalizeOptions(options);
@@ -70,12 +103,15 @@ export const useConfirmStore = create<ConfirmState>((set, get) => ({
                 resolve,
             });
         }),
-    close: (confirmed) => {
+    close: (confirmed, comment = '') => {
         const { resolve } = get();
         set({
             open: false,
             resolve: null,
         });
-        resolve?.(confirmed);
+        resolve?.({
+            confirmed,
+            comment: confirmed ? comment : '',
+        });
     },
 }));

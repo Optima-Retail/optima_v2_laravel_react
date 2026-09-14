@@ -123,7 +123,7 @@ final class EvaluationsCrudTest extends TestCase
                 'facility_question' => 'Updated facility question',
                 'technician_question' => 'Updated technician question',
             ])
-            ->assertRedirect(route('evaluations.index'))
+            ->assertRedirect(route('evaluations.edit', $evaluation))
             ->assertSessionHas('success', 'evaluation_updated_successfully');
 
         $this->assertDatabaseHas('evaluations', [

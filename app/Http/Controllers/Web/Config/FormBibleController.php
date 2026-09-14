@@ -34,7 +34,7 @@ final class FormBibleController extends Controller
                 'sort' => $request->string('sort')->trim()->toString() ?: 'name',
                 'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
                 'per_page' => (string) ListQuery::perPage([
-                    'per_page' => $request->integer('per_page', 12),
+                    'per_page' => $request->integer('per_page', 25),
                 ]),
             ],
             'can' => [
@@ -71,10 +71,10 @@ final class FormBibleController extends Controller
 
     public function store(StoreFormBibleRequest $request): RedirectResponse
     {
-        $this->formBibles->create(['name' => $request->string('name')->toString()]);
+        $record = $this->formBibles->create(['name' => $request->string('name')->toString()]);
 
         return redirect()
-            ->route('config.form-bibles.index')
+            ->route('config.form-bibles.edit', $record)
             ->with('success', 'form_bible_created_successfully');
     }
 
@@ -95,7 +95,7 @@ final class FormBibleController extends Controller
         $this->formBibles->update($formBible, ['name' => $request->string('name')->toString()]);
 
         return redirect()
-            ->route('config.form-bibles.index')
+            ->route('config.form-bibles.edit', $formBible)
             ->with('success', 'form_bible_updated_successfully');
     }
 

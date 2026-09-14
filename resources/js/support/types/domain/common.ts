@@ -6,3 +6,8 @@ export type UserOption = {
     /** When false, option is inactive (kept only to display a saved value). */
     is_open?: boolean;
 };
+
+/** Option shape for company pickers (SearchableSelect / MultiSelect). */
+export type CompanyOption = UserOption & {
+    logo_url?: string | null;
+};

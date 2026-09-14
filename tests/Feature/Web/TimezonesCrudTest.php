@@ -44,7 +44,7 @@ final class TimezonesCrudTest extends TestCase
                 'name' => 'Europe/Madrid',
                 'timezone' => 'Europe/Madrid',
             ])
-            ->assertRedirect(route('config.timezones.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'timezone_created_successfully');
 
         $timezone = Timezone::query()->where('timezone', 'Europe/Madrid')->firstOrFail();
@@ -74,7 +74,7 @@ final class TimezonesCrudTest extends TestCase
                 'name' => 'Europe/Madrid (Spain)',
                 'timezone' => 'Europe/Madrid',
             ])
-            ->assertRedirect(route('config.timezones.index'))
+            ->assertRedirect(route('config.timezones.edit', $timezone))
             ->assertSessionHas('success', 'timezone_updated_successfully');
 
         $this->assertDatabaseHas('timezones', [

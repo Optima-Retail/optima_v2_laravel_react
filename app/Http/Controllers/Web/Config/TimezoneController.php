@@ -33,7 +33,7 @@ final class TimezoneController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class TimezoneController extends Controller
 
     public function store(StoreTimezoneRequest $request): RedirectResponse
     {
-        $this->timezones->create($request->validated());
+        $record = $this->timezones->create($request->validated());
 
         return redirect()
-            ->route('config.timezones.index')
+            ->route('config.timezones.edit', $record)
             ->with('success', 'timezone_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class TimezoneController extends Controller
         $this->timezones->update($timezone, $request->validated());
 
         return redirect()
-            ->route('config.timezones.index')
+            ->route('config.timezones.edit', $timezone)
             ->with('success', 'timezone_updated_successfully');
     }
 

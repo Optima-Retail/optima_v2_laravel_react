@@ -120,7 +120,9 @@ class FormTemplate extends Model
      */
     public function establishments(): BelongsToMany
     {
-        return $this->belongsToMany(Establishment::class, 'establishment_form_template');
+        return $this->belongsToMany(Establishment::class, 'establishment_form_template')
+            ->withPivot(['id', 'work_order_type_id'])
+            ->withTimestamps();
     }
 
     public function ownerLabel(): string

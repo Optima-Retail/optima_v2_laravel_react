@@ -2,12 +2,14 @@ import { FormEvent } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
 import { defaultEvaluationFormValues, EvaluationForm } from '@/components/evaluations/EvaluationForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { evaluationsService } from '@/services';
+import type { DocumentChatPayload } from '@/support/types/domain/chat';
 import type { UserOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type { EvaluationFormData } from '@/support/types/domain/evaluation';
@@ -17,8 +19,10 @@ type EditEvaluationProps = {
     evaluationStatusOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
+    chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
+        post_chat: boolean;
     };
 };
 
@@ -27,6 +31,7 @@ export default function EditEvaluation({
     evaluationStatusOptions,
     userOptions,
     establishmentOptions,
+    chat,
     can,
 }: EditEvaluationProps) {
     const { t } = useTranslation();
@@ -65,7 +70,19 @@ export default function EditEvaluation({
     }
 
     return (
-        <AppLayout title={t('common.editResource', { resource: t('evaluations.resource') })}>
+        <AppLayout
+            title={t('common.editResource', { resource: t('evaluations.resource') })}
+            aside={
+                chat ? (
+                    <DocumentChatPanel
+                        documentType="evaluation"
+                        documentId={evaluation.id}
+                        initialChat={chat}
+                        canPost={can.post_chat}
+                    />
+                ) : null
+            }
+        >
             <Head
                 title={t('common.editItem', {
                     name: evaluation.subject || evaluation.public_id || evaluation.id,

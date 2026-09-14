@@ -33,7 +33,7 @@ final class TaskToPerformController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -75,10 +75,10 @@ final class TaskToPerformController extends Controller
 
     public function store(StoreTaskToPerformRequest $request): RedirectResponse
     {
-        $this->tasks->create($request->validated());
+        $record = $this->tasks->create($request->validated());
 
         return redirect()
-            ->route('config.tasks-to-perform.index')
+            ->route('config.tasks-to-perform.edit', $record)
             ->with('success', 'task_to_perform_created_successfully');
     }
 
@@ -100,7 +100,7 @@ final class TaskToPerformController extends Controller
         $this->tasks->update($taskToPerform, $request->validated());
 
         return redirect()
-            ->route('config.tasks-to-perform.index')
+            ->route('config.tasks-to-perform.edit', $taskToPerform)
             ->with('success', 'task_to_perform_updated_successfully');
     }
 

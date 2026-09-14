@@ -34,7 +34,7 @@ final class RoleController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -84,13 +84,13 @@ final class RoleController extends Controller
 
     public function store(StoreRoleRequest $request): RedirectResponse
     {
-        $this->roles->create([
+        $record = $this->roles->create([
             'name' => $request->string('name')->toString(),
             'permissions' => $request->validated('permissions') ?? [],
         ]);
 
         return redirect()
-            ->route('config.roles.index')
+            ->route('config.roles.edit', $record)
             ->with('success', 'role_created_successfully');
     }
 
@@ -117,7 +117,7 @@ final class RoleController extends Controller
         ]);
 
         return redirect()
-            ->route('config.roles.index')
+            ->route('config.roles.edit', $role)
             ->with('success', 'role_updated_successfully');
     }
 

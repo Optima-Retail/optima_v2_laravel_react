@@ -107,28 +107,8 @@ final class UpdateUserRequest extends FormRequest
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => [
                 'integer',
-                Rule::in($this->actorCompanyIds()),
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
             ],
         ];
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function actorCompanyIds(): array
-    {
-        $actor = $this->user();
-
-        if ($actor === null) {
-            return [0];
-        }
-
-        $ids = $actor->companies()
-            ->wherePivot('is_active', true)
-            ->pluck('companies.id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        return $ids === [] ? [0] : $ids;
     }
 }

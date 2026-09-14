@@ -43,8 +43,8 @@ return new class extends Migration
             $table->boolean('is_quality_control_contactable')->default(false);
             $table->boolean('has_parking')->default(false);
             $table->boolean('is_ulez_zone')->default(false);
-            $table->decimal('latitude', 10, 7)->nullable();
-            $table->decimal('longitude', 10, 7)->nullable();
+            $table->decimal('latitude', 20, 16)->nullable();
+            $table->decimal('longitude', 20, 16)->nullable();
             $table->decimal('tax_rate', 10, 2)->nullable();
             $table->boolean('tax_included')->default(false);
             $table->string('legacy_erp_id', 64)->nullable();

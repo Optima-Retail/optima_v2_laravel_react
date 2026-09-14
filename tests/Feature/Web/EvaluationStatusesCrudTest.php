@@ -46,7 +46,7 @@ final class EvaluationStatusesCrudTest extends TestCase
                 'lifecycle' => 1,
                 'is_open' => true,
             ])
-            ->assertRedirect(route('config.evaluation-statuses.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'evaluation_status_created_successfully');
 
         $status = EvaluationStatus::query()->where('name', 'Draft')->firstOrFail();
@@ -66,7 +66,7 @@ final class EvaluationStatusesCrudTest extends TestCase
                 'lifecycle' => 1,
                 'is_open' => false,
             ])
-            ->assertRedirect(route('config.evaluation-statuses.index'))
+            ->assertRedirect(route('config.evaluation-statuses.edit', $status))
             ->assertSessionHas('success', 'evaluation_status_updated_successfully');
 
         $this->assertDatabaseHas('evaluation_statuses', [

@@ -129,12 +129,12 @@ final class BrandService
     /**
      * Customer relationships linked to this brand.
      *
-     * @return list<array{id: int, related_company_name: string|null, status: string, owner_company_name: string|null}>
+     * @return list<array{id: int, related_company_name: string|null, related_company_logo_url: string|null, status: string, owner_company_name: string|null}>
      */
     public function clientsForBrand(Brand $brand): array
     {
         return CompanyRelationship::query()
-            ->with(['relatedCompany:id,name', 'ownerCompany:id,name'])
+            ->with(['relatedCompany:id,name,logo', 'ownerCompany:id,name'])
             ->where('brand_id', $brand->id)
             ->where('kind', CompanyRelationshipKind::Customer->value)
             ->orderBy('id')
@@ -142,6 +142,7 @@ final class BrandService
             ->map(fn (CompanyRelationship $relationship): array => [
                 'id' => $relationship->id,
                 'related_company_name' => $relationship->relatedCompany?->name,
+                'related_company_logo_url' => $relationship->relatedCompany?->logoUrl(),
                 'status' => $relationship->status->value,
                 'owner_company_name' => $relationship->ownerCompany?->name,
             ])

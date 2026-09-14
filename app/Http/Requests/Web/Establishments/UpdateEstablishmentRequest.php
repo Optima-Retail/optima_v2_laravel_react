@@ -44,7 +44,32 @@ final class UpdateEstablishmentRequest extends FormRequest
                 (array) $this->input('collaborator_ids', []),
                 fn (mixed $id): bool => $id !== '' && $id !== null,
             )),
+            'blocked_technician_ids' => array_values(array_filter(
+                (array) $this->input('blocked_technician_ids', []),
+                fn (mixed $id): bool => $id !== '' && $id !== null,
+            )),
+            'favorite_technician_ids' => array_values(array_filter(
+                (array) $this->input('favorite_technician_ids', []),
+                fn (mixed $id): bool => $id !== '' && $id !== null,
+            )),
         ]);
+
+        if ($this->has('form_template_links')) {
+            $this->merge([
+                'form_template_links' => array_values(array_map(
+                    function (mixed $row): array {
+                        $row = is_array($row) ? $row : [];
+
+                        return [
+                            'id' => $row['id'] ?? null,
+                            'form_template_id' => $row['form_template_id'] ?? null,
+                            'work_order_type_id' => $row['work_order_type_id'] ?? null,
+                        ];
+                    },
+                    (array) $this->input('form_template_links', []),
+                )),
+            ]);
+        }
     }
 
     /**
@@ -60,6 +85,12 @@ final class UpdateEstablishmentRequest extends FormRequest
 
         $accessible = app(EstablishmentService::class)->accessibleCompanyIds($owner);
 
-        return CompanyValidation::establishmentRules($establishment->id, $accessible);
+        return [
+            ...CompanyValidation::establishmentRules($establishment->id, $accessible),
+            'form_template_links' => ['sometimes', 'array'],
+            'form_template_links.*.id' => ['nullable', 'integer', 'exists:establishment_form_template,id'],
+            'form_template_links.*.form_template_id' => ['required', 'integer', 'exists:form_templates,id'],
+            'form_template_links.*.work_order_type_id' => ['required', 'integer', 'exists:work_order_types,id'],
+        ];
     }
 }

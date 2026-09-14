@@ -88,6 +88,33 @@ export default function TechnicianIncidentStatusesIndex({
                     tabulatorStatusBadge(Boolean(cell.getValue()), t('common.active'), t('common.inactive')),
             },
             {
+                title: t('technicianIncidentStatuses.isDefault'),
+                field: 'is_default',
+                width: 110,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.yes'), t('common.no')),
+            },
+            {
+                title: t('technicianIncidentStatuses.marksVerified'),
+                field: 'marks_verified',
+                width: 120,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.yes'), t('common.no')),
+            },
+            {
+                title: t('technicianIncidentStatuses.setsResponseDate'),
+                field: 'sets_response_date',
+                width: 140,
+                headerSort: true,
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    tabulatorStatusBadge(Boolean(cell.getValue()), t('common.yes'), t('common.no')),
+            },
+            {
                 title: t('common.color'),
                 field: 'color',
                 minWidth: 140,
@@ -189,7 +216,7 @@ export default function TechnicianIncidentStatusesIndex({
                         column: filters.sort || 'lifecycle',
                         dir: filters.direction === 'desc' ? 'desc' : 'asc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                     }}

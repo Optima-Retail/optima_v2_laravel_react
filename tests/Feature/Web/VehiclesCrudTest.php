@@ -67,7 +67,7 @@ final class VehiclesCrudTest extends TestCase
                 'license_plate' => '1234ABC',
                 'company_relationship_id' => $relationship->id,
             ])
-            ->assertRedirect(route('config.vehicles.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'vehicle_created_successfully');
 
         $vehicle = Vehicle::query()->where('license_plate', '1234ABC')->firstOrFail();
@@ -87,7 +87,7 @@ final class VehiclesCrudTest extends TestCase
                 'license_plate' => '1234ABC',
                 'company_relationship_id' => $relationship->id,
             ])
-            ->assertRedirect(route('config.vehicles.index'))
+            ->assertRedirect(route('config.vehicles.edit', $vehicle))
             ->assertSessionHas('success', 'vehicle_updated_successfully');
 
         $this->assertDatabaseHas('vehicles', [

@@ -1,5 +1,11 @@
 import { useMemo, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { EstablishmentAttachmentsPanel } from '@/components/establishments/EstablishmentAttachmentsPanel';
+import {
+    EstablishmentDocumentsPanel,
+} from '@/components/establishments/EstablishmentDocumentsPanel';
+import type { EstablishmentDocumentTotalsData } from '@/components/establishments/EstablishmentDocumentTotals';
+import { EstablishmentTemplatesPanel } from '@/components/establishments/EstablishmentTemplatesPanel';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -9,8 +15,14 @@ import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { UserOption } from '@/support/types/domain/common';
-import type { EstablishmentFormData } from '@/support/types/domain/establishment';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import { clampDecimalPlaces } from '@/support/coordinates';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
+import type {
+    EstablishmentAttachmentItem,
+    EstablishmentFormData,
+    EstablishmentFormTemplateLinkValues,
+} from '@/support/types/domain/establishment';
 import type { ProvinceOption } from '@/support/types/domain/province';
 
 export type EstablishmentFormValues = {
@@ -37,6 +49,9 @@ export type EstablishmentFormValues = {
     billing_company_id: string;
     responsible_user_id: string;
     collaborator_ids: string[];
+    blocked_technician_ids: string[];
+    favorite_technician_ids: string[];
+    form_template_links: EstablishmentFormTemplateLinkValues[];
     is_active: boolean;
     is_client_priority: boolean;
     is_reviewed: boolean;
@@ -60,9 +75,9 @@ export type EstablishmentFormValues = {
 
 type EstablishmentFormProps = {
     values: EstablishmentFormValues;
-    errors: Partial<Record<keyof EstablishmentFormValues, string>>;
+    errors: Partial<Record<string, string>>;
     processing: boolean;
-    companyOptions: UserOption[];
+    companyOptions: CompanyOption[];
     countryOptions: UserOption[];
     provinceOptions: ProvinceOption[];
     timezoneOptions: UserOption[];
@@ -71,7 +86,33 @@ type EstablishmentFormProps = {
     establishmentTypeOptions: UserOption[];
     seriesOptions: UserOption[];
     userOptions: UserOption[];
-    onChange: (key: keyof EstablishmentFormValues, value: string | boolean | string[]) => void;
+    technicianOptions?: CompanyOption[];
+    workOrderTypeOptions?: UserOption[];
+    formTemplateOptions?: UserOption[];
+    establishmentId?: number;
+    attachments?: EstablishmentAttachmentItem[];
+    workOrderTotals?: EstablishmentDocumentTotalsData | null;
+    estimateTotals?: EstablishmentDocumentTotalsData | null;
+    can?: {
+        view_attachments?: boolean;
+        upload_attachments?: boolean;
+        download_attachments?: boolean;
+        delete_attachments?: boolean;
+        view_private_attachments?: boolean;
+        view_work_orders?: boolean;
+        create_work_orders?: boolean;
+        update_work_orders?: boolean;
+        delete_work_orders?: boolean;
+        view_estimates?: boolean;
+        create_estimates?: boolean;
+        update_estimates?: boolean;
+        delete_estimates?: boolean;
+    };
+    defaultTab?: string;
+    onChange: (
+        key: keyof EstablishmentFormValues,
+        value: string | boolean | string[] | EstablishmentFormTemplateLinkValues[],
+    ) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
     submitIcon?: ReactNode;
@@ -115,6 +156,9 @@ export function defaultEstablishmentFormValues(overrides: Partial<EstablishmentF
         billing_company_id: '',
         responsible_user_id: '',
         collaborator_ids: [],
+        blocked_technician_ids: [],
+        favorite_technician_ids: [],
+        form_template_links: [],
         is_active: true,
         is_client_priority: false,
         is_reviewed: false,
@@ -163,6 +207,14 @@ export function establishmentFormValuesFromData(establishment: EstablishmentForm
         billing_company_id: id(establishment.billing_company_id),
         responsible_user_id: id(establishment.responsible_user_id),
         collaborator_ids: (establishment.collaborator_ids ?? []).map(String),
+        blocked_technician_ids: (establishment.blocked_technician_ids ?? []).map(String),
+        favorite_technician_ids: (establishment.favorite_technician_ids ?? []).map(String),
+        form_template_links: (establishment.form_template_links ?? []).map((row) => ({
+            id: row.id,
+            temp_key: `link_${row.id}`,
+            form_template_id: String(row.form_template_id),
+            work_order_type_id: String(row.work_order_type_id),
+        })),
         is_active: establishment.is_active,
         is_client_priority: bool(establishment.is_client_priority),
         is_reviewed: bool(establishment.is_reviewed),
@@ -205,6 +257,15 @@ export function EstablishmentForm({
     establishmentTypeOptions,
     seriesOptions,
     userOptions,
+    technicianOptions = [],
+    workOrderTypeOptions = [],
+    formTemplateOptions = [],
+    establishmentId,
+    attachments = [],
+    workOrderTotals = null,
+    estimateTotals = null,
+    can = {},
+    defaultTab = 'identity',
     onChange,
     onSubmit,
     submitLabel,
@@ -221,22 +282,58 @@ export function EstablishmentForm({
         return provinceOptions.filter((option) => String(option.country_id) === values.country_id);
     }, [provinceOptions, values.country_id]);
 
-    const tabItems = useMemo<TabItem[]>(
-        () => [
+    const isEdit = establishmentId != null;
+    const showAttachmentsTab = isEdit && Boolean(can.view_attachments);
+    const showTemplatesTab = isEdit;
+    const showWorkOrdersTab = isEdit && Boolean(can.view_work_orders) && workOrderTotals != null;
+    const showEstimatesTab = isEdit && Boolean(can.view_estimates) && estimateTotals != null;
+
+    const tabItems = useMemo<TabItem[]>(() => {
+        const items: TabItem[] = [
             { id: 'identity', label: t('establishments.tabs.identity') },
             { id: 'address', label: t('establishments.tabs.address') },
             { id: 'catalogs', label: t('establishments.tabs.catalogs') },
+            { id: 'technicians', label: t('establishments.tabs.technicians') },
             { id: 'geo', label: t('establishments.tabs.geo') },
             { id: 'notes', label: t('establishments.tabs.notes') },
             { id: 'flags', label: t('establishments.tabs.flags') },
-        ],
-        [t],
-    );
+        ];
+
+        if (showWorkOrdersTab) {
+            items.push({ id: 'work-orders', label: t('establishments.tabs.workOrders') });
+        }
+
+        if (showEstimatesTab) {
+            items.push({ id: 'estimates', label: t('establishments.tabs.estimates') });
+        }
+
+        if (showAttachmentsTab) {
+            items.push({
+                id: 'attachments',
+                label: t('establishments.tabs.attachments', { count: attachments.length }),
+            });
+        }
+
+        if (showTemplatesTab) {
+            items.push({ id: 'templates', label: t('establishments.tabs.templates') });
+        }
+
+        return items;
+    }, [
+        attachments.length,
+        showAttachmentsTab,
+        showEstimatesTab,
+        showTemplatesTab,
+        showWorkOrdersTab,
+        t,
+    ]);
+
+    const initialTab = tabItems.some((item) => item.id === defaultTab) ? defaultTab : 'identity';
 
     return (
         <FieldHelpScope table="establishments">
         <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
-            <Tabs items={tabItems} defaultValue="identity">
+            <Tabs items={tabItems} defaultValue={initialTab}>
                 <TabPanel id="identity">
                     <div className="grid gap-5 sm:grid-cols-2">
                     <Field label={t('establishments.client')} htmlFor="company_id" error={errors.company_id} className="sm:col-span-2" required>
@@ -246,7 +343,7 @@ export function EstablishmentForm({
                             invalid={Boolean(errors.company_id)}
                             onChange={(value) => onChange('company_id', value)}
                             emptyLabel={t('common.select')}
-                            options={toSelectOptions(companyOptions)}
+                            options={toCompanySelectOptions(companyOptions)}
                         />
                     </Field>
 
@@ -354,6 +451,27 @@ export function EstablishmentForm({
                         />
                     </Field>
 
+                    <Field label={t('companies.country')} htmlFor="country_id" error={errors.country_id}>
+                        <SearchableSelect
+                            id="country_id"
+                            value={values.country_id}
+                            invalid={Boolean(errors.country_id)}
+                            onChange={(value) => {
+                                onChange('country_id', value);
+                                const stillValid = provinceOptions.some(
+                                    (option) =>
+                                        String(option.id) === values.province_id &&
+                                        String(option.country_id) === value,
+                                );
+                                if (values.province_id && !stillValid) {
+                                    onChange('province_id', '');
+                                }
+                            }}
+                            emptyLabel={t('common.none')}
+                            options={toSelectOptions(countryOptions)}
+                        />
+                    </Field>
+
                     <Field label={t('companies.province')} htmlFor="province_id" error={errors.province_id}>
                         <SearchableSelect
                             id="province_id"
@@ -381,27 +499,6 @@ export function EstablishmentForm({
 
                 <TabPanel id="catalogs">
                     <div className="grid gap-5 sm:grid-cols-2">
-                    <Field label={t('companies.country')} htmlFor="country_id" error={errors.country_id}>
-                        <SearchableSelect
-                            id="country_id"
-                            value={values.country_id}
-                            invalid={Boolean(errors.country_id)}
-                            onChange={(value) => {
-                                onChange('country_id', value);
-                                const stillValid = provinceOptions.some(
-                                    (option) =>
-                                        String(option.id) === values.province_id &&
-                                        String(option.country_id) === value,
-                                );
-                                if (values.province_id && !stillValid) {
-                                    onChange('province_id', '');
-                                }
-                            }}
-                            emptyLabel={t('common.none')}
-                            options={toSelectOptions(countryOptions)}
-                        />
-                    </Field>
-
                     <Field label={t('establishments.timezone')} htmlFor="timezone_id" error={errors.timezone_id}>
                         <SearchableSelect
                             id="timezone_id"
@@ -464,7 +561,7 @@ export function EstablishmentForm({
                             invalid={Boolean(errors.billing_company_id)}
                             onChange={(value) => onChange('billing_company_id', value)}
                             emptyLabel={t('common.none')}
-                            options={toSelectOptions(companyOptions)}
+                            options={toCompanySelectOptions(companyOptions)}
                         />
                     </Field>
 
@@ -497,6 +594,42 @@ export function EstablishmentForm({
                     </div>
                 </TabPanel>
 
+                <TabPanel id="technicians">
+                    <div className="grid gap-5 sm:grid-cols-2">
+                        <Field
+                            label={t('establishments.blockedTechnicians')}
+                            htmlFor="blocked_technician_ids"
+                            error={errors.blocked_technician_ids}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="blocked_technician_ids"
+                                value={values.blocked_technician_ids}
+                                onChange={(ids) => onChange('blocked_technician_ids', ids)}
+                                options={toCompanySelectOptions(technicianOptions)}
+                                placeholder={t('establishments.blockedTechniciansPlaceholder')}
+                                invalid={Boolean(errors.blocked_technician_ids)}
+                            />
+                        </Field>
+
+                        <Field
+                            label={t('establishments.favoriteTechnicians')}
+                            htmlFor="favorite_technician_ids"
+                            error={errors.favorite_technician_ids}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="favorite_technician_ids"
+                                value={values.favorite_technician_ids}
+                                onChange={(ids) => onChange('favorite_technician_ids', ids)}
+                                options={toCompanySelectOptions(technicianOptions)}
+                                placeholder={t('establishments.favoriteTechniciansPlaceholder')}
+                                invalid={Boolean(errors.favorite_technician_ids)}
+                            />
+                        </Field>
+                    </div>
+                </TabPanel>
+
                 <TabPanel id="geo">
                     <div className="grid gap-5 sm:grid-cols-2">
                     <Field label={t('establishments.latitude')} htmlFor="latitude" error={errors.latitude}>
@@ -506,7 +639,7 @@ export function EstablishmentForm({
                             step="any"
                             value={values.latitude}
                             invalid={Boolean(errors.latitude)}
-                            onChange={(event) => onChange('latitude', event.target.value)}
+                            onChange={(event) => onChange('latitude', clampDecimalPlaces(event.target.value))}
                         />
                     </Field>
 
@@ -517,7 +650,7 @@ export function EstablishmentForm({
                             step="any"
                             value={values.longitude}
                             invalid={Boolean(errors.longitude)}
-                            onChange={(event) => onChange('longitude', event.target.value)}
+                            onChange={(event) => onChange('longitude', clampDecimalPlaces(event.target.value))}
                         />
                     </Field>
 
@@ -674,6 +807,63 @@ export function EstablishmentForm({
                     />
                     </div>
                 </TabPanel>
+
+                {showWorkOrdersTab && establishmentId != null && workOrderTotals != null ? (
+                    <TabPanel id="work-orders">
+                        <EstablishmentDocumentsPanel
+                            establishmentId={establishmentId}
+                            stage="work_order"
+                            totals={workOrderTotals}
+                            can={{
+                                create: Boolean(can.create_work_orders),
+                                update: Boolean(can.update_work_orders),
+                                delete: Boolean(can.delete_work_orders),
+                            }}
+                        />
+                    </TabPanel>
+                ) : null}
+
+                {showEstimatesTab && establishmentId != null && estimateTotals != null ? (
+                    <TabPanel id="estimates">
+                        <EstablishmentDocumentsPanel
+                            establishmentId={establishmentId}
+                            stage="estimate"
+                            totals={estimateTotals}
+                            can={{
+                                create: Boolean(can.create_estimates),
+                                update: Boolean(can.update_estimates),
+                                delete: Boolean(can.delete_estimates),
+                            }}
+                        />
+                    </TabPanel>
+                ) : null}
+
+                {showAttachmentsTab && establishmentId != null ? (
+                    <TabPanel id="attachments">
+                        <EstablishmentAttachmentsPanel
+                            establishmentId={establishmentId}
+                            attachments={attachments}
+                            can={{
+                                upload_attachments: Boolean(can.upload_attachments),
+                                download_attachments: Boolean(can.download_attachments),
+                                delete_attachments: Boolean(can.delete_attachments),
+                                view_private_attachments: Boolean(can.view_private_attachments),
+                            }}
+                        />
+                    </TabPanel>
+                ) : null}
+
+                {showTemplatesTab ? (
+                    <TabPanel id="templates">
+                        <EstablishmentTemplatesPanel
+                            links={values.form_template_links}
+                            workOrderTypeOptions={workOrderTypeOptions}
+                            formTemplateOptions={formTemplateOptions}
+                            errors={errors}
+                            onChange={(rows) => onChange('form_template_links', rows)}
+                        />
+                    </TabPanel>
+                ) : null}
             </Tabs>
 
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">

@@ -1,7 +1,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { usePage } from '@inertiajs/react';
-import { Building2, Check, ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { CompanyMark } from '@/components/companies/CompanyOptionLabel';
 import { companiesService } from '@/services';
 import { cn } from '@/support/cn';
 import type { SharedPageProps } from '@/types';
@@ -51,7 +52,7 @@ export function CompanySwitcher() {
                 onClick={() => setOpen((currentOpen) => !currentOpen)}
                 className="inline-flex h-8 max-w-48 items-center gap-1.5 rounded-lg border border-line bg-surface px-2.5 text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:text-brand"
             >
-                <Building2 className="size-3.5 shrink-0 text-ink-muted" aria-hidden />
+                <CompanyMark name={active?.name ?? ''} logoUrl={active?.logo_url} size="xs" />
                 <span className="truncate">{active?.name ?? t('companies.switcher')}</span>
                 <ChevronDown className={cn('size-3.5 shrink-0 text-ink-muted transition-transform', open && 'rotate-180')} aria-hidden />
             </button>
@@ -76,6 +77,7 @@ export function CompanySwitcher() {
                                         selected ? 'bg-brand-soft text-brand' : 'text-ink hover:bg-canvas',
                                     )}
                                 >
+                                    <CompanyMark name={company.name} logoUrl={company.logo_url} size="xs" />
                                     <span className="flex-1 truncate">{company.name}</span>
                                     {selected ? <Check className="size-3.5 shrink-0" aria-hidden /> : null}
                                 </button>

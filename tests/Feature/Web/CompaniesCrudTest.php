@@ -10,6 +10,8 @@ use App\Models\Company;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\InteractsWithCompanies;
 use Tests\TestCase;
@@ -44,7 +46,7 @@ final class CompaniesCrudTest extends TestCase
                 'kind' => CompanyKind::Party->value,
                 'is_active' => true,
             ])
-            ->assertRedirect(route('companies.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'company_created_successfully');
 
         $company = Company::query()->where('tax_id', 'B12345678')->firstOrFail();
@@ -58,7 +60,7 @@ final class CompaniesCrudTest extends TestCase
                 'kind' => CompanyKind::Party->value,
                 'is_active' => true,
             ])
-            ->assertRedirect(route('companies.index'))
+            ->assertRedirect(route('companies.edit', $company))
             ->assertSessionHas('success', 'company_updated_successfully');
 
         $this->assertDatabaseHas('companies', [
@@ -231,10 +233,63 @@ final class CompaniesCrudTest extends TestCase
 
         $this->actingAs($admin)
             ->delete("/companies/{$company->id}/users/{$member->id}")
-            ->assertRedirect(route('companies.edit', $company))
+            ->assertRedirect(route('companies.index'))
             ->assertSessionHas('success', 'company_user_unlinked_successfully');
 
         $this->assertFalse($member->fresh()?->belongsToCompany($company->id));
+    }
+
+    public function test_admin_can_upload_and_remove_company_logo(): void
+    {
+        Storage::fake('public');
+
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleEnum::Admin->value);
+
+        $file = UploadedFile::fake()->image('logo.png', 120, 120);
+
+        $this->actingAs($admin)
+            ->post('/companies', [
+                'name' => 'Logo Co',
+                'kind' => CompanyKind::Party->value,
+                'is_active' => true,
+                'logo' => $file,
+            ])
+            ->assertRedirect();
+
+        $company = Company::query()->where('name', 'Logo Co')->firstOrFail();
+        $this->assertNotNull($company->logo);
+        Storage::disk('public')->assertExists($company->logo);
+
+        $this->actingAs($admin)
+            ->get("/companies/{$company->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Companies/Edit')
+                ->where('company.logo_url', $company->logoUrl()));
+
+        $this->actingAs($admin)
+            ->getJson('/companies/data')
+            ->assertOk()
+            ->assertJsonFragment([
+                'id' => $company->id,
+                'logo_url' => $company->logoUrl(),
+            ]);
+
+        $oldPath = $company->logo;
+
+        $this->actingAs($admin)
+            ->put("/companies/{$company->id}", [
+                'name' => 'Logo Co',
+                'kind' => CompanyKind::Party->value,
+                'is_active' => true,
+                'remove_logo' => true,
+            ])
+            ->assertRedirect(route('companies.edit', $company));
+
+        $company->refresh();
+        $this->assertNull($company->logo);
+        Storage::disk('public')->assertMissing($oldPath);
     }
 
     public function test_user_without_permission_cannot_view_companies(): void

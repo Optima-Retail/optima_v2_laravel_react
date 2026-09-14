@@ -11,6 +11,9 @@ export type TechnicianIncidentStatusFormValues = {
     color: string;
     lifecycle: number | string;
     is_open: boolean;
+    is_default: boolean;
+    marks_verified: boolean;
+    sets_response_date: boolean;
 };
 
 type TechnicianIncidentStatusFormProps = {
@@ -96,6 +99,52 @@ export function TechnicianIncidentStatusForm({
                         uncheckedLabel={t('technicianIncidentStatuses.isOpenOff')}
                     />
                     {errors.is_open ? <p className="text-sm text-danger">{errors.is_open}</p> : null}
+                </div>
+
+                <div className="space-y-1">
+                    <p className="text-sm font-semibold text-ink">{t('technicianIncidentStatuses.isDefault')}</p>
+                    <p className="text-xs text-ink-muted">{t('technicianIncidentStatuses.isDefaultHint')}</p>
+                    <Toggle
+                        name="is_default"
+                        checked={values.is_default}
+                        onCheckedChange={(checked) => onChange('is_default', checked)}
+                        checkedLabel={t('common.yes')}
+                        uncheckedLabel={t('common.no')}
+                    />
+                    {errors.is_default ? <p className="text-sm text-danger">{errors.is_default}</p> : null}
+                </div>
+
+                <div className="space-y-1">
+                    <p className="text-sm font-semibold text-ink">{t('technicianIncidentStatuses.marksVerified')}</p>
+                    <p className="text-xs text-ink-muted">{t('technicianIncidentStatuses.marksVerifiedHint')}</p>
+                    <Toggle
+                        name="marks_verified"
+                        checked={values.marks_verified}
+                        onCheckedChange={(checked) => {
+                            onChange('marks_verified', checked);
+                            if (checked) {
+                                onChange('sets_response_date', true);
+                            }
+                        }}
+                        checkedLabel={t('common.yes')}
+                        uncheckedLabel={t('common.no')}
+                    />
+                    {errors.marks_verified ? <p className="text-sm text-danger">{errors.marks_verified}</p> : null}
+                </div>
+
+                <div className="space-y-1">
+                    <p className="text-sm font-semibold text-ink">{t('technicianIncidentStatuses.setsResponseDate')}</p>
+                    <p className="text-xs text-ink-muted">{t('technicianIncidentStatuses.setsResponseDateHint')}</p>
+                    <Toggle
+                        name="sets_response_date"
+                        checked={values.sets_response_date}
+                        onCheckedChange={(checked) => onChange('sets_response_date', checked)}
+                        checkedLabel={t('common.yes')}
+                        uncheckedLabel={t('common.no')}
+                    />
+                    {errors.sets_response_date ? (
+                        <p className="text-sm text-danger">{errors.sets_response_date}</p>
+                    ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">

@@ -1,4 +1,4 @@
-import type { UserOption } from './common';
+import type { CompanyOption, UserOption } from './common';
 
 export type UserListItem = {
     id: number;
@@ -45,5 +45,5 @@ export type UserFormOptions = {
     teams: UserOption[];
     timezones: UserOption[];
     brands: UserOption[];
-    companies: UserOption[];
+    companies: CompanyOption[];
 };

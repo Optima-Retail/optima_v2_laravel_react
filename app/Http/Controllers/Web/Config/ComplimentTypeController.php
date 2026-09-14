@@ -33,7 +33,7 @@ final class ComplimentTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -71,10 +71,10 @@ final class ComplimentTypeController extends Controller
 
     public function store(StoreComplimentTypeRequest $request): RedirectResponse
     {
-        $this->complimentTypes->create($request->validated());
+        $record = $this->complimentTypes->create($request->validated());
 
         return redirect()
-            ->route('config.compliment-types.index')
+            ->route('config.compliment-types.edit', $record)
             ->with('success', 'compliment_type_created_successfully');
     }
 
@@ -95,7 +95,7 @@ final class ComplimentTypeController extends Controller
         $this->complimentTypes->update($complimentType, $request->validated());
 
         return redirect()
-            ->route('config.compliment-types.index')
+            ->route('config.compliment-types.edit', $complimentType)
             ->with('success', 'compliment_type_updated_successfully');
     }
 

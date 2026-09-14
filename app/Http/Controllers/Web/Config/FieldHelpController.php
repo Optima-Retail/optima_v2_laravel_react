@@ -36,7 +36,7 @@ final class FieldHelpController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'key',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -79,7 +79,7 @@ final class FieldHelpController extends Controller
     {
         $validated = $request->validated();
 
-        $this->fieldHelps->create([
+        $record = $this->fieldHelps->create([
             'key' => $validated['key'],
             'context' => $validated['context'] ?? $validated['table'],
             'is_active' => $validated['is_active'],
@@ -87,7 +87,7 @@ final class FieldHelpController extends Controller
         ]);
 
         return redirect()
-            ->route('config.field-helps.index')
+            ->route('config.field-helps.edit', $record)
             ->with('success', 'field_help_created_successfully');
     }
 
@@ -117,7 +117,7 @@ final class FieldHelpController extends Controller
         ]);
 
         return redirect()
-            ->route('config.field-helps.index')
+            ->route('config.field-helps.edit', $fieldHelp)
             ->with('success', 'field_help_updated_successfully');
     }
 

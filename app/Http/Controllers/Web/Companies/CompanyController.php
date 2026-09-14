@@ -40,7 +40,7 @@ final class CompanyController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -91,10 +91,10 @@ final class CompanyController extends Controller
 
     public function store(StoreCompanyRequest $request): RedirectResponse
     {
-        $this->companies->create($request->validated(), $request->user());
+        $record = $this->companies->create($request->validated(), $request->user());
 
         return redirect()
-            ->route('companies.index')
+            ->route('companies.edit', $record)
             ->with('success', 'company_created_successfully');
     }
 
@@ -122,7 +122,7 @@ final class CompanyController extends Controller
         $this->companies->update($company, $request->validated());
 
         return redirect()
-            ->route('companies.index')
+            ->route('companies.edit', $company)
             ->with('success', 'company_updated_successfully');
     }
 

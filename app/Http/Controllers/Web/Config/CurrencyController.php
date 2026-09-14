@@ -33,7 +33,7 @@ final class CurrencyController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class CurrencyController extends Controller
 
     public function store(StoreCurrencyRequest $request): RedirectResponse
     {
-        $this->currencies->create($request->validated());
+        $record = $this->currencies->create($request->validated());
 
         return redirect()
-            ->route('config.currencies.index')
+            ->route('config.currencies.edit', $record)
             ->with('success', 'currency_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class CurrencyController extends Controller
         $this->currencies->update($currency, $request->validated());
 
         return redirect()
-            ->route('config.currencies.index')
+            ->route('config.currencies.edit', $currency)
             ->with('success', 'currency_updated_successfully');
     }
 

@@ -48,7 +48,7 @@ final class IncidentStatusesCrudTest extends TestCase
                 'is_open' => true,
                 'excluded_type_ids' => [],
             ])
-            ->assertRedirect(route('config.incident-statuses.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'incident_status_created_successfully');
 
         $status = IncidentStatus::query()->where('name', 'Draft')->firstOrFail();
@@ -88,7 +88,7 @@ final class IncidentStatusesCrudTest extends TestCase
                 'is_open' => false,
                 'excluded_type_ids' => [$type->id],
             ])
-            ->assertRedirect(route('config.incident-statuses.index'))
+            ->assertRedirect(route('config.incident-statuses.edit', $status))
             ->assertSessionHas('success', 'incident_status_updated_successfully');
 
         $this->assertDatabaseHas('incident_statuses', [

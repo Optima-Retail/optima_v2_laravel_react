@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Incidents;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
+use App\Domain\Chats\Services\DocumentChatService;
 use App\Domain\Incidents\Services\IncidentLineService;
 use App\Domain\Incidents\Services\IncidentService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
@@ -29,6 +31,7 @@ final class IncidentController extends Controller
     public function __construct(
         private readonly IncidentService $incidents,
         private readonly IncidentLineService $incidentLines,
+        private readonly DocumentChatService $chats,
     ) {}
 
     public function index(Request $request): Response
@@ -43,7 +46,7 @@ final class IncidentController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -121,10 +124,10 @@ final class IncidentController extends Controller
             $data['control_at'] = now()->format('Y-m-d H:i:s');
         }
 
-        $this->incidents->create($owner, $data);
+        $record = $this->incidents->create($owner, $data);
 
         return redirect()
-            ->route('incidents.index')
+            ->route('incidents.edit', $record)
             ->with('success', 'incident_created_successfully');
     }
 
@@ -134,6 +137,7 @@ final class IncidentController extends Controller
 
         $owner = $this->activeCompany($request);
         $user = $request->user();
+        $incident->loadMissing('establishment:id,company_id');
 
         return Inertia::render('Incidents/Edit', [
             'incident' => $this->incidents->toFormData($incident),
@@ -147,13 +151,25 @@ final class IncidentController extends Controller
             'incidentTypeOptions' => $this->incidents->incidentTypeOptions(),
             'incidentSubtypeOptions' => $this->incidents->incidentSubtypeOptions(),
             'userOptions' => $this->incidents->userOptions($owner),
-            'establishmentOptions' => $this->incidents->establishmentOptions($owner),
-            'clientOptions' => $this->incidents->clientOptions($owner),
+            'establishmentOptions' => $this->incidents->establishmentOptions(
+                $owner,
+                $incident->establishment_id !== null ? [(int) $incident->establishment_id] : [],
+            ),
+            'clientOptions' => $this->incidents->clientOptions(
+                $owner,
+                $incident->establishment?->company_id !== null
+                    ? (int) $incident->establishment->company_id
+                    : null,
+            ),
             'brandOptions' => $this->incidents->brandOptions($owner),
             'evaluationOptions' => $this->incidents->evaluationOptions($owner),
+            'chat' => $user !== null
+                ? $this->chats->payload(ChatDocumentType::Incident, (int) $incident->id, $user)
+                : null,
             'can' => [
                 'delete' => $user?->can('delete', $incident) ?? false,
                 'create_line' => $user?->can('update', $incident) ?? false,
+                'post_chat' => $user?->can('update', $incident) ?? false,
             ],
         ]);
     }
@@ -175,7 +191,7 @@ final class IncidentController extends Controller
         $this->incidents->update($incident, $request->validated());
 
         return redirect()
-            ->route('incidents.index')
+            ->route('incidents.edit', $incident)
             ->with('success', 'incident_updated_successfully');
     }
 

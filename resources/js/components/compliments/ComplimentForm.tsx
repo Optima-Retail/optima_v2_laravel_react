@@ -6,9 +6,11 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { MultiSelect } from '@/components/ui/MultiSelect';
+import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { SelectOption } from '@/components/ui/SearchableSelect';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { CompanyOption } from '@/support/types/domain/common';
 
 export type ComplimentFormValues = {
     subject_type: string;
@@ -30,7 +32,7 @@ type ComplimentFormProps = {
     processing: boolean;
     typeOptions: Option[];
     brandOptions: Option[];
-    customerOptions: Option[];
+    customerOptions: CompanyOption[];
     establishmentOptions: Option[];
     userOptions: Option[];
     showAttachmentField?: boolean;
@@ -147,19 +149,14 @@ export function ComplimentForm({
                             error={errors.company_relationship_id}
                             required
                         >
-                            <Select
+                            <SearchableSelect
                                 id="company_relationship_id"
                                 value={values.company_relationship_id}
                                 invalid={Boolean(errors.company_relationship_id)}
-                                onChange={(event) => onChange('company_relationship_id', event.target.value)}
-                            >
-                                <option value="">{t('common.select')}</option>
-                                {customerOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </Select>
+                                emptyLabel={t('common.select')}
+                                onChange={(value) => onChange('company_relationship_id', value)}
+                                options={toCompanySelectOptions(customerOptions)}
+                            />
                         </Field>
                     ) : null}
 

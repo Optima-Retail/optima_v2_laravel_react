@@ -55,7 +55,7 @@ final class BanksCrudTest extends TestCase
                 'website' => 'https://www.bbva.es',
                 'is_active' => true,
             ])
-            ->assertRedirect(route('config.banks.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'bank_created_successfully');
 
         $bank = Bank::query()->where('name', 'BBVA')->firstOrFail();
@@ -100,7 +100,7 @@ final class BanksCrudTest extends TestCase
                 'website' => 'https://www.bbva.es',
                 'is_active' => true,
             ])
-            ->assertRedirect(route('config.banks.index'))
+            ->assertRedirect(route('config.banks.edit', $bank))
             ->assertSessionHas('success', 'bank_updated_successfully');
 
         $this->assertDatabaseHas('banks', [

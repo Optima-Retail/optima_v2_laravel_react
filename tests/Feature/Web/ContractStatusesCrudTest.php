@@ -46,7 +46,7 @@ final class ContractStatusesCrudTest extends TestCase
                 'lifecycle' => 1,
                 'is_open' => true,
             ])
-            ->assertRedirect(route('config.contract-statuses.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'contract_status_created_successfully');
 
         $status = ContractStatus::query()->where('name', 'Draft')->firstOrFail();
@@ -66,7 +66,7 @@ final class ContractStatusesCrudTest extends TestCase
                 'lifecycle' => 1,
                 'is_open' => false,
             ])
-            ->assertRedirect(route('config.contract-statuses.index'))
+            ->assertRedirect(route('config.contract-statuses.edit', $status))
             ->assertSessionHas('success', 'contract_status_updated_successfully');
 
         $this->assertDatabaseHas('contract_statuses', [

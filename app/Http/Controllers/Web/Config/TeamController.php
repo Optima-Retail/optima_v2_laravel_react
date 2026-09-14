@@ -33,7 +33,7 @@ final class TeamController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class TeamController extends Controller
 
     public function store(StoreTeamRequest $request): RedirectResponse
     {
-        $this->teams->create($request->validated());
+        $record = $this->teams->create($request->validated());
 
         return redirect()
-            ->route('config.teams.index')
+            ->route('config.teams.edit', $record)
             ->with('success', 'team_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class TeamController extends Controller
         $this->teams->update($team, $request->validated());
 
         return redirect()
-            ->route('config.teams.index')
+            ->route('config.teams.edit', $team)
             ->with('success', 'team_updated_successfully');
     }
 

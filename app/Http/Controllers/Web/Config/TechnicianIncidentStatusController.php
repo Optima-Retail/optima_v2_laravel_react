@@ -33,7 +33,7 @@ final class TechnicianIncidentStatusController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'lifecycle',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -53,7 +53,7 @@ final class TechnicianIncidentStatusController extends Controller
 
         $filters = TabulatorQuery::fromRequest(
             $request,
-            allowedSorts: ['id', 'name', 'lifecycle', 'is_open'],
+            allowedSorts: ['id', 'name', 'lifecycle', 'is_open', 'is_default', 'marks_verified', 'sets_response_date'],
             defaultSort: 'lifecycle',
             defaultDirection: 'asc',
             filterKeys: ['search'],
@@ -73,15 +73,18 @@ final class TechnicianIncidentStatusController extends Controller
 
     public function store(StoreTechnicianIncidentStatusRequest $request): RedirectResponse
     {
-        $this->technicianIncidentStatuses->create([
+        $record = $this->technicianIncidentStatuses->create([
             'name' => $request->string('name')->toString(),
             'color' => $request->input('color'),
             'lifecycle' => $request->input('lifecycle'),
             'is_open' => $request->boolean('is_open'),
+            'is_default' => $request->boolean('is_default'),
+            'marks_verified' => $request->boolean('marks_verified'),
+            'sets_response_date' => $request->boolean('sets_response_date'),
         ]);
 
         return redirect()
-            ->route('config.technician-incident-statuses.index')
+            ->route('config.technician-incident-statuses.edit', $record)
             ->with('success', 'technician_incident_status_created_successfully');
     }
 
@@ -106,10 +109,13 @@ final class TechnicianIncidentStatusController extends Controller
             'color' => $request->input('color'),
             'lifecycle' => $request->input('lifecycle'),
             'is_open' => $request->boolean('is_open'),
+            'is_default' => $request->boolean('is_default'),
+            'marks_verified' => $request->boolean('marks_verified'),
+            'sets_response_date' => $request->boolean('sets_response_date'),
         ]);
 
         return redirect()
-            ->route('config.technician-incident-statuses.index')
+            ->route('config.technician-incident-statuses.edit', $technicianIncidentStatus)
             ->with('success', 'technician_incident_status_updated_successfully');
     }
 

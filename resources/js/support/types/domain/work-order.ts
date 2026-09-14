@@ -8,9 +8,19 @@ export type WorkOrderListItem = {
     establishment_name: string | null;
     status_name: string | null;
     status_color: string | null;
+    priority_name: string | null;
+    priority_color: string | null;
     type_name: string | null;
+    type_color: string | null;
     responsible_user_name: string | null;
+    technician_name: string | null;
     is_urgent: boolean;
+    total_euros: number | null;
+    cost_amount: number | null;
+    margin_percentage: number | null;
+    intervention_at: string | null;
+    expected_close_at: string | null;
+    closed_at: string | null;
     created_at: string | null;
 };
 
@@ -41,10 +51,12 @@ export type WorkOrderFormData = {
     source_work_order_id: number | null;
     source_work_order_label: string | null;
     status_id: number | null;
+    status_is_open?: boolean;
     work_order_type_id: number | null;
     client_priority_id: number | null;
     is_urgent: boolean;
     establishment_id: number | null;
+    contract_id: number | null;
     billing_company_id: number | null;
     responsible_user_id: number | null;
     requester_id: number | null;
@@ -76,5 +88,7 @@ export type WorkOrderAttachmentItem = {
     size_bytes: number | null;
     uploaded_by_name: string | null;
     download_url: string;
+    view_url: string;
+    is_image: boolean;
     created_at: string | null;
 };

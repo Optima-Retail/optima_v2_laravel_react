@@ -12,6 +12,7 @@ import {
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { incidentsService } from '@/services';
+import { formatDateTime } from '@/support/datetime';
 import {
     isDeleteActionClick,
     tabulatorActionsCell,
@@ -138,7 +139,8 @@ export default function IncidentsIndex({ filters, incidentStatusOptions, can }: 
                 headerSort: true,
                 cssClass: 'cell-muted',
                 titleFormatter,
-                formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
+                formatter: (cell: CellComponent) =>
+                    formatDateTime(cell.getValue() as string | null, i18n.language) || t('common.emDash'),
             },
             {
                 title: t('common.createdAt'),
@@ -147,7 +149,8 @@ export default function IncidentsIndex({ filters, incidentStatusOptions, can }: 
                 headerSort: true,
                 cssClass: 'cell-muted',
                 titleFormatter,
-                formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
+                formatter: (cell: CellComponent) =>
+                    formatDateTime(cell.getValue() as string | null, i18n.language) || t('common.emDash'),
             },
             {
                 title: t('common.actions'),
@@ -242,7 +245,7 @@ export default function IncidentsIndex({ filters, incidentStatusOptions, can }: 
                         column: filters.sort || 'id',
                         dir: filters.direction === 'asc' ? 'asc' : 'desc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         incident_status_id: filters.incident_status_id,

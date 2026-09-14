@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { Pencil } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { CompanyOptionLabel } from '@/components/companies/CompanyOptionLabel';
 import { badgeVariantForRelationshipStatus } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { BaseModal } from '@/components/ui/BaseModal';
@@ -161,7 +162,13 @@ export function BrandClientsModal({
                                         return (
                                             <tr key={row.id}>
                                                 <td className="px-4 py-2.5 text-ink-muted">{row.id}</td>
-                                                <td className="px-4 py-2.5 font-medium text-ink">{name}</td>
+                                                <td className="px-4 py-2.5 font-medium text-ink">
+                                                    <CompanyOptionLabel
+                                                        name={name}
+                                                        logoUrl={row.related_company_logo_url}
+                                                        size="sm"
+                                                    />
+                                                </td>
                                                 <td className="px-4 py-2.5">
                                                     <span
                                                         className={cn(

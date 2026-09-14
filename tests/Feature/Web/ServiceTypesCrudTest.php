@@ -45,7 +45,7 @@ final class ServiceTypesCrudTest extends TestCase
                 'code' => 'ELEC',
                 'color' => '#5e5126',
             ])
-            ->assertRedirect(route('config.service-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'service_type_created_successfully');
 
         $type = ServiceType::query()->where('code', 'ELEC')->firstOrFail();
@@ -63,7 +63,7 @@ final class ServiceTypesCrudTest extends TestCase
                 'code' => 'ELEC',
                 'color' => '#5e5126',
             ])
-            ->assertRedirect(route('config.service-types.index'))
+            ->assertRedirect(route('config.service-types.edit', $type))
             ->assertSessionHas('success', 'service_type_updated_successfully');
 
         $this->assertDatabaseHas('service_types', [

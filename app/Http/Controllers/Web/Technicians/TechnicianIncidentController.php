@@ -48,7 +48,7 @@ final class TechnicianIncidentController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -158,10 +158,12 @@ final class TechnicianIncidentController extends Controller
         $incident = $this->incidents->updateStatus(
             $technicianIncident,
             (int) $request->validated('status_id'),
+            $request->user(),
         );
 
         return response()->json([
             'incident' => $this->incidents->toDetailData($incident),
+            'messages' => $this->messages->listForIncident($incident, $request->user()),
             'statusOptions' => $this->incidents->statusOptions(
                 $incident->status_id !== null ? (int) $incident->status_id : null,
             ),
@@ -180,6 +182,7 @@ final class TechnicianIncidentController extends Controller
 
         return response()->json([
             'incident' => $this->incidents->toDetailData($incident),
+            'messages' => $this->messages->listForIncident($incident, $request->user()),
             'statusOptions' => $this->incidents->statusOptions(
                 $incident->status_id !== null ? (int) $incident->status_id : null,
             ),

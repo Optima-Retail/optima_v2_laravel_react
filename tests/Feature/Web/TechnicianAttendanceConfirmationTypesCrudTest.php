@@ -43,7 +43,7 @@ final class TechnicianAttendanceConfirmationTypesCrudTest extends TestCase
             ->post('/config/technician-attendance-confirmation-types', [
                 'name' => 'Whatsapp',
             ])
-            ->assertRedirect(route('config.technician-attendance-confirmation-types.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'technician_attendance_confirmation_type_created_successfully');
 
         $type = TechnicianAttendanceConfirmationType::query()->where('name', 'Whatsapp')->firstOrFail();
@@ -59,7 +59,7 @@ final class TechnicianAttendanceConfirmationTypesCrudTest extends TestCase
             ->put("/config/technician-attendance-confirmation-types/{$type->id}", [
                 'name' => 'WhatsApp',
             ])
-            ->assertRedirect(route('config.technician-attendance-confirmation-types.index'))
+            ->assertRedirect(route('config.technician-attendance-confirmation-types.edit', $type))
             ->assertSessionHas('success', 'technician_attendance_confirmation_type_updated_successfully');
 
         $this->assertDatabaseHas('technician_attendance_confirmation_types', [

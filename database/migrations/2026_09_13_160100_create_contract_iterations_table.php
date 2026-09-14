@@ -41,10 +41,22 @@ return new class extends Migration
             $table->index('work_order_type_id');
             $table->index('invoicing_aggregation_id');
         });
+
+        Schema::table('work_orders', function (Blueprint $table): void {
+            $table->foreignId('contract_iteration_id')
+                ->nullable()
+                ->after('contract_id')
+                ->constrained('contract_iterations')
+                ->nullOnDelete();
+        });
     }
 
     public function down(): void
     {
+        Schema::table('work_orders', function (Blueprint $table): void {
+            $table->dropConstrainedForeignId('contract_iteration_id');
+        });
+
         Schema::dropIfExists('contract_iterations');
     }
 };

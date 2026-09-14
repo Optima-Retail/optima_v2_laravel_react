@@ -87,28 +87,8 @@ final class StoreUserRequest extends FormRequest
             'company_ids' => ['nullable', 'array'],
             'company_ids.*' => [
                 'integer',
-                Rule::in($this->actorCompanyIds()),
+                Rule::exists('companies', 'id')->whereNull('deleted_at'),
             ],
         ];
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function actorCompanyIds(): array
-    {
-        $user = $this->user();
-
-        if ($user === null) {
-            return [0];
-        }
-
-        $ids = $user->companies()
-            ->wherePivot('is_active', true)
-            ->pluck('companies.id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        return $ids === [] ? [0] : $ids;
     }
 }

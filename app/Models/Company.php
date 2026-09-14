@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class Company extends Model
@@ -63,8 +64,6 @@ class Company extends Model
             'person_type' => PersonType::class,
             'is_active' => 'boolean',
             'employee_count' => 'integer',
-            'latitude' => 'decimal:7',
-            'longitude' => 'decimal:7',
         ];
     }
 
@@ -212,6 +211,37 @@ class Company extends Model
     public function requesters(): HasMany
     {
         return $this->hasMany(Requester::class);
+    }
+
+    public function logoUrl(): ?string
+    {
+        if ($this->logo === null || $this->logo === '') {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->logo);
+    }
+
+    /**
+     * @return array{id: int, label: string, logo_url: string|null}
+     */
+    public function toSelectOption(string $labelStyle = 'tax_id'): array
+    {
+        $label = match ($labelStyle) {
+            'tradename' => $this->tradename
+                ? "{$this->name} ({$this->tradename})"
+                : $this->name,
+            'name' => $this->name,
+            default => $this->tax_id
+                ? "{$this->name} ({$this->tax_id})"
+                : $this->name,
+        };
+
+        return [
+            'id' => $this->id,
+            'label' => $label,
+            'logo_url' => $this->logoUrl(),
+        ];
     }
 
     public function softDeleteSafely(): bool

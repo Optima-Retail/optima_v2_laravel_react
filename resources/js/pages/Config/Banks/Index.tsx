@@ -189,7 +189,7 @@ export default function BanksIndex({ filters, can }: BanksIndexProps) {
                         column: filters.sort || 'name',
                         dir: filters.direction === 'desc' ? 'desc' : 'asc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         status: filters.status,

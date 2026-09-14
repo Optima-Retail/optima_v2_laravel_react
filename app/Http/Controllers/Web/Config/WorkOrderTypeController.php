@@ -33,7 +33,7 @@ final class WorkOrderTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,14 +73,14 @@ final class WorkOrderTypeController extends Controller
 
     public function store(StoreWorkOrderTypeRequest $request): RedirectResponse
     {
-        $this->workOrderTypes->create([
+        $record = $this->workOrderTypes->create([
             'name' => $request->string('name')->toString(),
             'code' => $request->input('code'),
             'color' => $request->input('color'),
         ]);
 
         return redirect()
-            ->route('config.work-order-types.index')
+            ->route('config.work-order-types.edit', $record)
             ->with('success', 'work_order_type_created_successfully');
     }
 
@@ -110,7 +110,7 @@ final class WorkOrderTypeController extends Controller
         ]);
 
         return redirect()
-            ->route('config.work-order-types.index')
+            ->route('config.work-order-types.edit', $workOrderType)
             ->with('success', 'work_order_type_updated_successfully');
     }
 

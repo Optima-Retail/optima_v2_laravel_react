@@ -29,7 +29,7 @@ final class VehicleService
         );
 
         return Vehicle::query()
-            ->with(['companyRelationship.relatedCompany:id,name,tradename'])
+            ->with(['companyRelationship.relatedCompany:id,name,tradename,logo'])
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner
@@ -114,16 +114,15 @@ final class VehicleService
     {
         /** @var Collection<int, CompanyRelationship> $relationships */
         $relationships = CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename')
+            ->with('relatedCompany:id,name,tradename,logo')
             ->where('kind', CompanyRelationshipKind::Technician->value)
             ->orderBy('id')
             ->get();
 
         return $relationships
-            ->map(fn (CompanyRelationship $relationship): array => [
-                'id' => $relationship->id,
-                'label' => $this->relationshipLabel($relationship),
-            ])
+            ->map(fn (CompanyRelationship $relationship): array => $relationship->toSelectOption(
+                $this->relationshipLabel($relationship),
+            ))
             ->values()
             ->all();
     }
@@ -250,7 +249,7 @@ final class VehicleService
      */
     public function toListItem(Vehicle $vehicle): array
     {
-        $vehicle->loadMissing('companyRelationship.relatedCompany:id,name,tradename');
+        $vehicle->loadMissing('companyRelationship.relatedCompany:id,name,tradename,logo');
 
         $relationship = $vehicle->companyRelationship;
 

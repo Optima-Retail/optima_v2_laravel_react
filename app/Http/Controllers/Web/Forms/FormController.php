@@ -42,7 +42,7 @@ final class FormController extends Controller
                 'sort' => $request->string('sort')->trim()->toString() ?: 'id',
                 'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
                 'per_page' => (string) ListQuery::perPage([
-                    'per_page' => $request->integer('per_page', 12),
+                    'per_page' => $request->integer('per_page', 25),
                 ]),
             ],
             'typeOptions' => $this->forms->typeOptions(),
@@ -108,7 +108,9 @@ final class FormController extends Controller
         return Inertia::render('Forms/Edit', [
             'form' => $this->forms->toFormData($form),
             'typeOptions' => $this->forms->typeOptions(),
-            'statusOptions' => $this->forms->statusOptions(),
+            'statusOptions' => $this->forms->statusOptions(
+                $form->form_status_id !== null ? (int) $form->form_status_id : null,
+            ),
             'templateOptions' => $this->templates->options($owner),
             'workOrderOptions' => $this->forms->workOrderOptions($owner),
             'technicianOptions' => $this->forms->technicianOptions($owner),

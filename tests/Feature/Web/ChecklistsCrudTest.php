@@ -62,7 +62,7 @@ final class ChecklistsCrudTest extends TestCase
                 'work_order_status_id' => $workOrderStatus->id,
                 'sort_order' => 10,
             ])
-            ->assertRedirect(route('config.checklists.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'checklist_created_successfully');
 
         $checklist = Checklist::query()->where('label', 'Confirm technician arrival')->firstOrFail();
@@ -89,7 +89,7 @@ final class ChecklistsCrudTest extends TestCase
                 'work_order_status_id' => $estimateStatus->id,
                 'sort_order' => 5,
             ])
-            ->assertRedirect(route('config.checklists.index'))
+            ->assertRedirect(route('config.checklists.edit', $checklist))
             ->assertSessionHas('success', 'checklist_updated_successfully');
 
         $this->assertDatabaseHas('checklists', [

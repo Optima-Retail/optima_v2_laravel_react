@@ -4,40 +4,28 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
+use App\Models\Concerns\CreatesDocumentChat;
 use Database\Factories\WorkOrderFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class WorkOrder extends Model
 {
+    use CreatesDocumentChat;
+
     /** @use HasFactory<WorkOrderFactory> */
     use HasFactory;
 
     use SoftDeletes;
-
-    /** Legacy presupuesto Pendiente. */
-    public const DEFAULT_ESTIMATE_STATUS_ID = 1;
-
-    /** Legacy presupuesto Aprobado — confirms the estimate in place. */
-    public const APPROVED_ESTIMATE_STATUS_ID = 7;
-
-    /** Legacy OT Abierta - Establecimiento. */
-    public const DEFAULT_WORK_ORDER_STATUS_ID = 10;
-
-    /** Legacy OT Rechazada - Presupuesto — clones a new estimate. */
-    public const REJECTED_TO_ESTIMATE_STATUS_ID = 12;
-
-    /**
-     * Legacy OT status after an estimate is approved (`EstadoOTEnum::RECIBIDA_OK_POR_ORGANIZAR`).
-     */
-    public const DEFAULT_CONFIRMED_STATUS_ID = 14;
 
     /**
      * @var list<string>
@@ -382,5 +370,18 @@ class WorkOrder extends Model
     public function checklistCompletions(): HasMany
     {
         return $this->hasMany(WorkOrderChecklistCompletion::class);
+    }
+
+    /**
+     * @return HasOne<WorkOrderChat, $this>
+     */
+    public function chat(): HasOne
+    {
+        return $this->hasOne(WorkOrderChat::class);
+    }
+
+    public function chatDocumentType(): ChatDocumentType
+    {
+        return ChatDocumentType::WorkOrder;
     }
 }

@@ -34,7 +34,7 @@ final class UserController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -84,10 +84,10 @@ final class UserController extends Controller
 
     public function store(StoreUserRequest $request): RedirectResponse
     {
-        $this->users->create($request->validated());
+        $record = $this->users->create($request->validated());
 
         return redirect()
-            ->route('config.users.index')
+            ->route('config.users.edit', $record)
             ->with('success', 'user_created_successfully');
     }
 
@@ -113,7 +113,7 @@ final class UserController extends Controller
         ]);
 
         return redirect()
-            ->route('config.users.index')
+            ->route('config.users.edit', $user)
             ->with('success', 'user_updated_successfully');
     }
 

@@ -40,7 +40,7 @@ final class NumberingPatternController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'resource',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -89,7 +89,7 @@ final class NumberingPatternController extends Controller
     {
         $company = $this->activeCompany($request);
 
-        $this->patterns->create([
+        $record = $this->patterns->create([
             'company_id' => $company->id,
             'resource' => $request->string('resource')->toString(),
             'segments' => $request->input('segments', []),
@@ -98,7 +98,7 @@ final class NumberingPatternController extends Controller
         ]);
 
         return redirect()
-            ->route('config.numbering-patterns.index')
+            ->route('config.numbering-patterns.edit', $record)
             ->with('success', 'numbering_pattern_created_successfully');
     }
 
@@ -127,7 +127,7 @@ final class NumberingPatternController extends Controller
         ]);
 
         return redirect()
-            ->route('config.numbering-patterns.index')
+            ->route('config.numbering-patterns.edit', $numberingPattern)
             ->with('success', 'numbering_pattern_updated_successfully');
     }
 

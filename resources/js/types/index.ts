@@ -1,6 +1,7 @@
 export type AuthCompany = {
     id: number;
     name: string;
+    logo_url: string | null;
 };
 
 export type AuthUser = {

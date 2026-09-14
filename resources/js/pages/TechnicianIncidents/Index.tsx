@@ -164,7 +164,7 @@ export default function TechnicianIncidentsIndex({ filters, statusOptions, can }
                         column: filters.sort || 'id',
                         dir: filters.direction === 'asc' ? 'asc' : 'desc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         status_id: filters.status_id,

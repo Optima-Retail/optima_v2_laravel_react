@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domain\Companies\Services;
 
+use App\Domain\Companies\Support\Coordinates;
 use App\Models\Brand;
 use App\Models\Company;
 use App\Models\CompanyUser;
@@ -12,7 +13,9 @@ use App\Models\Language;
 use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 final class CompanyService
@@ -74,6 +77,7 @@ final class CompanyService
     {
         return DB::transaction(function () use ($data, $member): Company {
             $payload = $this->attributes($data);
+            $payload = $this->applyLogo($payload, null);
             $payload['slug'] = $payload['slug'] ?? Company::uniqueSlugFromName((string) $payload['name']);
 
             $company = Company::query()->create($payload);
@@ -99,6 +103,7 @@ final class CompanyService
     {
         return DB::transaction(function () use ($company, $data): Company {
             $payload = $this->attributes($data);
+            $payload = $this->applyLogo($payload, $company);
 
             if (isset($payload['slug'])) {
                 $payload['slug'] = Str::slug((string) $payload['slug']) ?: $company->slug;
@@ -117,6 +122,7 @@ final class CompanyService
         }
 
         DB::transaction(function () use ($company): void {
+            $this->deleteLogoFile($company->logo);
             $company->softDeleteSafely();
         });
     }
@@ -159,20 +165,15 @@ final class CompanyService
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
     public function membershipOptionsForUser(User $user): array
     {
         return $user->companies()
             ->wherePivot('is_active', true)
             ->orderBy('companies.name')
-            ->get(['companies.id', 'companies.name', 'companies.tax_id'])
-            ->map(fn (Company $company): array => [
-                'id' => $company->id,
-                'label' => $company->tax_id
-                    ? "{$company->name} ({$company->tax_id})"
-                    : $company->name,
-            ])
+            ->get(['companies.id', 'companies.name', 'companies.tax_id', 'companies.logo'])
+            ->map(fn (Company $company): array => $company->toSelectOption())
             ->values()
             ->all();
     }
@@ -282,20 +283,22 @@ final class CompanyService
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function companyOptions(?int $exceptId = null): array
+    public function companyOptions(?int $exceptId = null, ?int $includeId = null): array
     {
         return Company::query()
             ->when($exceptId !== null, fn ($query) => $query->where('id', '!=', $exceptId))
+            ->where(function ($query) use ($includeId): void {
+                $query->where('is_active', true);
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
             ->orderBy('name')
-            ->get(['id', 'name', 'tax_id'])
-            ->map(fn (Company $company): array => [
-                'id' => $company->id,
-                'label' => $company->tax_id
-                    ? "{$company->name} ({$company->tax_id})"
-                    : $company->name,
-            ])
+            ->get(['id', 'name', 'tax_id', 'logo'])
+            ->map(fn (Company $company): array => $company->toSelectOption())
             ->values()
             ->all();
     }
@@ -327,10 +330,11 @@ final class CompanyService
             'postal_code' => $company->postal_code,
             'employee_count' => $company->employee_count,
             'is_active' => $company->is_active,
+            'logo_url' => $company->logoUrl(),
             'brand_id' => $company->brand_id,
             'language_id' => $company->language_id,
-            'latitude' => $company->latitude,
-            'longitude' => $company->longitude,
+            'latitude' => Coordinates::format($company->latitude),
+            'longitude' => Coordinates::format($company->longitude),
             'legacy_erp_id' => $company->legacy_erp_id,
         ];
     }
@@ -347,6 +351,7 @@ final class CompanyService
             'tax_id' => $company->tax_id,
             'kind' => $company->kind->value,
             'country_name' => $company->country?->name,
+            'logo_url' => $company->logoUrl(),
             'is_active' => $company->is_active,
             'created_at' => $company->created_at?->toIso8601String(),
         ];
@@ -362,7 +367,7 @@ final class CompanyService
             'tradename', 'slug', 'tax_id', 'country_id', 'residence_country_id',
             'person_type', 'email', 'phone', 'website', 'address_line_1',
             'address_line_2', 'city', 'province_id', 'postal_code', 'employee_count',
-            'logo', 'brand_id', 'language_id', 'latitude', 'longitude', 'legacy_erp_id',
+            'brand_id', 'language_id', 'latitude', 'longitude', 'legacy_erp_id',
         ];
 
         foreach ($nullable as $key) {
@@ -372,5 +377,43 @@ final class CompanyService
         }
 
         return $data;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function applyLogo(array $payload, ?Company $company): array
+    {
+        $removeLogo = (bool) ($payload['remove_logo'] ?? false);
+        unset($payload['remove_logo']);
+
+        $file = $payload['logo'] ?? null;
+        unset($payload['logo']);
+
+        if ($file instanceof UploadedFile) {
+            $this->deleteLogoFile($company?->logo);
+            $payload['logo'] = $file->store('company-logos', 'public');
+
+            return $payload;
+        }
+
+        if ($removeLogo) {
+            $this->deleteLogoFile($company?->logo);
+            $payload['logo'] = null;
+        }
+
+        return $payload;
+    }
+
+    private function deleteLogoFile(?string $path): void
+    {
+        if ($path === null || $path === '') {
+            return;
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 }

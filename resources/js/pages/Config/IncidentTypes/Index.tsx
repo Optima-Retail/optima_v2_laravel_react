@@ -216,7 +216,7 @@ export default function IncidentTypesIndex({ filters, can }: IncidentTypesIndexP
                         column: filters.sort || 'id',
                         dir: filters.direction === 'desc' ? 'desc' : 'asc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                     }}

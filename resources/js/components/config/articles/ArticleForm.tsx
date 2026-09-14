@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import type { UserOption } from '@/support/types/domain/common';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import type { ArticleClientRow, ArticleTranslationRow } from '@/support/types/domain/article';
 
 export type ArticleFormValues = {
@@ -23,7 +25,7 @@ type ArticleFormProps = {
     errors: Partial<Record<string, string>>;
     processing: boolean;
     languageOptions: UserOption[];
-    clientOptions: UserOption[];
+    clientOptions: CompanyOption[];
     onChange: (patch: Partial<ArticleFormValues>) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
@@ -134,7 +136,7 @@ export function ArticleForm({
         });
     }
 
-    function clientChoicesForRow(index: number): UserOption[] {
+    function clientChoicesForRow(index: number): CompanyOption[] {
         const current = String(values.clients[index]?.company_relationship_id ?? '');
 
         return clientOptions.filter(
@@ -316,7 +318,7 @@ export function ArticleForm({
                                             className="border-t border-line align-top"
                                         >
                                             <td className="px-3 py-2">
-                                                <Select
+                                                <SearchableSelect
                                                     aria-label={t('articles.client')}
                                                     value={
                                                         row.company_relationship_id === ''
@@ -326,21 +328,16 @@ export function ArticleForm({
                                                     invalid={Boolean(
                                                         errors[`clients.${index}.company_relationship_id`],
                                                     )}
-                                                    onChange={(event) =>
+                                                    emptyLabel={t('common.select')}
+                                                    onChange={(value) =>
                                                         updateClient(index, {
-                                                            company_relationship_id: event.target.value
-                                                                ? Number(event.target.value)
+                                                            company_relationship_id: value
+                                                                ? Number(value)
                                                                 : '',
                                                         })
                                                     }
-                                                >
-                                                    <option value="">{t('common.select')}</option>
-                                                    {clientChoicesForRow(index).map((option) => (
-                                                        <option key={option.id} value={option.id}>
-                                                            {option.label}
-                                                        </option>
-                                                    ))}
-                                                </Select>
+                                                    options={toCompanySelectOptions(clientChoicesForRow(index))}
+                                                />
                                                 {errors[`clients.${index}.company_relationship_id`] ? (
                                                     <p className="mt-1 text-xs text-danger">
                                                         {errors[`clients.${index}.company_relationship_id`]}

@@ -10,9 +10,11 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
 import { cn } from '@/support/cn';
-import type { UserOption } from '@/support/types/domain/common';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type { WorkOrderLineForm, WorkOrderTechnicianForm } from '@/support/types/domain/work-order';
+import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
 
 export type WorkOrderFormValues = {
     code: string;
@@ -25,6 +27,7 @@ export type WorkOrderFormValues = {
     client_priority_id: string;
     is_urgent: boolean;
     establishment_id: string;
+    contract_id: string;
     responsible_user_id: string;
     requester_id: string;
     notes: string;
@@ -43,13 +46,15 @@ type WorkOrderFormProps = {
     processing: boolean;
     codeDisabled?: boolean;
     stageLocked?: boolean;
-    statusOptions: UserOption[];
+    fieldsLocked?: boolean;
+    statusOptions: WorkOrderStatusOption[];
     typeOptions: UserOption[];
     priorityOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
+    contractOptions?: UserOption[];
     requesterOptions: UserOption[];
-    technicianOptions: UserOption[];
+    technicianOptions: CompanyOption[];
     articleOptions: UserOption[];
     sourceLabel?: string | null;
     onChange: (key: keyof WorkOrderFormValues, value: WorkOrderFormValues[keyof WorkOrderFormValues]) => void;
@@ -98,6 +103,7 @@ export function defaultWorkOrderFormValues(
         client_priority_id: '',
         is_urgent: false,
         establishment_id: '',
+        contract_id: '',
         responsible_user_id: '',
         requester_id: '',
         notes: '',
@@ -118,11 +124,13 @@ export function WorkOrderForm({
     processing,
     codeDisabled = false,
     stageLocked = false,
+    fieldsLocked = false,
     statusOptions,
     typeOptions,
     priorityOptions,
     userOptions,
     establishmentOptions,
+    contractOptions = [],
     requesterOptions,
     technicianOptions,
     articleOptions,
@@ -134,7 +142,8 @@ export function WorkOrderForm({
     actions,
 }: WorkOrderFormProps) {
     const { t } = useTranslation();
-    const isEstimate = values.stage === 'estimate';
+    const locked = fieldsLocked;
+    const selectedStatus = statusOptions.find((option) => String(option.id) === values.status_id);
 
     const establishmentSelect = useMemo(
         () =>
@@ -143,6 +152,15 @@ export function WorkOrderForm({
                 label: option.label,
             })),
         [establishmentOptions],
+    );
+
+    const contractSelect = useMemo(
+        () =>
+            contractOptions.map((option) => ({
+                value: String(option.id),
+                label: option.label,
+            })),
+        [contractOptions],
     );
 
     return (
@@ -154,12 +172,19 @@ export function WorkOrderForm({
                     </p>
                 ) : null}
 
+                {locked ? (
+                    <p className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink-muted">
+                        {t('workOrders.fieldsLockedHint')}
+                    </p>
+                ) : null}
+
                 <div className="grid gap-5 sm:grid-cols-2">
                     <Field label={t('workOrders.subject')} htmlFor="subject" error={errors.subject} className="sm:col-span-2" required>
                         <Input
                             id="subject"
                             value={values.subject}
                             invalid={Boolean(errors.subject)}
+                            disabled={locked}
                             onChange={(event) => onChange('subject', event.target.value)}
                         />
                     </Field>
@@ -169,8 +194,8 @@ export function WorkOrderForm({
                             id="code"
                             value={values.code}
                             invalid={Boolean(errors.code)}
-                            disabled={codeDisabled}
-                            readOnly={codeDisabled}
+                            disabled={codeDisabled || locked}
+                            readOnly={codeDisabled || locked}
                             onChange={(event) => onChange('code', event.target.value)}
                         />
                         {codeDisabled ? (
@@ -183,7 +208,7 @@ export function WorkOrderForm({
                             id="stage"
                             value={values.stage}
                             invalid={Boolean(errors.stage)}
-                            disabled={stageLocked}
+                            disabled={stageLocked || locked}
                             onChange={(event) => onChange('stage', event.target.value)}
                         >
                             <option value="estimate">{t('workOrders.stages.estimate')}</option>
@@ -191,7 +216,7 @@ export function WorkOrderForm({
                         </Select>
                     </Field>
 
-                    <Field label={t('workOrders.status')} htmlFor="status_id" error={errors.status_id} required>
+                    <Field label={t('workOrders.status')} htmlFor="status_id" error={errors.status_id ?? errors.status_justification} required>
                         <SearchableSelect
                             id="status_id"
                             value={values.status_id}
@@ -200,10 +225,10 @@ export function WorkOrderForm({
                             emptyLabel={t('common.select')}
                             options={toSelectOptions(statusOptions)}
                         />
-                        {isEstimate && values.status_id === '7' ? (
+                        {selectedStatus?.confirms_estimate ? (
                             <p className="text-xs text-ink-muted">{t('workOrders.approveHint')}</p>
                         ) : null}
-                        {!isEstimate && values.status_id === '12' ? (
+                        {selectedStatus?.rejects_to_estimate ? (
                             <p className="text-xs text-ink-muted">{t('workOrders.rejectHint')}</p>
                         ) : null}
                     </Field>
@@ -213,9 +238,22 @@ export function WorkOrderForm({
                             id="establishment_id"
                             value={values.establishment_id}
                             invalid={Boolean(errors.establishment_id)}
+                            disabled={locked}
                             onChange={(value) => onChange('establishment_id', value)}
                             emptyLabel={t('common.select')}
                             options={establishmentSelect}
+                        />
+                    </Field>
+
+                    <Field label={t('workOrders.contract')} htmlFor="contract_id" error={errors.contract_id}>
+                        <SearchableSelect
+                            id="contract_id"
+                            value={values.contract_id}
+                            invalid={Boolean(errors.contract_id)}
+                            disabled={locked}
+                            onChange={(value) => onChange('contract_id', value)}
+                            emptyLabel={t('common.select')}
+                            options={contractSelect}
                         />
                     </Field>
 
@@ -224,6 +262,7 @@ export function WorkOrderForm({
                             id="work_order_type_id"
                             value={values.work_order_type_id}
                             invalid={Boolean(errors.work_order_type_id)}
+                            disabled={locked}
                             onChange={(value) => onChange('work_order_type_id', value)}
                             emptyLabel={t('common.select')}
                             options={toSelectOptions(typeOptions)}
@@ -235,6 +274,7 @@ export function WorkOrderForm({
                             id="client_priority_id"
                             value={values.client_priority_id}
                             invalid={Boolean(errors.client_priority_id)}
+                            disabled={locked}
                             onChange={(value) => onChange('client_priority_id', value)}
                             emptyLabel={t('common.select')}
                             options={toSelectOptions(priorityOptions)}
@@ -246,6 +286,7 @@ export function WorkOrderForm({
                             id="responsible_user_id"
                             value={values.responsible_user_id}
                             invalid={Boolean(errors.responsible_user_id)}
+                            disabled={locked}
                             onChange={(value) => onChange('responsible_user_id', value)}
                             emptyLabel={t('common.select')}
                             options={toSelectOptions(userOptions)}
@@ -257,6 +298,7 @@ export function WorkOrderForm({
                             id="requester_id"
                             value={values.requester_id}
                             invalid={Boolean(errors.requester_id)}
+                            disabled={locked}
                             onChange={(value) => onChange('requester_id', value)}
                             emptyLabel={t('common.select')}
                             options={toSelectOptions(requesterOptions)}
@@ -268,6 +310,7 @@ export function WorkOrderForm({
                             id="reference"
                             value={values.reference}
                             invalid={Boolean(errors.reference)}
+                            disabled={locked}
                             onChange={(event) => onChange('reference', event.target.value)}
                         />
                     </Field>
@@ -277,6 +320,7 @@ export function WorkOrderForm({
                             id="purchase_order"
                             value={values.purchase_order}
                             invalid={Boolean(errors.purchase_order)}
+                            disabled={locked}
                             onChange={(event) => onChange('purchase_order', event.target.value)}
                         />
                     </Field>
@@ -287,6 +331,7 @@ export function WorkOrderForm({
                             type="datetime-local"
                             value={values.received_at}
                             invalid={Boolean(errors.received_at)}
+                            disabled={locked}
                             onChange={(event) => onChange('received_at', event.target.value)}
                         />
                     </Field>
@@ -297,6 +342,7 @@ export function WorkOrderForm({
                             type="datetime-local"
                             value={values.due_at}
                             invalid={Boolean(errors.due_at)}
+                            disabled={locked}
                             onChange={(event) => onChange('due_at', event.target.value)}
                         />
                     </Field>
@@ -307,6 +353,7 @@ export function WorkOrderForm({
                             type="datetime-local"
                             value={values.intervention_at}
                             invalid={Boolean(errors.intervention_at)}
+                            disabled={locked}
                             onChange={(event) => onChange('intervention_at', event.target.value)}
                         />
                     </Field>
@@ -317,6 +364,7 @@ export function WorkOrderForm({
                     <Toggle
                         name="is_urgent"
                         checked={values.is_urgent}
+                        disabled={locked}
                         onCheckedChange={(checked) => onChange('is_urgent', checked)}
                         checkedLabel={t('workOrders.urgent')}
                         uncheckedLabel={t('workOrders.notUrgent')}
@@ -327,6 +375,7 @@ export function WorkOrderForm({
                     <MultiSelect
                         id="collaborator_ids"
                         value={values.collaborator_ids}
+                        disabled={locked}
                         onChange={(next) => onChange('collaborator_ids', next)}
                         options={toSelectOptions(userOptions)}
                         placeholder={t('workOrders.collaboratorsPlaceholder')}
@@ -338,10 +387,12 @@ export function WorkOrderForm({
                         id="notes"
                         rows={3}
                         value={values.notes}
+                        disabled={locked}
                         onChange={(event) => onChange('notes', event.target.value)}
                         className={cn(
                             'w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition',
                             'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20',
+                            'disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-muted disabled:opacity-80',
                             errors.notes ? 'border-danger' : 'border-line',
                         )}
                     />
@@ -352,10 +403,12 @@ export function WorkOrderForm({
                         id="internal_notes"
                         rows={3}
                         value={values.internal_notes}
+                        disabled={locked}
                         onChange={(event) => onChange('internal_notes', event.target.value)}
                         className={cn(
                             'w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition',
                             'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20',
+                            'disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-muted disabled:opacity-80',
                             errors.internal_notes ? 'border-danger' : 'border-line',
                         )}
                     />
@@ -367,6 +420,7 @@ export function WorkOrderForm({
                         <Button
                             type="button"
                             variant="secondary"
+                            disabled={locked}
                             onClick={() => onChange('lines', [...values.lines, emptyWorkOrderLine()])}
                         >
                             <Plus className="size-3.5" aria-hidden />
@@ -383,6 +437,7 @@ export function WorkOrderForm({
                                         <SearchableSelect
                                             id={`line-article-${index}`}
                                             value={line.article_id}
+                                            disabled={locked}
                                             onChange={(value) => {
                                                 const next = [...values.lines];
                                                 next[index] = { ...line, article_id: value };
@@ -396,6 +451,7 @@ export function WorkOrderForm({
                                         <Input
                                             id={`line-description-${index}`}
                                             value={line.description}
+                                            disabled={locked}
                                             onChange={(event) => {
                                                 const next = [...values.lines];
                                                 next[index] = { ...line, description: event.target.value };
@@ -410,6 +466,7 @@ export function WorkOrderForm({
                                             min={0}
                                             step="0.001"
                                             value={line.quantity}
+                                            disabled={locked}
                                             onChange={(event) => {
                                                 const next = [...values.lines];
                                                 next[index] = { ...line, quantity: event.target.value };
@@ -423,6 +480,7 @@ export function WorkOrderForm({
                                             type="number"
                                             step="0.01"
                                             value={line.unit_price}
+                                            disabled={locked}
                                             onChange={(event) => {
                                                 const next = [...values.lines];
                                                 next[index] = { ...line, unit_price: event.target.value };
@@ -434,6 +492,7 @@ export function WorkOrderForm({
                                         <Button
                                             type="button"
                                             variant="danger"
+                                            disabled={locked}
                                             onClick={() => onChange('lines', values.lines.filter((_, row) => row !== index))}
                                         >
                                             <Trash2 className="size-3.5" aria-hidden />
@@ -451,6 +510,7 @@ export function WorkOrderForm({
                         <Button
                             type="button"
                             variant="secondary"
+                            disabled={locked}
                             onClick={() => onChange('technicians', [...values.technicians, emptyWorkOrderTechnician()])}
                         >
                             <Plus className="size-3.5" aria-hidden />
@@ -467,13 +527,14 @@ export function WorkOrderForm({
                                         <SearchableSelect
                                             id={`tech-${index}`}
                                             value={technician.company_relationship_id}
+                                            disabled={locked}
                                             onChange={(value) => {
                                                 const next = [...values.technicians];
                                                 next[index] = { ...technician, company_relationship_id: value };
                                                 onChange('technicians', next);
                                             }}
                                             emptyLabel={t('common.select')}
-                                            options={toSelectOptions(technicianOptions)}
+                                            options={toCompanySelectOptions(technicianOptions)}
                                         />
                                     </Field>
                                     <Field label={t('workOrders.quoteNet')} htmlFor={`tech-quote-${index}`} className="sm:col-span-3" error={errors[`technicians.${index}.quote_net_amount`]}>
@@ -482,6 +543,7 @@ export function WorkOrderForm({
                                             type="number"
                                             step="0.01"
                                             value={technician.quote_net_amount}
+                                            disabled={locked}
                                             onChange={(event) => {
                                                 const next = [...values.technicians];
                                                 next[index] = { ...technician, quote_net_amount: event.target.value };
@@ -493,6 +555,7 @@ export function WorkOrderForm({
                                         <Toggle
                                             name={`technicians.${index}.is_selected`}
                                             checked={technician.is_selected}
+                                            disabled={locked}
                                             onCheckedChange={(checked) => {
                                                 const next = [...values.technicians];
                                                 next[index] = { ...technician, is_selected: checked };
@@ -506,6 +569,7 @@ export function WorkOrderForm({
                                         <Button
                                             type="button"
                                             variant="danger"
+                                            disabled={locked}
                                             onClick={() => onChange('technicians', values.technicians.filter((_, row) => row !== index))}
                                         >
                                             <Trash2 className="size-3.5" aria-hidden />

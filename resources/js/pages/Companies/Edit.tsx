@@ -71,6 +71,8 @@ export default function EditCompany({
         latitude: company.latitude !== null && company.latitude !== undefined ? String(company.latitude) : '',
         longitude: company.longitude !== null && company.longitude !== undefined ? String(company.longitude) : '',
         legacy_erp_id: company.legacy_erp_id !== null && company.legacy_erp_id !== undefined ? String(company.legacy_erp_id) : '',
+        logo: null as File | null,
+        remove_logo: false,
     });
 
     function submit(event: FormEvent) {
@@ -200,6 +202,7 @@ export default function EditCompany({
                     provinceOptions={provinceOptions}
                     brandOptions={brandOptions}
                     languageOptions={languageOptions}
+                    currentLogoUrl={company.logo_url}
                     onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.save')}

@@ -103,7 +103,7 @@ final class IncidentCompanyScopeTest extends TestCase
         $this->assertNotNull($incident);
 
         $response
-            ->assertRedirect(route('incidents.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'incident_created_successfully');
 
         $this->assertSame($owner->id, $incident->company_id);

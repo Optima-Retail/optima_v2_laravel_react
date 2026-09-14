@@ -46,7 +46,7 @@ final class ComplimentController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -133,8 +133,14 @@ final class ComplimentController extends Controller
                 : [],
             'typeOptions' => $this->compliments->typeOptions(),
             'brandOptions' => $this->compliments->brandOptions($owner),
-            'customerOptions' => $this->compliments->customerOptions($owner),
-            'establishmentOptions' => $this->compliments->establishmentOptions($owner),
+            'customerOptions' => $this->compliments->customerOptions(
+                $owner,
+                $compliment->company_relationship_id !== null ? (int) $compliment->company_relationship_id : null,
+            ),
+            'establishmentOptions' => $this->compliments->establishmentOptions(
+                $owner,
+                $compliment->establishment_id !== null ? [(int) $compliment->establishment_id] : [],
+            ),
             'userOptions' => $this->compliments->userOptions($owner, $form['user_ids']),
             'can' => [
                 'delete' => $user?->can('delete', $compliment) ?? false,
@@ -151,7 +157,7 @@ final class ComplimentController extends Controller
         $this->compliments->update($compliment, $request->validated());
 
         return redirect()
-            ->route('compliments.index')
+            ->route('compliments.edit', $compliment)
             ->with('success', 'compliment_updated_successfully');
     }
 

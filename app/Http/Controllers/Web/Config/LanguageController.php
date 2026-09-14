@@ -33,7 +33,7 @@ final class LanguageController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class LanguageController extends Controller
 
     public function store(StoreLanguageRequest $request): RedirectResponse
     {
-        $this->languages->create($request->validated());
+        $record = $this->languages->create($request->validated());
 
         return redirect()
-            ->route('config.languages.index')
+            ->route('config.languages.edit', $record)
             ->with('success', 'language_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class LanguageController extends Controller
         $this->languages->update($language, $request->validated());
 
         return redirect()
-            ->route('config.languages.index')
+            ->route('config.languages.edit', $language)
             ->with('success', 'language_updated_successfully');
     }
 

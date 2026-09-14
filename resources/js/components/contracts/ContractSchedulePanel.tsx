@@ -1,17 +1,24 @@
-import { Plus, Trash2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
+import { BaseModal } from '@/components/ui/BaseModal';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { Toggle } from '@/components/ui/Toggle';
 import type { UserOption } from '@/support/types/domain/common';
 import type {
     ContractInvoicingAggregationFormValues,
     ContractIterationFormValues,
 } from '@/support/types/domain/contract';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
+
+const BILLING_DAY_MIN = 1;
+const BILLING_DAY_MAX = 28;
+
+export type ContractScheduleSection = 'aggregations' | 'iterations';
 
 type ContractSchedulePanelProps = {
     iterations: ContractIterationFormValues[];
@@ -23,6 +30,20 @@ type ContractSchedulePanelProps = {
     formTemplateOptions: UserOption[];
     onIterationsChange: (rows: ContractIterationFormValues[]) => void;
     onAggregationsChange: (rows: ContractInvoicingAggregationFormValues[]) => void;
+    /** Which schedule blocks to render. Defaults to both. */
+    sections?: ContractScheduleSection[];
+};
+
+type AggregationEditor = {
+    mode: 'create' | 'edit';
+    index: number | null;
+    draft: ContractInvoicingAggregationFormValues;
+};
+
+type IterationEditor = {
+    mode: 'create' | 'edit';
+    index: number | null;
+    draft: ContractIterationFormValues;
 };
 
 function newTempKey(): string {
@@ -70,6 +91,48 @@ function toSelectOptions(options: UserOption[]) {
     }));
 }
 
+function optionLabel(options: UserOption[], id: string, fallback: string): string {
+    if (!id) {
+        return fallback;
+    }
+
+    return options.find((option) => String(option.id) === id)?.label ?? fallback;
+}
+
+function rowHasErrors(errors: Record<string, string | undefined>, prefix: string): boolean {
+    return Object.keys(errors).some((key) => key === prefix || key.startsWith(`${prefix}.`));
+}
+
+function rowErrorMessages(errors: Record<string, string | undefined>, prefix: string): string[] {
+    return Object.entries(errors)
+        .filter(([key, message]) => Boolean(message) && (key === prefix || key.startsWith(`${prefix}.`)))
+        .map(([, message]) => message as string);
+}
+
+function fieldError(
+    errors: Record<string, string | undefined>,
+    prefix: string | null,
+    field: string,
+): string | undefined {
+    if (prefix === null) {
+        return undefined;
+    }
+
+    return errors[`${prefix}.${field}`];
+}
+
+function parseBillingDay(value: string): number | null {
+    const trimmed = value.trim();
+
+    if (trimmed === '') {
+        return null;
+    }
+
+    const parsed = Number(trimmed);
+
+    return Number.isInteger(parsed) ? parsed : Number.NaN;
+}
+
 export function ContractSchedulePanel({
     iterations,
     invoicingAggregations,
@@ -80,8 +143,17 @@ export function ContractSchedulePanel({
     formTemplateOptions,
     onIterationsChange,
     onAggregationsChange,
+    sections = ['aggregations', 'iterations'],
 }: ContractSchedulePanelProps) {
     const { t } = useTranslation();
+    const showAggregations = sections.includes('aggregations');
+    const showIterations = sections.includes('iterations');
+    const empty = t('common.emDash');
+
+    const [aggregationEditor, setAggregationEditor] = useState<AggregationEditor | null>(null);
+    const [iterationEditor, setIterationEditor] = useState<IterationEditor | null>(null);
+    const [aggregationDraftErrors, setAggregationDraftErrors] = useState<Record<string, string>>({});
+    const openedAggregationErrorRef = useRef<string | null>(null);
 
     const establishmentSelect = useMemo(() => {
         if (!companyId) {
@@ -132,12 +204,136 @@ export function ContractSchedulePanel({
         [t],
     );
 
-    function updateIteration(index: number, patch: Partial<ContractIterationFormValues>) {
-        onIterationsChange(iterations.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+    const aggregationErrorPrefix =
+        aggregationEditor?.mode === 'edit' && aggregationEditor.index !== null
+            ? `invoicing_aggregations.${aggregationEditor.index}`
+            : null;
+    const iterationErrorPrefix =
+        iterationEditor?.mode === 'edit' && iterationEditor.index !== null
+            ? `iterations.${iterationEditor.index}`
+            : null;
+
+    useEffect(() => {
+        if (!showAggregations || aggregationEditor !== null) {
+            return;
+        }
+
+        const erroredIndex = invoicingAggregations.findIndex((_, index) =>
+            rowHasErrors(errors, `invoicing_aggregations.${index}`),
+        );
+
+        if (erroredIndex < 0) {
+            openedAggregationErrorRef.current = null;
+            return;
+        }
+
+        const signature = Object.entries(errors)
+            .filter(([key]) => key.startsWith(`invoicing_aggregations.${erroredIndex}.`))
+            .map(([key, message]) => `${key}:${message}`)
+            .join('|');
+
+        if (signature === '' || signature === openedAggregationErrorRef.current) {
+            return;
+        }
+
+        openedAggregationErrorRef.current = signature;
+        setAggregationDraftErrors({});
+        setAggregationEditor({
+            mode: 'edit',
+            index: erroredIndex,
+            draft: { ...invoicingAggregations[erroredIndex] },
+        });
+    }, [aggregationEditor, errors, invoicingAggregations, showAggregations]);
+
+    function openCreateAggregation() {
+        setAggregationDraftErrors({});
+        setAggregationEditor({
+            mode: 'create',
+            index: null,
+            draft: emptyAggregation(),
+        });
     }
 
-    function updateAggregation(index: number, patch: Partial<ContractInvoicingAggregationFormValues>) {
-        onAggregationsChange(invoicingAggregations.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+    function openEditAggregation(index: number) {
+        setAggregationDraftErrors({});
+        setAggregationEditor({
+            mode: 'edit',
+            index,
+            draft: { ...invoicingAggregations[index] },
+        });
+    }
+
+    function saveAggregationEditor() {
+        if (!aggregationEditor) {
+            return;
+        }
+
+        const billingDay = parseBillingDay(aggregationEditor.draft.billing_day);
+        const nextErrors: Record<string, string> = {};
+
+        if (billingDay !== null && (Number.isNaN(billingDay) || billingDay < BILLING_DAY_MIN || billingDay > BILLING_DAY_MAX)) {
+            nextErrors.billing_day = t('contracts.billingDayRangeError', {
+                min: BILLING_DAY_MIN,
+                max: BILLING_DAY_MAX,
+            });
+        }
+
+        if (Object.keys(nextErrors).length > 0) {
+            setAggregationDraftErrors(nextErrors);
+            return;
+        }
+
+        setAggregationDraftErrors({});
+
+        if (aggregationEditor.mode === 'create') {
+            onAggregationsChange([...invoicingAggregations, aggregationEditor.draft]);
+        } else if (aggregationEditor.index !== null) {
+            onAggregationsChange(
+                invoicingAggregations.map((row, i) =>
+                    i === aggregationEditor.index ? aggregationEditor.draft : row,
+                ),
+            );
+        }
+
+        setAggregationEditor(null);
+    }
+
+    function openCreateIteration() {
+        setIterationEditor({
+            mode: 'create',
+            index: null,
+            draft: emptyIteration(),
+        });
+    }
+
+    function openEditIteration(index: number) {
+        setIterationEditor({
+            mode: 'edit',
+            index,
+            draft: {
+                ...iterations[index],
+                weekdays: [...iterations[index].weekdays],
+                month_days: [...iterations[index].month_days],
+                months: [...iterations[index].months],
+                establishment_ids: [...iterations[index].establishment_ids],
+            },
+        });
+    }
+
+    function saveIterationEditor() {
+        if (!iterationEditor) {
+            return;
+        }
+
+        if (iterationEditor.mode === 'create') {
+            onIterationsChange([...iterations, iterationEditor.draft]);
+        } else if (iterationEditor.index !== null) {
+            onIterationsChange(
+                iterations.map((row, i) => (i === iterationEditor.index ? iterationEditor.draft : row)),
+            );
+        }
+
+        setIterationEditor(null);
     }
 
     function aggregationValue(row: ContractIterationFormValues): string {
@@ -152,255 +348,696 @@ export function ContractSchedulePanel({
         return '';
     }
 
-    function setAggregationLink(index: number, value: string) {
+    function setDraftAggregationLink(value: string) {
+        if (!iterationEditor) {
+            return;
+        }
+
         if (value.startsWith('id:')) {
-            updateIteration(index, {
-                invoicing_aggregation_id: value.slice(3),
-                invoicing_aggregation_temp_key: '',
+            setIterationEditor({
+                ...iterationEditor,
+                draft: {
+                    ...iterationEditor.draft,
+                    invoicing_aggregation_id: value.slice(3),
+                    invoicing_aggregation_temp_key: '',
+                },
             });
             return;
         }
 
         if (value.startsWith('tmp:')) {
-            updateIteration(index, {
-                invoicing_aggregation_id: '',
-                invoicing_aggregation_temp_key: value.slice(4),
+            setIterationEditor({
+                ...iterationEditor,
+                draft: {
+                    ...iterationEditor.draft,
+                    invoicing_aggregation_id: '',
+                    invoicing_aggregation_temp_key: value.slice(4),
+                },
             });
             return;
         }
 
-        updateIteration(index, {
-            invoicing_aggregation_id: '',
-            invoicing_aggregation_temp_key: '',
+        setIterationEditor({
+            ...iterationEditor,
+            draft: {
+                ...iterationEditor.draft,
+                invoicing_aggregation_id: '',
+                invoicing_aggregation_temp_key: '',
+            },
         });
     }
 
+    function frequencyLabel(value: string): string {
+        const key = `contracts.frequency.${value}`;
+        const label = t(key);
+
+        return label === key ? value || empty : label;
+    }
+
+    function periodicityLabel(value: string): string {
+        if (value === 'weekly') {
+            return t('contracts.periodicityWeekly');
+        }
+
+        if (value === 'monthly') {
+            return t('contracts.periodicityMonthly');
+        }
+
+        return value || empty;
+    }
+
     return (
-        <div className="space-y-8 border-t border-line pt-6">
-            <section className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h3 className="text-sm font-semibold text-ink">{t('contracts.aggregationsTitle')}</h3>
-                        <p className="text-sm text-muted">{t('contracts.aggregationsDescription')}</p>
-                    </div>
-                    <Button type="button" variant="secondary" onClick={() => onAggregationsChange([...invoicingAggregations, emptyAggregation()])}>
-                        <Plus className="size-4" aria-hidden />
-                        {t('contracts.addAggregation')}
-                    </Button>
-                </div>
-
-                {invoicingAggregations.length === 0 ? (
-                    <p className="text-sm text-muted">{t('contracts.aggregationsEmpty')}</p>
-                ) : (
-                    invoicingAggregations.map((row, index) => (
-                        <div key={row.id ?? row.temp_key} className="space-y-4 rounded-xl border border-line p-4">
-                            <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-medium text-ink">
-                                    {t('contracts.aggregationLabel', { index: index + 1 })}
-                                </p>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={() => onAggregationsChange(invoicingAggregations.filter((_, i) => i !== index))}
-                                >
-                                    <Trash2 className="size-4" aria-hidden />
-                                    {t('common.delete')}
-                                </Button>
-                            </div>
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Field label={t('contracts.aggregationSubject')} error={errors[`invoicing_aggregations.${index}.subject`]}>
-                                    <Input
-                                        value={row.subject}
-                                        onChange={(event) => updateAggregation(index, { subject: event.target.value })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.billingFrequency')} error={errors[`invoicing_aggregations.${index}.billing_frequency`]}>
-                                    <SearchableSelect
-                                        value={row.billing_frequency}
-                                        options={[
-                                            { value: 'monthly', label: t('contracts.frequency.monthly') },
-                                            { value: 'bimonthly', label: t('contracts.frequency.bimonthly') },
-                                            { value: 'quarterly', label: t('contracts.frequency.quarterly') },
-                                            { value: 'annually', label: t('contracts.frequency.annually') },
-                                            { value: 'biannually', label: t('contracts.frequency.biannually') },
-                                        ]}
-                                        onChange={(value) => updateAggregation(index, { billing_frequency: value as ContractInvoicingAggregationFormValues['billing_frequency'] })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.billingDay')} error={errors[`invoicing_aggregations.${index}.billing_day`]}>
-                                    <Input
-                                        type="number"
-                                        min={1}
-                                        max={28}
-                                        value={row.billing_day}
-                                        onChange={(event) => updateAggregation(index, { billing_day: event.target.value })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.billingCycleStart')} error={errors[`invoicing_aggregations.${index}.billing_cycle_start`]}>
-                                    <Input
-                                        type="date"
-                                        value={row.billing_cycle_start}
-                                        onChange={(event) => updateAggregation(index, { billing_cycle_start: event.target.value })}
-                                    />
-                                </Field>
-                                <label className="flex items-center gap-2 text-sm text-ink sm:col-span-2">
-                                    <input
-                                        type="checkbox"
-                                        checked={row.per_establishment}
-                                        onChange={(event) => updateAggregation(index, { per_establishment: event.target.checked })}
-                                    />
-                                    {t('contracts.perEstablishment')}
-                                </label>
-                            </div>
+        <div className={showAggregations && showIterations ? 'space-y-8 border-t border-line pt-6' : 'space-y-4'}>
+            {showAggregations ? (
+                <section className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 className="text-sm font-semibold text-ink">{t('contracts.aggregationsTitle')}</h3>
+                            <p className="text-sm text-muted">{t('contracts.aggregationsDescription')}</p>
                         </div>
-                    ))
-                )}
-            </section>
-
-            <section className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h3 className="text-sm font-semibold text-ink">{t('contracts.iterationsTitle')}</h3>
-                        <p className="text-sm text-muted">{t('contracts.iterationsDescription')}</p>
+                        <Button type="button" variant="secondary" onClick={openCreateAggregation}>
+                            <Plus className="size-4" aria-hidden />
+                            {t('contracts.addAggregation')}
+                        </Button>
                     </div>
-                    <Button type="button" variant="secondary" onClick={() => onIterationsChange([...iterations, emptyIteration()])}>
-                        <Plus className="size-4" aria-hidden />
-                        {t('contracts.addIteration')}
-                    </Button>
-                </div>
 
-                {iterations.length === 0 ? (
-                    <p className="text-sm text-muted">{t('contracts.iterationsEmpty')}</p>
-                ) : (
-                    iterations.map((row, index) => (
-                        <div key={row.id ?? row.temp_key} className="space-y-4 rounded-xl border border-line p-4">
-                            <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-medium text-ink">
-                                    {t('contracts.iterationLabel', { index: index + 1 })}
-                                </p>
-                                <Button
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={() => onIterationsChange(iterations.filter((_, i) => i !== index))}
-                                >
-                                    <Trash2 className="size-4" aria-hidden />
-                                    {t('common.delete')}
-                                </Button>
-                            </div>
+                    {invoicingAggregations.length === 0 ? (
+                        <p className="text-sm text-muted">{t('contracts.aggregationsEmpty')}</p>
+                    ) : (
+                        <div className="overflow-x-auto rounded-xl border border-line">
+                            <table className="min-w-full text-left text-sm">
+                                <thead className="border-b border-line bg-canvas/60 text-xs uppercase tracking-wide text-ink-muted">
+                                    <tr>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.aggregationSubject')}</th>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.billingFrequency')}</th>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.billingDay')}</th>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.billingCycleStart')}</th>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.perEstablishment')}</th>
+                                        <th className="px-4 py-3 font-medium text-right">{t('common.actions')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {invoicingAggregations.map((row, index) => {
+                                        const prefix = `invoicing_aggregations.${index}`;
+                                        const hasErrors = rowHasErrors(errors, prefix);
+                                        const messages = rowErrorMessages(errors, prefix);
 
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <Field label={t('contracts.iterationSubject')} error={errors[`iterations.${index}.subject`]} className="sm:col-span-2">
-                                    <Input
-                                        value={row.subject}
-                                        onChange={(event) => updateIteration(index, { subject: event.target.value })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.workOrderType')} error={errors[`iterations.${index}.work_order_type_id`]} required>
-                                    <SearchableSelect
-                                        value={row.work_order_type_id}
-                                        options={toSelectOptions(workOrderTypeOptions)}
-                                        onChange={(value) => updateIteration(index, { work_order_type_id: value })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.formTemplate')} error={errors[`iterations.${index}.form_template_id`]}>
-                                    <SearchableSelect
-                                        value={row.form_template_id}
-                                        options={toSelectOptions(formTemplateOptions)}
-                                        onChange={(value) => updateIteration(index, { form_template_id: value })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.startsOn')} error={errors[`iterations.${index}.starts_on`]} required>
-                                    <Input
-                                        type="date"
-                                        value={row.starts_on}
-                                        onChange={(event) => updateIteration(index, { starts_on: event.target.value })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.endsOn')} error={errors[`iterations.${index}.ends_on`]} required>
-                                    <Input
-                                        type="date"
-                                        value={row.ends_on}
-                                        onChange={(event) => updateIteration(index, { ends_on: event.target.value })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.periodicity')} error={errors[`iterations.${index}.periodicity`]} required>
-                                    <SearchableSelect
-                                        value={row.periodicity}
-                                        options={[
-                                            { value: 'weekly', label: t('contracts.periodicityWeekly') },
-                                            { value: 'monthly', label: t('contracts.periodicityMonthly') },
-                                        ]}
-                                        onChange={(value) => updateIteration(index, { periodicity: value as ContractIterationFormValues['periodicity'] })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.periodicityKind')} error={errors[`iterations.${index}.periodicity_kind`]} required>
-                                    <SearchableSelect
-                                        value={row.periodicity_kind}
-                                        options={[
-                                            { value: 'basic', label: t('contracts.periodicityBasic') },
-                                            { value: 'complex', label: t('contracts.periodicityComplex') },
-                                        ]}
-                                        onChange={(value) => updateIteration(index, { periodicity_kind: value as ContractIterationFormValues['periodicity_kind'] })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.interval')} error={errors[`iterations.${index}.interval`]}>
-                                    <Input
-                                        type="number"
-                                        min={1}
-                                        value={row.interval}
-                                        onChange={(event) => updateIteration(index, { interval: event.target.value })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.costAmount')} error={errors[`iterations.${index}.cost_amount`]} required>
-                                    <Input
-                                        type="number"
-                                        min={0}
-                                        step="0.01"
-                                        value={row.cost_amount}
-                                        onChange={(event) => updateIteration(index, { cost_amount: event.target.value })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.weekdays')} error={errors[`iterations.${index}.weekdays`]} className="sm:col-span-2">
-                                    <MultiSelect
-                                        value={row.weekdays}
-                                        options={weekdayOptions}
-                                        onChange={(values) => updateIteration(index, { weekdays: values })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.monthDays')} error={errors[`iterations.${index}.month_days`]} className="sm:col-span-2">
-                                    <MultiSelect
-                                        value={row.month_days}
-                                        options={monthDayOptions}
-                                        onChange={(values) => updateIteration(index, { month_days: values })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.months')} error={errors[`iterations.${index}.months`]} className="sm:col-span-2">
-                                    <MultiSelect
-                                        value={row.months}
-                                        options={monthOptions}
-                                        onChange={(values) => updateIteration(index, { months: values })}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.iterationEstablishments')} error={errors[`iterations.${index}.establishment_ids`]} className="sm:col-span-2">
-                                    <MultiSelect
-                                        value={row.establishment_ids}
-                                        options={establishmentSelect}
-                                        onChange={(values) => updateIteration(index, { establishment_ids: values })}
-                                        placeholder={companyId ? t('contracts.establishmentsPlaceholder') : t('contracts.selectClientFirst')}
-                                    />
-                                </Field>
-                                <Field label={t('contracts.invoicingAggregation')} error={errors[`iterations.${index}.invoicing_aggregation_id`]} className="sm:col-span-2">
-                                    <SearchableSelect
-                                        value={aggregationValue(row)}
-                                        options={aggregationOptions}
-                                        onChange={(value) => setAggregationLink(index, value)}
-                                    />
-                                </Field>
-                            </div>
+                                        return (
+                                            <Fragment key={row.id ?? row.temp_key}>
+                                                <tr
+                                                    className={`border-b border-line last:border-b-0 ${
+                                                        hasErrors ? 'bg-danger/5' : ''
+                                                    }`}
+                                                >
+                                                    <td className="px-4 py-3 font-medium text-ink">
+                                                        {row.subject ||
+                                                            t('contracts.aggregationUntitled', {
+                                                                index: index + 1,
+                                                            })}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-ink-muted">
+                                                        {frequencyLabel(row.billing_frequency)}
+                                                    </td>
+                                                    <td
+                                                        className={`px-4 py-3 ${
+                                                            errors[`${prefix}.billing_day`]
+                                                                ? 'font-medium text-danger'
+                                                                : 'text-ink-muted'
+                                                        }`}
+                                                    >
+                                                        {row.billing_day || empty}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-ink-muted">
+                                                        {row.billing_cycle_start || empty}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-ink-muted">
+                                                        {row.per_establishment
+                                                            ? t('common.yes')
+                                                            : t('common.no')}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                onClick={() => openEditAggregation(index)}
+                                                                aria-label={t('common.edit')}
+                                                            >
+                                                                <Pencil className="size-4" aria-hidden />
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="ghost"
+                                                                onClick={() =>
+                                                                    onAggregationsChange(
+                                                                        invoicingAggregations.filter(
+                                                                            (_, i) => i !== index,
+                                                                        ),
+                                                                    )
+                                                                }
+                                                                aria-label={t('common.delete')}
+                                                            >
+                                                                <Trash2 className="size-4" aria-hidden />
+                                                            </Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                                {messages.length > 0 ? (
+                                                    <tr className="border-b border-line bg-danger/5 last:border-b-0">
+                                                        <td
+                                                            colSpan={6}
+                                                            className="px-4 py-2 text-sm text-danger"
+                                                        >
+                                                            {messages.join(' · ')}
+                                                        </td>
+                                                    </tr>
+                                                ) : null}
+                                            </Fragment>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
-                    ))
-                )}
-            </section>
+                    )}
+                </section>
+            ) : null}
+
+            {showIterations ? (
+                <section className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 className="text-sm font-semibold text-ink">{t('contracts.iterationsTitle')}</h3>
+                            <p className="text-sm text-muted">{t('contracts.iterationsDescription')}</p>
+                        </div>
+                        <Button type="button" variant="secondary" onClick={openCreateIteration}>
+                            <Plus className="size-4" aria-hidden />
+                            {t('contracts.addIteration')}
+                        </Button>
+                    </div>
+
+                    {iterations.length === 0 ? (
+                        <p className="text-sm text-muted">{t('contracts.iterationsEmpty')}</p>
+                    ) : (
+                        <div className="overflow-x-auto rounded-xl border border-line">
+                            <table className="min-w-full text-left text-sm">
+                                <thead className="border-b border-line bg-canvas/60 text-xs uppercase tracking-wide text-ink-muted">
+                                    <tr>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.iterationSubject')}</th>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.workOrderType')}</th>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.startsOn')}</th>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.endsOn')}</th>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.periodicity')}</th>
+                                        <th className="px-4 py-3 font-medium">{t('contracts.costAmount')}</th>
+                                        <th className="px-4 py-3 font-medium text-right">{t('common.actions')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {iterations.map((row, index) => (
+                                        <tr
+                                            key={row.id ?? row.temp_key}
+                                            className={`border-b border-line last:border-b-0 ${
+                                                rowHasErrors(errors, `iterations.${index}`) ? 'bg-danger/5' : ''
+                                            }`}
+                                        >
+                                            <td className="px-4 py-3 font-medium text-ink">
+                                                {row.subject || t('contracts.iterationLabel', { index: index + 1 })}
+                                            </td>
+                                            <td className="px-4 py-3 text-ink-muted">
+                                                {optionLabel(workOrderTypeOptions, row.work_order_type_id, empty)}
+                                            </td>
+                                            <td className="px-4 py-3 text-ink-muted">{row.starts_on || empty}</td>
+                                            <td className="px-4 py-3 text-ink-muted">{row.ends_on || empty}</td>
+                                            <td className="px-4 py-3 text-ink-muted">{periodicityLabel(row.periodicity)}</td>
+                                            <td className="px-4 py-3 text-ink-muted">{row.cost_amount || empty}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        onClick={() => openEditIteration(index)}
+                                                        aria-label={t('common.edit')}
+                                                    >
+                                                        <Pencil className="size-4" aria-hidden />
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        onClick={() =>
+                                                            onIterationsChange(iterations.filter((_, i) => i !== index))
+                                                        }
+                                                        aria-label={t('common.delete')}
+                                                    >
+                                                        <Trash2 className="size-4" aria-hidden />
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </section>
+            ) : null}
+
+            {aggregationEditor ? (
+                <BaseModal
+                    open
+                    size="lg"
+                    title={
+                        aggregationEditor.mode === 'create'
+                            ? t('contracts.addAggregation')
+                            : t('contracts.editAggregation')
+                    }
+                    onClose={() => {
+                        setAggregationDraftErrors({});
+                        setAggregationEditor(null);
+                    }}
+                    footer={
+                        <>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => {
+                                    setAggregationDraftErrors({});
+                                    setAggregationEditor(null);
+                                }}
+                            >
+                                {t('common.cancel')}
+                            </Button>
+                            <Button type="button" onClick={saveAggregationEditor}>
+                                {t('common.save')}
+                            </Button>
+                        </>
+                    }
+                >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Field
+                            label={t('contracts.aggregationSubject')}
+                            htmlFor="aggregation_subject"
+                            error={fieldError(errors, aggregationErrorPrefix, 'subject')}
+                            className="sm:col-span-2"
+                        >
+                            <Input
+                                id="aggregation_subject"
+                                value={aggregationEditor.draft.subject}
+                                onChange={(event) =>
+                                    setAggregationEditor({
+                                        ...aggregationEditor,
+                                        draft: { ...aggregationEditor.draft, subject: event.target.value },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.billingFrequency')}
+                            htmlFor="aggregation_billing_frequency"
+                            error={fieldError(errors, aggregationErrorPrefix, 'billing_frequency')}
+                        >
+                            <SearchableSelect
+                                id="aggregation_billing_frequency"
+                                value={aggregationEditor.draft.billing_frequency}
+                                options={[
+                                    { value: 'monthly', label: t('contracts.frequency.monthly') },
+                                    { value: 'bimonthly', label: t('contracts.frequency.bimonthly') },
+                                    { value: 'quarterly', label: t('contracts.frequency.quarterly') },
+                                    { value: 'annually', label: t('contracts.frequency.annually') },
+                                    { value: 'biannually', label: t('contracts.frequency.biannually') },
+                                ]}
+                                onChange={(value) =>
+                                    setAggregationEditor({
+                                        ...aggregationEditor,
+                                        draft: {
+                                            ...aggregationEditor.draft,
+                                            billing_frequency:
+                                                value as ContractInvoicingAggregationFormValues['billing_frequency'],
+                                        },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.billingDay')}
+                            htmlFor="aggregation_billing_day"
+                            error={
+                                aggregationDraftErrors.billing_day ||
+                                fieldError(errors, aggregationErrorPrefix, 'billing_day')
+                            }
+                        >
+                            <Input
+                                id="aggregation_billing_day"
+                                type="number"
+                                min={BILLING_DAY_MIN}
+                                max={BILLING_DAY_MAX}
+                                value={aggregationEditor.draft.billing_day}
+                                onChange={(event) => {
+                                    setAggregationDraftErrors((current) => {
+                                        if (!current.billing_day) {
+                                            return current;
+                                        }
+
+                                        const { billing_day: _removed, ...rest } = current;
+
+                                        return rest;
+                                    });
+                                    setAggregationEditor({
+                                        ...aggregationEditor,
+                                        draft: { ...aggregationEditor.draft, billing_day: event.target.value },
+                                    });
+                                }}
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.billingCycleStart')}
+                            htmlFor="aggregation_billing_cycle_start"
+                            error={fieldError(errors, aggregationErrorPrefix, 'billing_cycle_start')}
+                        >
+                            <Input
+                                id="aggregation_billing_cycle_start"
+                                type="date"
+                                value={aggregationEditor.draft.billing_cycle_start}
+                                onChange={(event) =>
+                                    setAggregationEditor({
+                                        ...aggregationEditor,
+                                        draft: {
+                                            ...aggregationEditor.draft,
+                                            billing_cycle_start: event.target.value,
+                                        },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <div className="sm:col-span-2">
+                            <Toggle
+                                name="per_establishment"
+                                checked={aggregationEditor.draft.per_establishment}
+                                onCheckedChange={(checked) =>
+                                    setAggregationEditor({
+                                        ...aggregationEditor,
+                                        draft: {
+                                            ...aggregationEditor.draft,
+                                            per_establishment: checked,
+                                        },
+                                    })
+                                }
+                                checkedLabel={t('contracts.perEstablishment')}
+                                uncheckedLabel={t('contracts.perEstablishmentOff')}
+                            />
+                        </div>
+                    </div>
+                </BaseModal>
+            ) : null}
+
+            {iterationEditor ? (
+                <BaseModal
+                    open
+                    size="xl"
+                    title={
+                        iterationEditor.mode === 'create'
+                            ? t('contracts.addIteration')
+                            : t('contracts.editIteration')
+                    }
+                    onClose={() => setIterationEditor(null)}
+                    footer={
+                        <>
+                            <Button type="button" variant="secondary" onClick={() => setIterationEditor(null)}>
+                                {t('common.cancel')}
+                            </Button>
+                            <Button type="button" onClick={saveIterationEditor}>
+                                {t('common.save')}
+                            </Button>
+                        </>
+                    }
+                >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Field
+                            label={t('contracts.iterationSubject')}
+                            htmlFor="iteration_subject"
+                            error={fieldError(errors, iterationErrorPrefix, 'subject')}
+                            className="sm:col-span-2"
+                        >
+                            <Input
+                                id="iteration_subject"
+                                value={iterationEditor.draft.subject}
+                                onChange={(event) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, subject: event.target.value },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.workOrderType')}
+                            htmlFor="iteration_work_order_type_id"
+                            error={fieldError(errors, iterationErrorPrefix, 'work_order_type_id')}
+                            required
+                        >
+                            <SearchableSelect
+                                id="iteration_work_order_type_id"
+                                value={iterationEditor.draft.work_order_type_id}
+                                options={toSelectOptions(workOrderTypeOptions)}
+                                onChange={(value) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, work_order_type_id: value },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.formTemplate')}
+                            htmlFor="iteration_form_template_id"
+                            error={fieldError(errors, iterationErrorPrefix, 'form_template_id')}
+                        >
+                            <SearchableSelect
+                                id="iteration_form_template_id"
+                                value={iterationEditor.draft.form_template_id}
+                                options={toSelectOptions(formTemplateOptions)}
+                                onChange={(value) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, form_template_id: value },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.startsOn')}
+                            htmlFor="iteration_starts_on"
+                            error={fieldError(errors, iterationErrorPrefix, 'starts_on')}
+                            required
+                        >
+                            <Input
+                                id="iteration_starts_on"
+                                type="date"
+                                value={iterationEditor.draft.starts_on}
+                                onChange={(event) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, starts_on: event.target.value },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.endsOn')}
+                            htmlFor="iteration_ends_on"
+                            error={fieldError(errors, iterationErrorPrefix, 'ends_on')}
+                            required
+                        >
+                            <Input
+                                id="iteration_ends_on"
+                                type="date"
+                                value={iterationEditor.draft.ends_on}
+                                onChange={(event) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, ends_on: event.target.value },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.periodicity')}
+                            htmlFor="iteration_periodicity"
+                            error={fieldError(errors, iterationErrorPrefix, 'periodicity')}
+                            required
+                        >
+                            <SearchableSelect
+                                id="iteration_periodicity"
+                                value={iterationEditor.draft.periodicity}
+                                options={[
+                                    { value: 'weekly', label: t('contracts.periodicityWeekly') },
+                                    { value: 'monthly', label: t('contracts.periodicityMonthly') },
+                                ]}
+                                onChange={(value) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: {
+                                            ...iterationEditor.draft,
+                                            periodicity: value as ContractIterationFormValues['periodicity'],
+                                        },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.periodicityKind')}
+                            htmlFor="iteration_periodicity_kind"
+                            error={fieldError(errors, iterationErrorPrefix, 'periodicity_kind')}
+                            required
+                        >
+                            <SearchableSelect
+                                id="iteration_periodicity_kind"
+                                value={iterationEditor.draft.periodicity_kind}
+                                options={[
+                                    { value: 'basic', label: t('contracts.periodicityBasic') },
+                                    { value: 'complex', label: t('contracts.periodicityComplex') },
+                                ]}
+                                onChange={(value) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: {
+                                            ...iterationEditor.draft,
+                                            periodicity_kind:
+                                                value as ContractIterationFormValues['periodicity_kind'],
+                                        },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.interval')}
+                            htmlFor="iteration_interval"
+                            error={fieldError(errors, iterationErrorPrefix, 'interval')}
+                        >
+                            <Input
+                                id="iteration_interval"
+                                type="number"
+                                min={1}
+                                value={iterationEditor.draft.interval}
+                                onChange={(event) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, interval: event.target.value },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.costAmount')}
+                            htmlFor="iteration_cost_amount"
+                            error={fieldError(errors, iterationErrorPrefix, 'cost_amount')}
+                            required
+                        >
+                            <Input
+                                id="iteration_cost_amount"
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={iterationEditor.draft.cost_amount}
+                                onChange={(event) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, cost_amount: event.target.value },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.weekdays')}
+                            htmlFor="iteration_weekdays"
+                            error={fieldError(errors, iterationErrorPrefix, 'weekdays')}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="iteration_weekdays"
+                                value={iterationEditor.draft.weekdays}
+                                options={weekdayOptions}
+                                onChange={(values) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, weekdays: values },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.monthDays')}
+                            htmlFor="iteration_month_days"
+                            error={fieldError(errors, iterationErrorPrefix, 'month_days')}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="iteration_month_days"
+                                value={iterationEditor.draft.month_days}
+                                options={monthDayOptions}
+                                onChange={(values) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, month_days: values },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.months')}
+                            htmlFor="iteration_months"
+                            error={fieldError(errors, iterationErrorPrefix, 'months')}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="iteration_months"
+                                value={iterationEditor.draft.months}
+                                options={monthOptions}
+                                onChange={(values) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, months: values },
+                                    })
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.iterationEstablishments')}
+                            htmlFor="iteration_establishment_ids"
+                            error={fieldError(errors, iterationErrorPrefix, 'establishment_ids')}
+                            className="sm:col-span-2"
+                        >
+                            <MultiSelect
+                                id="iteration_establishment_ids"
+                                value={iterationEditor.draft.establishment_ids}
+                                options={establishmentSelect}
+                                onChange={(values) =>
+                                    setIterationEditor({
+                                        ...iterationEditor,
+                                        draft: { ...iterationEditor.draft, establishment_ids: values },
+                                    })
+                                }
+                                placeholder={
+                                    companyId
+                                        ? t('contracts.establishmentsPlaceholder')
+                                        : t('contracts.selectClientFirst')
+                                }
+                            />
+                        </Field>
+                        <Field
+                            label={t('contracts.invoicingAggregation')}
+                            htmlFor="iteration_invoicing_aggregation_id"
+                            error={fieldError(errors, iterationErrorPrefix, 'invoicing_aggregation_id')}
+                            className="sm:col-span-2"
+                        >
+                            <SearchableSelect
+                                id="iteration_invoicing_aggregation_id"
+                                value={aggregationValue(iterationEditor.draft)}
+                                options={aggregationOptions}
+                                onChange={setDraftAggregationLink}
+                            />
+                        </Field>
+                    </div>
+                </BaseModal>
+            ) : null}
         </div>
     );
 }

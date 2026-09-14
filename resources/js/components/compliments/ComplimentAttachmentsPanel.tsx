@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { Download, Eye, FileText, Paperclip, Trash2, Upload } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { AttachmentImagePreviewModal } from '@/components/attachments/AttachmentImagePreviewModal';
 import { Button } from '@/components/ui/Button';
-import { BaseModal } from '@/components/ui/BaseModal';
 import { confirmAction } from '@/helpers/confirm';
 import { complimentsService } from '@/services';
 import type { ComplimentAttachmentItem } from '@/support/types/domain/compliment';
@@ -177,22 +177,13 @@ export function ComplimentAttachmentsPanel({
                 )}
             </div>
 
-            <BaseModal
+            <AttachmentImagePreviewModal
                 open={preview !== null}
                 title={preview?.name ?? t('compliments.attachment')}
+                src={preview?.view_url ?? null}
+                alt={preview?.name}
                 onClose={() => setPreview(null)}
-                size="xl"
-            >
-                {preview ? (
-                    <div className="flex justify-center">
-                        <img
-                            src={preview.view_url}
-                            alt={preview.name}
-                            className="max-h-[70vh] w-auto max-w-full rounded-lg object-contain"
-                        />
-                    </div>
-                ) : null}
-            </BaseModal>
+            />
         </>
     );
 }

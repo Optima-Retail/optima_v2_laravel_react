@@ -134,6 +134,11 @@ Legacy 2026 CRM `companies` / `contacts` / `workplaces` / `deals` sits **beside*
 | [13-forms-and-templates.md](13-forms-and-templates.md) | Plantillas + formularios (templates / filled forms) |
 | [14-contract-iterations.md](14-contract-iterations.md) | Contract iterations (`iteraciones`) + invoicing aggregations |
 | [15-table-inventory.md](15-table-inventory.md) | Old ↔ new names, v2-only tables, skipped tables |
+| [16-technician-requests.md](16-technician-requests.md) | Technician requests / petitions |
+| [17-document-chats.md](17-document-chats.md) | Typed document chats (split polymorphic chats) |
+| [18-technician-rates-ratings-establishment-lists.md](18-technician-rates-ratings-establishment-lists.md) | Technician rates / ratings / establishment lists |
+| [19-establishment-attachments-and-templates.md](19-establishment-attachments-and-templates.md) | Establishment attachments + plantilla work_order_type_id |
+| [20-status-change-histories.md](20-status-change-histories.md) | Status audit + History-tab system chat lines |
 
 Machine-readable mappings: `database/migration/mappings/`.
 

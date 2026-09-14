@@ -1,14 +1,16 @@
-import { FormEvent } from 'react';
+import { FormEvent, useMemo } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { BrandClientsPanel } from '@/components/config/brands/BrandClientsPanel';
 import { BrandForm } from '@/components/config/brands/BrandForm';
 import { BrandMessagesPanel } from '@/components/config/brands/BrandMessagesPanel';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
+import { TabPanel, Tabs } from '@/components/ui/Tabs';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
-import { brandsService } from '@/services';
+import { brandsService, type BrandClientRow } from '@/services/brands';
 import type { BrandFormData, BrandMessageItem } from '@/support/types/domain/brand';
 import type { UserOption } from '@/support/types/domain/common';
 
@@ -16,8 +18,10 @@ type EditBrandProps = {
     brand: BrandFormData;
     userOptions: UserOption[];
     messages: BrandMessageItem[];
+    clients: BrandClientRow[];
     can: {
         delete: boolean;
+        update_clients: boolean;
         view_messages: boolean;
         send_messages: boolean;
         view_message_files: boolean;
@@ -26,7 +30,7 @@ type EditBrandProps = {
     };
 };
 
-export default function EditBrand({ brand, userOptions, messages, can }: EditBrandProps) {
+export default function EditBrand({ brand, userOptions, messages, clients, can }: EditBrandProps) {
     const { t } = useTranslation();
     const form = useForm({
         name: brand.name,
@@ -37,6 +41,12 @@ export default function EditBrand({ brand, userOptions, messages, can }: EditBra
         is_quality_control_contactable: brand.is_quality_control_contactable,
         send_debt_reminders: brand.send_debt_reminders,
     });
+
+    const defaultTab = useMemo(() => {
+        const tab = new URLSearchParams(window.location.search).get('tab');
+
+        return tab === 'clients' ? 'clients' : 'details';
+    }, []);
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -67,39 +77,56 @@ export default function EditBrand({ brand, userOptions, messages, can }: EditBra
                     backLabel={t('common.backTo', { resource: t('brands.resourcePlural') })}
                 />
 
-                <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.9fr)]">
-                    <BrandForm
-                        values={form.data}
-                        errors={form.errors}
-                        processing={form.processing}
-                        userOptions={userOptions}
-                        onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
-                        onSubmit={submit}
-                        submitLabel={t('common.save')}
-                        submitIcon={<Save className="size-4" aria-hidden />}
-                        actions={
-                            can.delete ? (
-                                <Button type="button" variant="danger" onClick={destroyBrand}>
-                                    <Trash2 className="size-4" aria-hidden />
-                                    {t('common.delete')}
-                                </Button>
-                            ) : null
-                        }
-                    />
+                <Tabs
+                    items={[
+                        { id: 'details', label: t('brands.tabs.details') },
+                        {
+                            id: 'clients',
+                            label: t('brands.tabs.clients', { count: clients.length }),
+                        },
+                    ]}
+                    defaultValue={defaultTab}
+                >
+                    <TabPanel id="details">
+                        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(20rem,0.9fr)]">
+                            <BrandForm
+                                values={form.data}
+                                errors={form.errors}
+                                processing={form.processing}
+                                userOptions={userOptions}
+                                onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
+                                onSubmit={submit}
+                                submitLabel={t('common.save')}
+                                submitIcon={<Save className="size-4" aria-hidden />}
+                                actions={
+                                    can.delete ? (
+                                        <Button type="button" variant="danger" onClick={destroyBrand}>
+                                            <Trash2 className="size-4" aria-hidden />
+                                            {t('common.delete')}
+                                        </Button>
+                                    ) : null
+                                }
+                            />
 
-                    {can.view_messages ? (
-                        <BrandMessagesPanel
-                            brandId={brand.id}
-                            messages={messages}
-                            can={{
-                                send_messages: can.send_messages,
-                                view_message_files: can.view_message_files,
-                                download_message_files: can.download_message_files,
-                                send_message_files: can.send_message_files,
-                            }}
-                        />
-                    ) : null}
-                </div>
+                            {can.view_messages ? (
+                                <BrandMessagesPanel
+                                    brandId={brand.id}
+                                    messages={messages}
+                                    can={{
+                                        send_messages: can.send_messages,
+                                        view_message_files: can.view_message_files,
+                                        download_message_files: can.download_message_files,
+                                        send_message_files: can.send_message_files,
+                                    }}
+                                />
+                            ) : null}
+                        </div>
+                    </TabPanel>
+
+                    <TabPanel id="clients">
+                        <BrandClientsPanel clients={clients} canEdit={can.update_clients} />
+                    </TabPanel>
+                </Tabs>
             </div>
         </AppLayout>
     );

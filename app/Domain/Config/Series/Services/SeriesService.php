@@ -97,17 +97,34 @@ final class SeriesService
     /**
      * @return list<array{id: int, label: string}>
      */
-    public function seriesOptions(): array
+    /**
+     * Selectable series for selects. Keep `$includeId` so edit still shows a saved non-selectable value.
+     *
+     * @return list<array{id: int, label: string}>
+     */
+    public function seriesOptions(?int $excludeId = null, ?int $includeId = null): array
     {
         /** @var Collection<int, Series> $rows */
-        $rows = Series::query()->orderBy('key')->get(['id', 'key']);
+        $rows = Series::query()
+            ->where(function ($query) use ($includeId): void {
+                $query->where('is_selectable', true);
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
+            ->orderBy('key')
+            ->get(['id', 'key']);
 
         return $rows
+            ->when($excludeId !== null, fn (Collection $items) => $items->reject(
+                fn (Series $series): bool => $series->id === $excludeId,
+            ))
+            ->values()
             ->map(fn (Series $series): array => [
                 'id' => $series->id,
                 'label' => $series->key,
             ])
-            ->values()
             ->all();
     }
 

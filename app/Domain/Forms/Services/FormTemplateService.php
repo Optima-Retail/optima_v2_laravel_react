@@ -239,28 +239,38 @@ final class FormTemplateService
     /**
      * @return list<array{id: int, label: string}>
      */
-    public function customerOptions(?Company $owner = null): array
+    /**
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function customerOptions(?Company $owner = null, ?int $includeId = null): array
     {
         $query = CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename')
-            ->where('kind', CompanyRelationshipKind::Customer->value);
+            ->with('relatedCompany:id,name,tradename,logo,is_active')
+            ->where('kind', CompanyRelationshipKind::Customer->value)
+            ->where(function ($inner) use ($includeId): void {
+                $inner->whereHas('relatedCompany', fn ($company) => $company->where('is_active', true));
+
+                if ($includeId !== null) {
+                    $inner->orWhereKey($includeId);
+                }
+            });
 
         if ($owner !== null) {
             $query->where('owner_company_id', $owner->id);
         }
 
         return $query->limit(500)->get()
-            ->map(fn (CompanyRelationship $rel): array => [
-                'id' => $rel->id,
-                'label' => (string) ($rel->relatedCompany?->name ?? $rel->relatedCompany?->tradename ?? '#'.$rel->id),
-            ])
+            ->map(fn (CompanyRelationship $rel): array => $rel->toSelectOption(
+                (string) ($rel->relatedCompany?->name ?? $rel->relatedCompany?->tradename ?? '#'.$rel->id),
+            ))
             ->values()->all();
     }
 
     /**
+     * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string}>
      */
-    public function establishmentOptions(?Company $owner = null): array
+    public function establishmentOptions(?Company $owner = null, array $includeIds = []): array
     {
         $query = Establishment::query()->orderBy('name');
 
@@ -270,6 +280,19 @@ final class FormTemplateService
                 ->pluck('related_company_id');
             $query->whereIn('company_id', $companyIds);
         }
+
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        $query->where(function ($inner) use ($includeIds): void {
+            $inner->where('is_active', true);
+
+            if ($includeIds !== []) {
+                $inner->orWhereIn('id', $includeIds);
+            }
+        });
 
         return $query->limit(500)->get(['id', 'name'])
             ->map(fn (Establishment $establishment): array => [
@@ -306,7 +329,7 @@ final class FormTemplateService
             ->with([
                 'type:id,name',
                 'brand:id,name',
-                'companyRelationship.relatedCompany:id,name,tradename',
+                'companyRelationship.relatedCompany:id,name,tradename,logo',
                 'establishment:id,name',
                 'bible:id,name',
             ]);

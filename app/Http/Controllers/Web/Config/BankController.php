@@ -34,7 +34,7 @@ final class BankController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -74,10 +74,10 @@ final class BankController extends Controller
 
     public function store(StoreBankRequest $request): RedirectResponse
     {
-        $this->banks->create($request->validated());
+        $record = $this->banks->create($request->validated());
 
         return redirect()
-            ->route('config.banks.index')
+            ->route('config.banks.edit', $record)
             ->with('success', 'bank_created_successfully');
     }
 
@@ -99,7 +99,7 @@ final class BankController extends Controller
         $this->banks->update($bank, $request->validated());
 
         return redirect()
-            ->route('config.banks.index')
+            ->route('config.banks.edit', $bank)
             ->with('success', 'bank_updated_successfully');
     }
 

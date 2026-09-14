@@ -33,7 +33,7 @@ final class FormStatusController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -75,14 +75,14 @@ final class FormStatusController extends Controller
 
     public function store(StoreFormStatusRequest $request): RedirectResponse
     {
-        $this->formStatuses->create([
+        $record = $this->formStatuses->create([
             'name' => $request->string('name')->toString(),
             'next_status_id' => $request->input('next_status_id'),
             'is_active' => $request->boolean('is_active'),
         ]);
 
         return redirect()
-            ->route('config.form-statuses.index')
+            ->route('config.form-statuses.edit', $record)
             ->with('success', 'form_status_created_successfully');
     }
 
@@ -111,7 +111,7 @@ final class FormStatusController extends Controller
         ]);
 
         return redirect()
-            ->route('config.form-statuses.index')
+            ->route('config.form-statuses.edit', $formStatus)
             ->with('success', 'form_status_updated_successfully');
     }
 

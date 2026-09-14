@@ -85,8 +85,6 @@ class Establishment extends Model
             'tax_included' => 'boolean',
             'notes_alert' => 'boolean',
             'internal_notes_alert' => 'boolean',
-            'latitude' => 'decimal:7',
-            'longitude' => 'decimal:7',
             'tax_rate' => 'decimal:2',
             'voicebot_time_slots' => 'array',
         ];
@@ -181,6 +179,36 @@ class Establishment extends Model
     }
 
     /**
+     * Legacy `establecimiento_tecnico` — technicians blocked for this site.
+     *
+     * @return BelongsToMany<CompanyRelationship, $this>
+     */
+    public function blacklistedTechnicians(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            CompanyRelationship::class,
+            'establishment_technician_blacklist',
+            'establishment_id',
+            'company_relationship_id',
+        )->withTimestamps();
+    }
+
+    /**
+     * Legacy `establecimiento_tecnico_fav` — preferred technicians for this site.
+     *
+     * @return BelongsToMany<CompanyRelationship, $this>
+     */
+    public function favoriteTechnicians(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            CompanyRelationship::class,
+            'establishment_favorite_technicians',
+            'establishment_id',
+            'company_relationship_id',
+        )->withTimestamps();
+    }
+
+    /**
      * @return HasMany<Evaluation, $this>
      */
     public function evaluations(): HasMany
@@ -194,6 +222,34 @@ class Establishment extends Model
     public function workOrders(): HasMany
     {
         return $this->hasMany(WorkOrder::class);
+    }
+
+    /**
+     * @return HasMany<EstablishmentAttachment, $this>
+     */
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(EstablishmentAttachment::class)->latest();
+    }
+
+    /**
+     * Legacy `establecimiento_plantilla` rows.
+     *
+     * @return HasMany<EstablishmentFormTemplate, $this>
+     */
+    public function formTemplateLinks(): HasMany
+    {
+        return $this->hasMany(EstablishmentFormTemplate::class);
+    }
+
+    /**
+     * @return BelongsToMany<FormTemplate, $this>
+     */
+    public function formTemplates(): BelongsToMany
+    {
+        return $this->belongsToMany(FormTemplate::class, 'establishment_form_template')
+            ->withPivot(['id', 'work_order_type_id'])
+            ->withTimestamps();
     }
 
     public function softDeleteSafely(): bool

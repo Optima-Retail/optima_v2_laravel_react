@@ -31,23 +31,22 @@ final class WorkOrderFormInput
             (array) $request->input('lines', []),
         ));
 
-        $technicians = array_values(array_filter(array_map(
-            static function (mixed $row): ?array {
-                $item = is_array($row) ? $row : [];
+        $technicians = [];
 
-                if (! filled($item['company_relationship_id'] ?? null)) {
-                    return null;
-                }
+        foreach ((array) $request->input('technicians', []) as $row) {
+            $item = is_array($row) ? $row : [];
 
-                return [
-                    'id' => filled($item['id'] ?? null) ? (int) $item['id'] : null,
-                    'company_relationship_id' => (int) $item['company_relationship_id'],
-                    'is_selected' => filter_var($item['is_selected'] ?? false, FILTER_VALIDATE_BOOLEAN),
-                    'quote_net_amount' => filled($item['quote_net_amount'] ?? null) ? $item['quote_net_amount'] : null,
-                ];
-            },
-            (array) $request->input('technicians', []),
-        )));
+            if (! filled($item['company_relationship_id'] ?? null)) {
+                continue;
+            }
+
+            $technicians[] = [
+                'id' => filled($item['id'] ?? null) ? (int) $item['id'] : null,
+                'company_relationship_id' => (int) $item['company_relationship_id'],
+                'is_selected' => filter_var($item['is_selected'] ?? false, FILTER_VALIDATE_BOOLEAN),
+                'quote_net_amount' => filled($item['quote_net_amount'] ?? null) ? $item['quote_net_amount'] : null,
+            ];
+        }
 
         return [
             'code' => filled($request->input('code')) ? $request->input('code') : null,
@@ -59,6 +58,7 @@ final class WorkOrderFormInput
             'client_priority_id' => filled($request->input('client_priority_id')) ? $request->integer('client_priority_id') : null,
             'is_urgent' => $request->boolean('is_urgent'),
             'establishment_id' => filled($request->input('establishment_id')) ? $request->integer('establishment_id') : null,
+            'contract_id' => filled($request->input('contract_id')) ? $request->integer('contract_id') : null,
             'responsible_user_id' => filled($request->input('responsible_user_id')) ? $request->integer('responsible_user_id') : null,
             'requester_id' => filled($request->input('requester_id')) ? $request->integer('requester_id') : null,
             'notes' => filled($request->input('notes')) ? $request->input('notes') : null,
@@ -72,18 +72,28 @@ final class WorkOrderFormInput
             )),
             'lines' => $lines,
             'technicians' => $technicians,
+            'status_justification' => filled($request->input('status_justification'))
+                ? trim((string) $request->input('status_justification'))
+                : null,
         ];
     }
 
     /**
      * @param  list<int>  $establishmentIds
+     * @param  list<int>  $contractIds
      * @return array<string, mixed>
      */
-    public static function baseRules(int $ownerCompanyId, array $establishmentIds, string $stage): array
-    {
+    public static function baseRules(
+        int $ownerCompanyId,
+        array $establishmentIds,
+        string $stage,
+        array $contractIds = [],
+    ): array {
         $statusKind = $stage === WorkOrderStage::WorkOrder->value
             ? WorkOrderStage::WorkOrder->value
             : WorkOrderStage::Estimate->value;
+
+        $contractIds = $contractIds === [] ? [0] : $contractIds;
 
         return [
             'subject' => ['required', 'string', 'max:255'],
@@ -92,12 +102,15 @@ final class WorkOrderFormInput
             'status_id' => [
                 'required',
                 'integer',
-                Rule::exists('work_order_statuses', 'id')->whereNull('deleted_at')->where('kind', $statusKind),
+                Rule::exists('work_order_statuses', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('kind', $statusKind),
             ],
             'work_order_type_id' => ['nullable', 'integer', Rule::exists('work_order_types', 'id')->whereNull('deleted_at')],
             'client_priority_id' => ['nullable', 'integer', Rule::exists('client_priorities', 'id')->whereNull('deleted_at')],
             'is_urgent' => ['required', 'boolean'],
             'establishment_id' => ['required', 'integer', Rule::in($establishmentIds)],
+            'contract_id' => ['nullable', 'integer', Rule::in($contractIds)],
             'responsible_user_id' => ['nullable', 'integer', CompanyMemberUsers::existsRule($ownerCompanyId)],
             'requester_id' => ['nullable', 'integer', Rule::exists('requesters', 'id')->whereNull('deleted_at')],
             'notes' => ['nullable', 'string'],
@@ -122,6 +135,7 @@ final class WorkOrderFormInput
             ],
             'technicians.*.is_selected' => ['required', 'boolean'],
             'technicians.*.quote_net_amount' => ['nullable', 'numeric'],
+            'status_justification' => ['nullable', 'string', 'max:2000'],
         ];
     }
 }

@@ -1,5 +1,5 @@
-import { FormEvent, useEffect, useRef, useState } from 'react';
-import { Link } from '@inertiajs/react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, router } from '@inertiajs/react';
 import { BadgeCheck, FileText, Paperclip, Plus, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
@@ -15,7 +15,7 @@ import {
     type TechnicianIncidentStatusOption,
 } from '@/services/technicianIncidents';
 import { cn } from '@/support/cn';
-import { formatDate, formatDateTime } from '@/support/datetime';
+import { formatDate, formatDateTime, formatTime } from '@/support/datetime';
 import { isEmptyRichText, normalizeRichText } from '@/support/richText';
 
 /** Legacy TecnicoIncidenciaTipoEnum::NEGOCIACION */
@@ -28,6 +28,12 @@ type TechnicianIncidentsPanelProps = {
     canCreate?: boolean;
     canVerify?: boolean;
     canUpdateStatus?: boolean;
+};
+
+type MessageGroup = {
+    dateKey: string;
+    dateLabel: string;
+    messages: TechnicianIncidentMessage[];
 };
 
 function MetaRow({ label, value }: { label: string; value: string }) {
@@ -47,6 +53,36 @@ function initials(name: string | null): string {
     const parts = name.trim().split(/\s+/).slice(0, 2);
 
     return parts.map((part) => part.charAt(0).toUpperCase()).join('') || '?';
+}
+
+function dateKeyFromMessage(message: TechnicianIncidentMessage, locale: string): string {
+    if (message.created_at) {
+        return formatDate(message.created_at, locale) || message.created_at.slice(0, 10);
+    }
+
+    return message.date || 'unknown';
+}
+
+function groupMessagesByDate(messages: TechnicianIncidentMessage[], locale: string): MessageGroup[] {
+    const groups: MessageGroup[] = [];
+
+    for (const message of messages) {
+        const key = dateKeyFromMessage(message, locale);
+        const last = groups[groups.length - 1];
+
+        if (last && last.dateKey === key) {
+            last.messages.push(message);
+            continue;
+        }
+
+        groups.push({
+            dateKey: key,
+            dateLabel: key === 'unknown' ? '—' : key,
+            messages: [message],
+        });
+    }
+
+    return groups;
 }
 
 export function TechnicianIncidentsPanel({
@@ -77,6 +113,11 @@ export function TechnicianIncidentsPanel({
     const [responseText, setResponseText] = useState('');
     const [negotiationSucceeded, setNegotiationSucceeded] = useState<boolean | null>(null);
     const [negotiationSolution, setNegotiationSolution] = useState('');
+
+    const groupedMessages = useMemo(
+        () => groupMessagesByDate(messages, i18n.language),
+        [i18n.language, messages],
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -271,11 +312,11 @@ export function TechnicianIncidentsPanel({
 
         if (message.type === 'image' && message.preview_url) {
             return (
-                <a href={message.preview_url} target="_blank" rel="noreferrer" className="block">
+                <a href={message.preview_url} target="_blank" rel="noreferrer" className="block max-w-full">
                     <img
                         src={message.preview_url}
                         alt={label}
-                        className="max-h-48 rounded-lg object-contain"
+                        className="max-h-48 max-w-full rounded-lg object-contain"
                         onLoad={() => {
                             const el = messagesRef.current;
                             if (el) {
@@ -318,7 +359,11 @@ export function TechnicianIncidentsPanel({
             const payload = await technicianIncidentsService.updateStatus(activeId, Number(statusId));
             setDetail(payload.incident);
             setStatusOptions(payload.statusOptions ?? []);
+            if (payload.messages) {
+                setMessages(payload.messages);
+            }
             syncListItem(payload.incident);
+            router.reload({ only: ['chat'] });
         } finally {
             setStatusSaving(false);
         }
@@ -364,7 +409,11 @@ export function TechnicianIncidentsPanel({
 
             setDetail(payload.incident);
             setStatusOptions(payload.statusOptions ?? []);
+            if (payload.messages) {
+                setMessages(payload.messages);
+            }
             syncListItem(payload.incident);
+            router.reload({ only: ['chat'] });
             setResponseText(payload.incident.response_text ?? '');
             setNegotiationSucceeded(payload.incident.negotiation_succeeded);
             setNegotiationSolution(payload.incident.unsuccessful_negotiation_solution ?? '');
@@ -391,12 +440,12 @@ export function TechnicianIncidentsPanel({
 
     if (items.length === 0) {
         return (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-line bg-surface p-6">
+            <div className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:p-6">
                 <p className="text-sm text-ink-muted">{t('technicianIncidents.emptyForTechnician')}</p>
                 {canCreate ? (
                     <Link
                         href={createHref}
-                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
+                        className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-strong sm:w-auto"
                     >
                         <Plus className="size-4" aria-hidden />
                         {t('common.newItem', { resource: t('technicianIncidents.resource') })}
@@ -407,16 +456,16 @@ export function TechnicianIncidentsPanel({
     }
 
     return (
-        <div className="space-y-4 rounded-2xl border border-line bg-surface p-5 sm:p-6">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
+        <div className="min-w-0 space-y-4 rounded-2xl border border-line bg-surface p-4 sm:p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                <div className="min-w-0">
                     <h2 className="text-base font-semibold text-ink">{t('technicianIncidents.resourcePlural')}</h2>
                     <p className="mt-1 text-sm text-ink-muted">{t('technicianIncidents.description')}</p>
                 </div>
                 {canCreate ? (
                     <Link
                         href={createHref}
-                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
+                        className="inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-strong sm:w-auto"
                     >
                         <Plus className="size-4" aria-hidden />
                         {t('common.create')}
@@ -424,7 +473,7 @@ export function TechnicianIncidentsPanel({
                 ) : null}
             </div>
 
-            <div className="grid h-[min(42rem,75vh)] min-h-[36rem] overflow-hidden rounded-xl border border-line lg:grid-cols-[minmax(13rem,16rem)_minmax(0,1fr)_minmax(0,1.15fr)]">
+            <div className="grid min-w-0 overflow-hidden rounded-xl border border-line lg:h-[min(42rem,75vh)] lg:min-h-[36rem] lg:grid-cols-[minmax(12rem,15rem)_minmax(0,1fr)_minmax(0,1.15fr)]">
                 <aside className="flex min-h-0 min-w-0 flex-col border-b border-line bg-canvas lg:border-b-0 lg:border-r">
                     <div className="border-b border-line px-3 py-3">
                         <h3 className="text-sm font-semibold text-ink">
@@ -432,7 +481,7 @@ export function TechnicianIncidentsPanel({
                             <span className="ml-1.5 font-normal text-ink-muted">({items.length})</span>
                         </h3>
                     </div>
-                    <div className="app-scroll max-h-56 flex-1 overflow-y-auto lg:max-h-none">
+                    <div className="app-scroll max-h-48 overflow-y-auto sm:max-h-56 lg:max-h-none lg:min-h-0 lg:flex-1">
                         <ul>
                             {items.map((item) => {
                                 const selected = item.id === activeId;
@@ -447,7 +496,7 @@ export function TechnicianIncidentsPanel({
                                             type="button"
                                             onClick={() => setActiveId(item.id)}
                                             className={cn(
-                                                'flex min-h-16 w-full flex-col justify-center gap-1 px-3 py-3 text-left transition-colors',
+                                                'flex min-h-14 w-full flex-col justify-center gap-1 px-3 py-3 text-left transition-colors',
                                                 selected
                                                     ? 'bg-brand-soft text-brand'
                                                     : 'text-ink hover:bg-surface',
@@ -482,24 +531,24 @@ export function TechnicianIncidentsPanel({
                     </div>
                 ) : detail ? (
                     <>
-                        <section className="app-scroll min-h-0 min-w-0 space-y-5 overflow-y-auto border-b border-line p-4 lg:border-b-0 lg:border-r">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
+                        <section className="min-w-0 space-y-5 border-b border-line p-4 lg:app-scroll lg:min-h-0 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
                                 <div className="min-w-0">
-                                    <h3 className="text-lg font-semibold text-ink">
+                                    <h3 className="break-words text-base font-semibold text-ink sm:text-lg">
                                         {detail.type_name || t('technicianIncidents.resource')}
                                         <span className="ml-2 font-normal text-ink-muted">#{detail.id}</span>
                                     </h3>
                                     {detail.is_verified ? (
                                         <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-brand">
-                                            <BadgeCheck className="size-4" aria-hidden />
+                                            <BadgeCheck className="size-4 shrink-0" aria-hidden />
                                             {t('technicianIncidents.alreadyVerified')}
                                         </p>
                                     ) : null}
                                 </div>
 
-                                <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+                                <div className="flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
                                     {canEditStatus ? (
-                                        <div className="w-44 shrink-0 sm:w-52">
+                                        <div className="w-full min-w-0 sm:w-52">
                                             <SearchableSelect
                                                 id={`technician-incident-status-${detail.id}`}
                                                 value={detail.status_id ? String(detail.status_id) : ''}
@@ -520,7 +569,12 @@ export function TechnicianIncidentsPanel({
                                     )}
 
                                     {canShowVerify ? (
-                                        <Button type="button" variant="secondary" onClick={openVerifyModal}>
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            className="w-full sm:w-auto"
+                                            onClick={openVerifyModal}
+                                        >
                                             <BadgeCheck className="size-4" aria-hidden />
                                             {t('technicianIncidents.resolve')}
                                         </Button>
@@ -604,8 +658,8 @@ export function TechnicianIncidentsPanel({
                             ) : null}
                         </section>
 
-                        <section className="flex min-h-0 min-w-0 flex-col overflow-hidden bg-canvas">
-                            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+                        <section className="flex min-h-[22rem] min-w-0 flex-col overflow-hidden bg-canvas sm:min-h-[26rem] lg:min-h-0">
+                            <div className="flex items-center justify-between border-b border-line px-3 py-3 sm:px-4">
                                 <h4 className="text-base font-semibold text-ink">
                                     {t('technicianIncidents.messages')}
                                     {messages.length > 0 ? (
@@ -616,50 +670,63 @@ export function TechnicianIncidentsPanel({
                                 </h4>
                             </div>
 
-                            <div ref={messagesRef} className="app-scroll flex-1 overflow-y-auto px-4 py-4">
-                                {messages.length === 0 ? (
+                            <div ref={messagesRef} className="app-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-4">
+                                {groupedMessages.length === 0 ? (
                                     <p className="py-8 text-center text-sm text-ink-muted">
                                         {t('technicianIncidents.noMessages')}
                                     </p>
                                 ) : (
-                                    <ul className="space-y-5">
-                                        {messages.map((message) => (
-                                            <li key={message.id} className="flex gap-3">
-                                                <div
-                                                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-semibold text-brand"
-                                                    aria-hidden
-                                                >
-                                                    {initials(message.user_name)}
+                                    <div className="space-y-5">
+                                        {groupedMessages.map((group) => (
+                                            <div key={group.dateKey} className="space-y-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="h-px flex-1 bg-line" />
+                                                    <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                                                        {group.dateLabel}
+                                                    </span>
+                                                    <div className="h-px flex-1 bg-line" />
                                                 </div>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                                                        <span className="text-sm font-semibold text-ink">
-                                                            {message.user_name || t('common.emDash')}
-                                                        </span>
-                                                        {message.created_at ? (
-                                                            <time className="text-sm text-ink-muted">
-                                                                {formatDateTime(message.created_at, i18n.language)}
-                                                            </time>
-                                                        ) : null}
-                                                    </div>
-                                                    <div className="mt-1.5 text-sm leading-relaxed text-ink">
-                                                        {message.type === 'text' || !message.type ? (
-                                                            <RichTextHtml html={message.body} />
-                                                        ) : (
-                                                            renderAttachment(message)
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </li>
+
+                                                <ul className="space-y-5">
+                                                    {group.messages.map((message) => (
+                                                        <li key={message.id} className="flex gap-2.5 sm:gap-3">
+                                                            <div
+                                                                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-brand-soft text-xs font-semibold text-brand sm:size-9 sm:text-sm"
+                                                                aria-hidden
+                                                            >
+                                                                {initials(message.user_name)}
+                                                            </div>
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                                                                    <span className="text-sm font-semibold text-ink">
+                                                                        {message.user_name || t('common.emDash')}
+                                                                    </span>
+                                                                    <time className="text-xs tabular-nums text-ink-muted sm:ml-auto">
+                                                                        {formatTime(message.created_at, i18n.language) ||
+                                                                            message.time}
+                                                                    </time>
+                                                                </div>
+                                                                <div className="mt-1.5 break-words text-sm leading-relaxed text-ink">
+                                                                    {message.type === 'text' || !message.type ? (
+                                                                        <RichTextHtml html={message.body} />
+                                                                    ) : (
+                                                                        renderAttachment(message)
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
                                         ))}
-                                    </ul>
+                                    </div>
                                 )}
                             </div>
 
                             {canPostMessages ? (
                                 <form
                                     onSubmit={submitMessage}
-                                    className="space-y-2 border-t border-line bg-surface px-4 py-3"
+                                    className="space-y-2 border-t border-line bg-surface px-3 py-3 sm:px-4"
                                 >
                                     <RichTextEditor
                                         value={messageBody}
@@ -667,7 +734,7 @@ export function TechnicianIncidentsPanel({
                                         placeholder={t('technicianIncidents.newMessage')}
                                         minHeightClassName="min-h-20"
                                     />
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex flex-col-reverse gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                                         <div>
                                             <input
                                                 ref={fileRef}
@@ -678,6 +745,7 @@ export function TechnicianIncidentsPanel({
                                             <Button
                                                 type="button"
                                                 variant="secondary"
+                                                className="w-full sm:w-auto"
                                                 onClick={() => fileRef.current?.click()}
                                                 disabled={posting}
                                             >
@@ -689,7 +757,7 @@ export function TechnicianIncidentsPanel({
                                             type="submit"
                                             loading={posting}
                                             disabled={isEmptyRichText(messageBody)}
-                                            className="shrink-0"
+                                            className="w-full shrink-0 sm:w-auto"
                                         >
                                             <Send className="size-4" aria-hidden />
                                             {t('technicianIncidents.sendMessage')}

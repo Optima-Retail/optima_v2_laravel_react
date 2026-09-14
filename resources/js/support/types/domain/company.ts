@@ -5,6 +5,7 @@ export type CompanyListItem = {
     tax_id: string | null;
     kind: string;
     country_name: string | null;
+    logo_url: string | null;
     is_active: boolean;
     created_at: string | null;
 };
@@ -30,6 +31,7 @@ export type CompanyFormData = {
     postal_code: string | null;
     employee_count: number | null;
     is_active: boolean;
+    logo_url: string | null;
     brand_id: number | null;
     language_id: number | null;
     latitude: string | null;

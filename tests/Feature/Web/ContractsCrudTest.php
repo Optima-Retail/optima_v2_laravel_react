@@ -99,7 +99,7 @@ final class ContractsCrudTest extends TestCase
                 'signed_at' => '2026-01-15',
                 'establishment_ids' => [$establishment->id],
             ])
-            ->assertRedirect(route('contracts.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'contract_created_successfully');
 
         $contract = Contract::query()->where('description', 'Maintenance contract')->firstOrFail();
@@ -128,7 +128,7 @@ final class ContractsCrudTest extends TestCase
                 'signed_at' => '2026-01-15',
                 'establishment_ids' => [$establishment->id],
             ])
-            ->assertRedirect(route('contracts.index'))
+            ->assertRedirect(route('contracts.edit', $contract))
             ->assertSessionHas('success', 'contract_updated_successfully');
 
         $this->assertDatabaseHas('contracts', [

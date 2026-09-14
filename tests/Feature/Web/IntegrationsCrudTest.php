@@ -44,7 +44,7 @@ final class IntegrationsCrudTest extends TestCase
                 'name' => 'Global Service Channel',
                 'code' => 'service-channel-global',
             ])
-            ->assertRedirect(route('config.integrations.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'integration_created_successfully');
 
         $integration = Integration::query()->where('code', 'service-channel-global')->firstOrFail();
@@ -74,7 +74,7 @@ final class IntegrationsCrudTest extends TestCase
                 'name' => 'Global Service Channel (updated)',
                 'code' => 'service-channel-global',
             ])
-            ->assertRedirect(route('config.integrations.index'))
+            ->assertRedirect(route('config.integrations.edit', $integration))
             ->assertSessionHas('success', 'integration_updated_successfully');
 
         $this->assertDatabaseHas('integrations', [

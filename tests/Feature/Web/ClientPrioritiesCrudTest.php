@@ -46,7 +46,7 @@ final class ClientPrioritiesCrudTest extends TestCase
                 'color' => '#FF6B6B',
                 'level' => 1,
             ])
-            ->assertRedirect(route('config.client-priorities.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'client_priority_created_successfully');
 
         $priority = ClientPriority::query()->where('code', 'P2')->firstOrFail();
@@ -79,7 +79,7 @@ final class ClientPrioritiesCrudTest extends TestCase
                 'color' => '#FF6B6B',
                 'level' => 1,
             ])
-            ->assertRedirect(route('config.client-priorities.index'))
+            ->assertRedirect(route('config.client-priorities.edit', $priority))
             ->assertSessionHas('success', 'client_priority_updated_successfully');
 
         $this->assertDatabaseHas('client_priorities', [

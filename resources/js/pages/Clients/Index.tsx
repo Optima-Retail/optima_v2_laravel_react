@@ -234,7 +234,7 @@ export default function ClientsIndex({ filters, can }: ClientsIndexProps) {
                         column: filters.sort || 'id',
                         dir: filters.direction === 'asc' ? 'asc' : 'desc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         status: filters.status,

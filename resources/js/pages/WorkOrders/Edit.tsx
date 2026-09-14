@@ -2,35 +2,44 @@ import { FormEvent, useMemo, useState } from 'react';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { WorkOrderAttachmentsPanel } from '@/components/work-orders/WorkOrderAttachmentsPanel';
 import { defaultWorkOrderFormValues, WorkOrderForm } from '@/components/work-orders/WorkOrderForm';
 import { confirmAction } from '@/helpers/confirm';
+import { confirmWorkOrderStatusChange } from '@/helpers/workOrderStatusChange';
 import { AppLayout } from '@/layouts/AppLayout';
 import { workOrdersService } from '@/services';
+import type { DocumentChatPayload } from '@/support/types/domain/chat';
 import type { UserOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type { WorkOrderAttachmentItem, WorkOrderFormData } from '@/support/types/domain/work-order';
+import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
 
 type EditWorkOrderProps = {
     workOrder: WorkOrderFormData;
     attachments: WorkOrderAttachmentItem[];
-    statusOptions: UserOption[];
+    statusOptions: WorkOrderStatusOption[];
     typeOptions: UserOption[];
     priorityOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
+    contractOptions: UserOption[];
     requesterOptions: UserOption[];
     technicianOptions: UserOption[];
     articleOptions: UserOption[];
+    fields_locked?: boolean;
+    chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
+        update_closed: boolean;
         view_attachments: boolean;
         upload_attachments: boolean;
         download_attachments: boolean;
         delete_attachments: boolean;
+        post_chat: boolean;
     };
 };
 
@@ -53,10 +62,13 @@ export default function EditWorkOrder({
     priorityOptions,
     userOptions,
     establishmentOptions,
+    contractOptions,
     requesterOptions,
     technicianOptions,
     articleOptions,
+    chat,
     can,
+    fields_locked = false,
 }: EditWorkOrderProps) {
     const { t } = useTranslation();
     const { url } = usePage();
@@ -77,6 +89,7 @@ export default function EditWorkOrder({
             client_priority_id: workOrder.client_priority_id ? String(workOrder.client_priority_id) : '',
             is_urgent: workOrder.is_urgent,
             establishment_id: workOrder.establishment_id ? String(workOrder.establishment_id) : '',
+            contract_id: workOrder.contract_id ? String(workOrder.contract_id) : '',
             responsible_user_id: workOrder.responsible_user_id ? String(workOrder.responsible_user_id) : '',
             requester_id: workOrder.requester_id ? String(workOrder.requester_id) : '',
             notes: workOrder.notes ?? '',
@@ -120,18 +133,21 @@ export default function EditWorkOrder({
     async function submit(event: FormEvent) {
         event.preventDefault();
 
-        if (form.data.status_id === '12') {
-            const confirmed = await confirmAction({
-                title: t('workOrders.rejectTitle'),
-                message: t('workOrders.rejectMessage'),
-                confirmLabel: t('workOrders.rejectConfirm'),
-            });
+        const result = await confirmWorkOrderStatusChange({
+            t,
+            statusOptions,
+            currentStatusId: workOrder.status_id ? String(workOrder.status_id) : '',
+            nextStatusId: form.data.status_id,
+        });
 
-            if (!confirmed) {
-                return;
-            }
+        if (!result.confirmed) {
+            return;
         }
 
+        form.transform((data) => ({
+            ...data,
+            status_justification: result.justification || null,
+        }));
         workOrdersService.update(workOrder.id, form);
     }
 
@@ -153,7 +169,19 @@ export default function EditWorkOrder({
     }
 
     return (
-        <AppLayout title={t('common.editResource', { resource: t('workOrders.resource') })}>
+        <AppLayout
+            title={t('common.editResource', { resource: t('workOrders.resource') })}
+            aside={
+                chat ? (
+                    <DocumentChatPanel
+                        documentType="work_order"
+                        documentId={workOrder.id}
+                        initialChat={chat}
+                        canPost={can.post_chat}
+                    />
+                ) : null
+            }
+        >
             <Head
                 title={t('common.editItem', {
                     name: workOrder.subject || workOrder.code || workOrder.id,
@@ -177,11 +205,13 @@ export default function EditWorkOrder({
                             errors={form.errors}
                             processing={form.processing}
                             stageLocked
+                            fieldsLocked={fields_locked || (workOrder.status_is_open === false && !can.update_closed)}
                             statusOptions={statusOptions}
                             typeOptions={typeOptions}
                             priorityOptions={priorityOptions}
                             userOptions={userOptions}
                             establishmentOptions={establishmentOptions}
+                            contractOptions={contractOptions}
                             requesterOptions={requesterOptions}
                             technicianOptions={technicianOptions}
                             articleOptions={articleOptions}

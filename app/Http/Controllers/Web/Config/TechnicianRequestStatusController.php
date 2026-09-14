@@ -35,7 +35,7 @@ final class TechnicianRequestStatusController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'lifecycle',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -82,7 +82,7 @@ final class TechnicianRequestStatusController extends Controller
 
     public function store(StoreTechnicianRequestStatusRequest $request): RedirectResponse
     {
-        $this->technicianRequestStatuses->create([
+        $record = $this->technicianRequestStatuses->create([
             'kind' => $request->string('kind')->toString(),
             'name' => $request->string('name')->toString(),
             'color' => $request->input('color'),
@@ -91,7 +91,7 @@ final class TechnicianRequestStatusController extends Controller
         ]);
 
         return redirect()
-            ->route('config.technician-request-statuses.index')
+            ->route('config.technician-request-statuses.edit', $record)
             ->with('success', 'technician_request_status_created_successfully');
     }
 
@@ -120,7 +120,7 @@ final class TechnicianRequestStatusController extends Controller
         ]);
 
         return redirect()
-            ->route('config.technician-request-statuses.index')
+            ->route('config.technician-request-statuses.edit', $technicianRequestStatus)
             ->with('success', 'technician_request_status_updated_successfully');
     }
 

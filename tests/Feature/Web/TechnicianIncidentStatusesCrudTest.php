@@ -45,8 +45,11 @@ final class TechnicianIncidentStatusesCrudTest extends TestCase
                 'color' => '#a9cef0',
                 'lifecycle' => 1,
                 'is_open' => true,
+                'is_default' => true,
+                'marks_verified' => false,
+                'sets_response_date' => false,
             ])
-            ->assertRedirect(route('config.technician-incident-statuses.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'technician_incident_status_created_successfully');
 
         $status = TechnicianIncidentStatus::query()->where('name', 'Abierta')->firstOrFail();
@@ -57,7 +60,8 @@ final class TechnicianIncidentStatusesCrudTest extends TestCase
             ->assertJsonPath('last_row', 1)
             ->assertJsonPath('data.0.id', $status->id)
             ->assertJsonPath('data.0.lifecycle', 1)
-            ->assertJsonPath('data.0.is_open', true);
+            ->assertJsonPath('data.0.is_open', true)
+            ->assertJsonPath('data.0.is_default', true);
 
         $this->actingAs($admin)
             ->put("/config/technician-incident-statuses/{$status->id}", [
@@ -65,14 +69,19 @@ final class TechnicianIncidentStatusesCrudTest extends TestCase
                 'color' => '#a9cef0',
                 'lifecycle' => 1,
                 'is_open' => false,
+                'is_default' => false,
+                'marks_verified' => true,
+                'sets_response_date' => true,
             ])
-            ->assertRedirect(route('config.technician-incident-statuses.index'))
+            ->assertRedirect(route('config.technician-incident-statuses.edit', $status))
             ->assertSessionHas('success', 'technician_incident_status_updated_successfully');
 
         $this->assertDatabaseHas('technician_incident_statuses', [
             'id' => $status->id,
             'name' => 'Abierta Updated',
             'is_open' => false,
+            'marks_verified' => true,
+            'sets_response_date' => true,
         ]);
 
         $this->actingAs($admin)

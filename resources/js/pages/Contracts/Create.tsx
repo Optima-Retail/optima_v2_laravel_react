@@ -1,9 +1,10 @@
-import { FormEvent } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ContractForm, defaultContractFormValues } from '@/components/contracts/ContractForm';
 import { PageHeader } from '@/components/page/PageHeader';
+import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { AppLayout } from '@/layouts/AppLayout';
 import { contractsService } from '@/services';
 import type { UserOption } from '@/support/types/domain/common';
@@ -37,6 +38,7 @@ export default function CreateContract({
     formTemplateOptions,
 }: CreateContractProps) {
     const { t } = useTranslation();
+    const [activeTab, setActiveTab] = useState('details');
     const form = useForm(
         defaultContractFormValues({
             code: suggestedCode ?? '',
@@ -45,10 +47,38 @@ export default function CreateContract({
         }),
     );
 
+    const tabItems = useMemo<TabItem[]>(
+        () => [
+            { id: 'details', label: t('contracts.tabDetails') },
+            { id: 'iterations', label: t('contracts.tabIterations') },
+            { id: 'aggregations', label: t('contracts.tabAggregations') },
+        ],
+        [t],
+    );
+
     function submit(event: FormEvent) {
         event.preventDefault();
         contractsService.store(form);
     }
+
+    const formProps = {
+        values: form.data,
+        errors: form.errors,
+        processing: form.processing,
+        codeDisabled: codeIsAutomatic,
+        companyOptions,
+        contractStatusOptions,
+        languageOptions,
+        userOptions,
+        establishmentOptions,
+        workOrderTypeOptions,
+        formTemplateOptions,
+        onChange: (key: keyof typeof form.data, value: (typeof form.data)[keyof typeof form.data]) =>
+            form.setData(key, value),
+        onSubmit: submit,
+        submitLabel: t('common.createItem', { resource: t('contracts.resource') }),
+        submitIcon: <Plus className="size-4" aria-hidden />,
+    } as const;
 
     return (
         <AppLayout title={t('common.newItem', { resource: t('contracts.resource') })}>
@@ -62,23 +92,17 @@ export default function CreateContract({
                     backLabel={t('common.backTo', { resource: t('contracts.resourcePlural') })}
                 />
 
-                <ContractForm
-                    values={form.data}
-                    errors={form.errors}
-                    processing={form.processing}
-                    codeDisabled={codeIsAutomatic}
-                    companyOptions={companyOptions}
-                    contractStatusOptions={contractStatusOptions}
-                    languageOptions={languageOptions}
-                    userOptions={userOptions}
-                    establishmentOptions={establishmentOptions}
-                    workOrderTypeOptions={workOrderTypeOptions}
-                    formTemplateOptions={formTemplateOptions}
-                    onChange={(key, value) => form.setData(key, value)}
-                    onSubmit={submit}
-                    submitLabel={t('common.createItem', { resource: t('contracts.resource') })}
-                    submitIcon={<Plus className="size-4" aria-hidden />}
-                />
+                <Tabs items={tabItems} value={activeTab} onValueChange={setActiveTab}>
+                    <TabPanel id="details">
+                        <ContractForm {...formProps} section="details" />
+                    </TabPanel>
+                    <TabPanel id="iterations">
+                        <ContractForm {...formProps} section="iterations" />
+                    </TabPanel>
+                    <TabPanel id="aggregations">
+                        <ContractForm {...formProps} section="aggregations" />
+                    </TabPanel>
+                </Tabs>
             </div>
         </AppLayout>
     );

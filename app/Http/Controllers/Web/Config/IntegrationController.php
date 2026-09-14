@@ -33,7 +33,7 @@ final class IntegrationController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class IntegrationController extends Controller
 
     public function store(StoreIntegrationRequest $request): RedirectResponse
     {
-        $this->integrations->create($request->validated());
+        $record = $this->integrations->create($request->validated());
 
         return redirect()
-            ->route('config.integrations.index')
+            ->route('config.integrations.edit', $record)
             ->with('success', 'integration_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class IntegrationController extends Controller
         $this->integrations->update($integration, $request->validated());
 
         return redirect()
-            ->route('config.integrations.index')
+            ->route('config.integrations.edit', $integration)
             ->with('success', 'integration_updated_successfully');
     }
 

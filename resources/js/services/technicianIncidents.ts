@@ -131,6 +131,7 @@ export const technicianIncidentsService = {
 
     async updateStatus(id: number, statusId: number): Promise<{
         incident: TechnicianIncidentDetail;
+        messages: TechnicianIncidentMessage[];
         statusOptions: TechnicianIncidentStatusOption[];
     }> {
         const response = await fetch(`${base}/${id}/status`, {
@@ -151,6 +152,7 @@ export const technicianIncidentsService = {
 
         return (await response.json()) as {
             incident: TechnicianIncidentDetail;
+            messages: TechnicianIncidentMessage[];
             statusOptions: TechnicianIncidentStatusOption[];
         };
     },
@@ -194,7 +196,11 @@ export const technicianIncidentsService = {
             negotiation_succeeded?: boolean | null;
             unsuccessful_negotiation_solution?: string | null;
         } = {},
-    ): Promise<{ incident: TechnicianIncidentDetail; statusOptions: TechnicianIncidentStatusOption[] }> {
+    ): Promise<{
+        incident: TechnicianIncidentDetail;
+        messages: TechnicianIncidentMessage[];
+        statusOptions: TechnicianIncidentStatusOption[];
+    }> {
         const response = await fetch(`${base}/${id}/verify`, {
             method: 'POST',
             credentials: 'same-origin',
@@ -220,6 +226,7 @@ export const technicianIncidentsService = {
 
         return (await response.json()) as {
             incident: TechnicianIncidentDetail;
+            messages: TechnicianIncidentMessage[];
             statusOptions: TechnicianIncidentStatusOption[];
         };
     },

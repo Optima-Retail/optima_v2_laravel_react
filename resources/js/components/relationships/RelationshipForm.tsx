@@ -8,6 +8,8 @@ import {
     type CompanyScheduleValues,
 } from '@/components/clients/CompanySchedulePanel';
 import { TechnicianIncidentsPanel } from '@/components/technicians/TechnicianIncidentsPanel';
+import { TechnicianRatesPanel } from '@/components/technicians/TechnicianRatesPanel';
+import { TechnicianRatingsPanel } from '@/components/technicians/TechnicianRatingsPanel';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -18,7 +20,8 @@ import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import type { RelationshipProfileValues } from '@/support/relationshipForm';
-import type { UserOption } from '@/support/types/domain/common';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import type { RelationshipFormOptions } from '@/support/types/domain/company-relationship';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import { useCan } from '@/hooks/useAuth';
@@ -49,7 +52,7 @@ type RelationshipFormProps = {
     values: RelationshipFormValues;
     errors: Partial<Record<string, string>>;
     processing: boolean;
-    companyOptions: UserOption[];
+    companyOptions: CompanyOption[];
     brandOptions?: UserOption[];
     formOptions?: RelationshipFormOptions;
     profileMode?: 'customer' | 'supplier' | 'technician';
@@ -144,6 +147,8 @@ export function RelationshipForm({
         (useCan('client_rates.create') ||
             useCan('client_rates.update') ||
             useCan('client_rates.delete'));
+    const canViewTechnicianRates = useCan('company_relationships.view');
+    const canEditTechnicianRates = useCan('company_relationships.update');
     const canViewEstablishments = useCan('establishments.view');
     const canEditEstablishments = useCan('establishments.update');
     const canCreateEstablishments = useCan('establishments.create');
@@ -155,6 +160,8 @@ export function RelationshipForm({
     const showEstablishmentsTab = showCustomerExtras && canViewEstablishments;
     const showArticlesTab = showCustomerExtras && canViewArticles;
     const showRatesTab = showCustomerExtras && canViewRates;
+    const showTechnicianRatesTab =
+        isTechnicianProfile && relationshipId != null && canViewTechnicianRates;
     const showOpeningHoursTab = showCustomerExtras && schedule != null;
     const showTechnicianServices = (isSupplierProfile || isTechnicianProfile) && values.kind === 'technician';
     const showIncidents = isTechnicianProfile && showIncidentsTab && relationshipId != null;
@@ -201,6 +208,10 @@ export function RelationshipForm({
                 items.push({ id: 'technician', label: t('relationships.tabs.technician') });
             }
 
+            if (showTechnicianRatesTab) {
+                items.push({ id: 'technician_rates', label: t('relationships.tabs.rates') });
+            }
+
             if (showIncidents) {
                 items.push({ id: 'incidents', label: t('relationships.tabs.incidents') });
             }
@@ -216,12 +227,13 @@ export function RelationshipForm({
         showIncidents,
         showOpeningHoursTab,
         showRatesTab,
+        showTechnicianRatesTab,
         t,
         values.kind,
     ]);
 
     const extraTabIds = useMemo(
-        () => new Set(['establishments', 'articles', 'rates', 'opening_hours', 'incidents']),
+        () => new Set(['establishments', 'articles', 'rates', 'technician_rates', 'opening_hours', 'incidents']),
         [],
     );
     const isExtraTab = extraTabIds.has(activeTab);
@@ -334,10 +346,7 @@ export function RelationshipForm({
                             value={values.related_company_id}
                             invalid={Boolean(errors.related_company_id)}
                             onChange={(value) => onChange('related_company_id', value)}
-                            options={companyOptions.map((option) => ({
-                                value: String(option.id),
-                                label: option.label,
-                            }))}
+                            options={toCompanySelectOptions(companyOptions)}
                         />
                     </Field>
                 )}
@@ -845,6 +854,20 @@ export function RelationshipForm({
                             onChange={(event) => onChange('customer_score_count', event.target.value)}
                         />
                     </Field>
+
+                    {isTechnicianProfile && relationshipId != null ? (
+                        <TechnicianRatingsPanel
+                            relationshipId={relationshipId}
+                            canEdit={canEditTechnicianRates}
+                            onAggregatesUpdated={(aggregates) => {
+                                onChange('optima_score', aggregates.optima_score ?? '');
+                                onChange('customer_score', aggregates.customer_score ?? '');
+                                onChange('average_score', aggregates.average_score ?? '');
+                                onChange('optima_score_count', String(aggregates.optima_score_count));
+                                onChange('customer_score_count', String(aggregates.customer_score_count));
+                            }}
+                        />
+                    ) : null}
                     </div>
                 </TabPanel>
 
@@ -1198,6 +1221,16 @@ export function RelationshipForm({
                         <ClientRatesPanel
                             relationshipId={relationshipId}
                             canEdit={canEditRates}
+                            embedded
+                        />
+                    </TabPanel>
+                ) : null}
+
+                {showTechnicianRatesTab && relationshipId != null ? (
+                    <TabPanel id="technician_rates">
+                        <TechnicianRatesPanel
+                            relationshipId={relationshipId}
+                            canEdit={canEditTechnicianRates}
                             embedded
                         />
                     </TabPanel>

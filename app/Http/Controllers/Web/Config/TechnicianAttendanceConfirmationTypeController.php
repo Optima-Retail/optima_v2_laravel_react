@@ -33,7 +33,7 @@ final class TechnicianAttendanceConfirmationTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,12 +73,12 @@ final class TechnicianAttendanceConfirmationTypeController extends Controller
 
     public function store(StoreTechnicianAttendanceConfirmationTypeRequest $request): RedirectResponse
     {
-        $this->types->create([
+        $record = $this->types->create([
             'name' => $request->string('name')->toString(),
         ]);
 
         return redirect()
-            ->route('config.technician-attendance-confirmation-types.index')
+            ->route('config.technician-attendance-confirmation-types.edit', $record)
             ->with('success', 'technician_attendance_confirmation_type_created_successfully');
     }
 
@@ -105,7 +105,7 @@ final class TechnicianAttendanceConfirmationTypeController extends Controller
         ]);
 
         return redirect()
-            ->route('config.technician-attendance-confirmation-types.index')
+            ->route('config.technician-attendance-confirmation-types.edit', $confirmation_type)
             ->with('success', 'technician_attendance_confirmation_type_updated_successfully');
     }
 

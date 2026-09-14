@@ -188,9 +188,9 @@ export default function FormsIndex({ filters, typeOptions, statusOptions, can }:
                         can.create ? (
                             <Link
                                 href={formsService.createPath}
-                                className="inline-flex h-9 items-center gap-2 rounded-lg bg-brand px-3 text-sm font-medium text-white"
+                                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
                             >
-                                <Plus className="size-4" aria-hidden />
+                                <Plus className="size-3.5" aria-hidden />
                                 {t('common.newItem', { resource: t('forms.resource') })}
                             </Link>
                         ) : null
@@ -205,7 +205,7 @@ export default function FormsIndex({ filters, typeOptions, statusOptions, can }:
                         column: filters.sort || 'id',
                         dir: filters.direction === 'asc' ? 'asc' : 'desc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                         form_type_id: filters.form_type_id,

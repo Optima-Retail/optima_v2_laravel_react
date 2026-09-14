@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/Input';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { cn } from '@/support/cn';
-import type { UserOption } from '@/support/types/domain/common';
+import { toCompanySelectOptions } from '@/support/companySelect';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type {
     IncidentSubtypeOption,
@@ -51,7 +52,7 @@ type IncidentFormProps = {
     incidentSubtypeOptions: IncidentSubtypeOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
-    clientOptions: UserOption[];
+    clientOptions: CompanyOption[];
     brandOptions: UserOption[];
     evaluationOptions: UserOption[];
     readonlyFields?: IncidentReadonlyFields | null;
@@ -151,7 +152,7 @@ export function IncidentForm({
         }
 
         if (values.origin_type === 'company') {
-            return toSelectOptions(clientOptions);
+            return toCompanySelectOptions(clientOptions);
         }
 
         if (values.origin_type === 'brand') {

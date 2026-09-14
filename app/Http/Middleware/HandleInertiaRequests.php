@@ -44,6 +44,7 @@ class HandleInertiaRequests extends Middleware
                 'company' => $company ? [
                     'id' => $company->id,
                     'name' => $company->name,
+                    'logo_url' => $company->logoUrl(),
                 ] : null,
                 'companies' => $user ? $activeCompany->membershipsForUser($user) : [],
             ],

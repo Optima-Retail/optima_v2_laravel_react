@@ -117,7 +117,7 @@ final class ComplimentService
             ->with([
                 'type:id,name',
                 'brand:id,name',
-                'companyRelationship.relatedCompany:id,name,tradename',
+                'companyRelationship.relatedCompany:id,name,tradename,logo',
                 'establishment:id,name,code',
                 'users:id,name',
             ])
@@ -274,14 +274,23 @@ final class ComplimentService
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * Active customer relationships for selects. Keep `$includeId` for edit forms.
+     *
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function customerOptions(Company $owner): array
+    public function customerOptions(Company $owner, ?int $includeId = null): array
     {
         return CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename')
+            ->with('relatedCompany:id,name,tradename,logo,is_active')
             ->where('owner_company_id', $owner->id)
             ->where('kind', CompanyRelationshipKind::Customer->value)
+            ->where(function ($query) use ($includeId): void {
+                $query->whereHas('relatedCompany', fn ($company) => $company->where('is_active', true));
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
             ->orderBy('id')
             ->get()
             ->map(function (CompanyRelationship $relationship): array {
@@ -290,19 +299,17 @@ final class ComplimentService
                     ?: $company?->tradename
                     ?: "#{$relationship->id}";
 
-                return [
-                    'id' => $relationship->id,
-                    'label' => $label,
-                ];
+                return $relationship->toSelectOption($label);
             })
             ->values()
             ->all();
     }
 
     /**
+     * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string}>
      */
-    public function establishmentOptions(Company $owner): array
+    public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
         $companyIds = $this->accessibleCompanyIds($owner);
 
@@ -310,8 +317,20 @@ final class ComplimentService
             return [];
         }
 
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
         return Establishment::query()
             ->whereIn('company_id', $companyIds)
+            ->where(function ($query) use ($includeIds): void {
+                $query->where('is_active', true);
+
+                if ($includeIds !== []) {
+                    $query->orWhereIn('id', $includeIds);
+                }
+            })
             ->orderBy('name')
             ->get(['id', 'name', 'code'])
             ->map(fn (Establishment $establishment): array => [

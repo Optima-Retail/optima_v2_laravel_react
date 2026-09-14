@@ -7,9 +7,9 @@ namespace App\Support;
 final class ListQuery
 {
     /** @var list<int> */
-    public const PER_PAGE_OPTIONS = [10, 12, 25, 50, 100];
+    public const PER_PAGE_OPTIONS = [10, 25, 50, 100];
 
-    public static function perPage(array $filters, int $default = 12): int
+    public static function perPage(array $filters, int $default = 25): int
     {
         $value = (int) ($filters['per_page'] ?? $default);
 

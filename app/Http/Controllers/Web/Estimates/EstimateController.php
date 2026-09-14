@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Estimates;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
+use App\Domain\Chats\Services\DocumentChatService;
 use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\Config\NumberingPatterns\Services\NumberingPatternService;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
@@ -40,6 +42,7 @@ final class EstimateController extends Controller
         private readonly WorkOrderService $workOrders,
         private readonly WorkOrderAttachmentService $attachments,
         private readonly NumberingPatternService $numberingPatterns,
+        private readonly DocumentChatService $chats,
     ) {}
 
     public function index(Request $request): Response
@@ -56,7 +59,7 @@ final class EstimateController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'id',
             'direction' => $request->string('direction')->trim()->toString() ?: 'desc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -84,11 +87,13 @@ final class EstimateController extends Controller
             allowedSorts: ['id', 'code', 'subject', 'created_at'],
             defaultSort: 'id',
             defaultDirection: 'desc',
-            filterKeys: ['search', 'pending', 'created_from', 'created_to'],
+            filterKeys: ['search', 'pending', 'created_from', 'created_to', 'establishment_id'],
         );
         $filters['stage'] = WorkOrderStage::Estimate->value;
 
-        if (! $request->has('pending') && ($filters['pending'] ?? '') === '') {
+        $scopedToEstablishment = (int) ($filters['establishment_id'] ?? 0) > 0;
+
+        if (! $scopedToEstablishment && ! $request->has('pending') && ($filters['pending'] ?? '') === '') {
             $filters['pending'] = '1';
         }
 
@@ -105,10 +110,19 @@ final class EstimateController extends Controller
         $stage = WorkOrderStage::Estimate;
         $suggestedCode = $this->numberingPatterns->peekNext($owner, NumberingResource::Estimates->value);
 
+        $defaults = $this->workOrders->defaultsFromContract(
+            $owner,
+            $request->integer('contract_id') ?: null,
+            $request->integer('establishment_id') ?: null,
+        );
+
         return Inertia::render('Estimates/Create', [
             'suggestedCode' => $suggestedCode,
             'codeIsAutomatic' => $suggestedCode !== null,
             'defaultStatusId' => $this->workOrders->defaultStatusId($stage),
+            'defaultEstablishmentId' => $defaults['establishment_id'],
+            'defaultContractId' => $defaults['contract_id'],
+            'defaultSubject' => $defaults['subject'],
             ...$this->formOptions($owner, $stage),
         ]);
     }
@@ -136,7 +150,10 @@ final class EstimateController extends Controller
         $owner = $this->activeCompany($request);
         $user = $request->user();
         $policy = app(EstimatePolicy::class);
+        $estimate->loadMissing('status');
         $canViewAttachments = $user !== null && $policy->viewAttachments($user, $estimate);
+        $canUpdateClosed = $user !== null && $policy->updateClosed($user, $estimate);
+        $isOpen = (bool) ($estimate->status?->is_open ?? true);
         $stage = WorkOrderStage::Estimate;
 
         return Inertia::render('Estimates/Edit', [
@@ -145,12 +162,18 @@ final class EstimateController extends Controller
                 ? $this->attachments->listForWorkOrder($estimate)
                 : [],
             ...$this->formOptions($owner, $stage, $estimate),
+            'fields_locked' => ! $isOpen && ! $canUpdateClosed,
+            'chat' => $user !== null
+                ? $this->chats->payload(ChatDocumentType::WorkOrder, (int) $estimate->id, $user)
+                : null,
             'can' => [
                 'delete' => $user !== null && $policy->delete($user, $estimate),
+                'update_closed' => $canUpdateClosed,
                 'view_attachments' => $canViewAttachments,
                 'upload_attachments' => $user !== null && $policy->uploadAttachments($user, $estimate),
                 'download_attachments' => $user !== null && $policy->downloadAttachments($user, $estimate),
                 'delete_attachments' => $user !== null && $policy->deleteAttachments($user, $estimate),
+                'post_chat' => $user !== null && $policy->update($user, $estimate),
             ],
         ]);
     }
@@ -158,7 +181,7 @@ final class EstimateController extends Controller
     public function update(UpdateEstimateRequest $request, WorkOrder $estimate): RedirectResponse
     {
         $owner = $this->activeCompany($request);
-        $result = $this->workOrders->update($owner, $estimate, $request->validated());
+        $result = $this->workOrders->update($owner, $estimate, $request->validated(), $request->user());
         $fresh = $result['work_order'];
 
         if ($fresh->isConfirmedWorkOrder()) {
@@ -201,7 +224,7 @@ final class EstimateController extends Controller
     {
         $this->authorizeEstimate('downloadAttachments', $estimate);
 
-        return $this->attachments->stream($estimate, $attachment);
+        return $this->attachments->stream($estimate, $attachment, $request->boolean('inline'));
     }
 
     public function destroyAttachment(Request $request, WorkOrder $estimate, WorkOrderAttachment $attachment): RedirectResponse
@@ -231,11 +254,21 @@ final class EstimateController extends Controller
         }
 
         return [
-            'statusOptions' => $this->workOrders->statusOptions($stage),
+            'statusOptions' => $this->workOrders->statusOptions(
+                $stage,
+                $workOrder?->status_id !== null ? (int) $workOrder->status_id : null,
+            ),
             'typeOptions' => $this->workOrders->typeOptions(),
             'priorityOptions' => $this->workOrders->priorityOptions(),
             'userOptions' => $this->workOrders->userOptions($owner, $includeUserIds),
-            'establishmentOptions' => $this->workOrders->establishmentOptions($owner),
+            'establishmentOptions' => $this->workOrders->establishmentOptions(
+                $owner,
+                $workOrder?->establishment_id !== null ? [(int) $workOrder->establishment_id] : [],
+            ),
+            'contractOptions' => $this->workOrders->contractOptions(
+                $owner,
+                $workOrder?->contract_id !== null ? [(int) $workOrder->contract_id] : [],
+            ),
             'requesterOptions' => $this->workOrders->requesterOptions($owner, $workOrder?->establishment_id),
             'technicianOptions' => $this->workOrders->technicianOptions($owner),
             'articleOptions' => $this->workOrders->articleOptions(),

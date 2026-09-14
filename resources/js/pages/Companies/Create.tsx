@@ -41,6 +41,8 @@ export default function CreateCompany({ countryOptions, provinceOptions, brandOp
         latitude: '',
         longitude: '',
         legacy_erp_id: '',
+        logo: null as File | null,
+        remove_logo: false,
     });
 
     function submit(event: FormEvent) {

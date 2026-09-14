@@ -7,6 +7,7 @@ namespace App\Domain\WorkOrders\Services;
 use App\Models\User;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderAttachment;
+use App\Support\Attachments\AttachmentMime;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -60,7 +61,7 @@ final class WorkOrderAttachmentService
         });
     }
 
-    public function stream(WorkOrder $workOrder, WorkOrderAttachment $attachment): StreamedResponse
+    public function stream(WorkOrder $workOrder, WorkOrderAttachment $attachment, bool $inline = false): StreamedResponse
     {
         abort_unless($attachment->work_order_id === $workOrder->id, 404);
         abort_if($attachment->path === '', 404);
@@ -69,12 +70,14 @@ final class WorkOrderAttachmentService
         $mime = $attachment->mime_type
             ?: (Storage::disk(self::DISK)->mimeType($attachment->path) ?: 'application/octet-stream');
 
+        $disposition = $inline ? 'inline' : 'attachment';
+
         return Storage::disk(self::DISK)->response(
             $attachment->path,
             $attachment->name,
             [
                 'Content-Type' => $mime,
-                'Content-Disposition' => 'attachment; filename="'.$attachment->name.'"',
+                'Content-Disposition' => $disposition.'; filename="'.$attachment->name.'"',
                 'X-Content-Type-Options' => 'nosniff',
             ],
         );
@@ -85,21 +88,24 @@ final class WorkOrderAttachmentService
      */
     public function toListItem(WorkOrder $workOrder, WorkOrderAttachment $attachment): array
     {
+        $downloadUrl = $workOrder->isEstimate()
+            ? route('estimates.attachments.download', [
+                'estimate' => $workOrder,
+                'attachment' => $attachment,
+            ])
+            : route('work-orders.attachments.download', [
+                'work_order' => $workOrder,
+                'attachment' => $attachment,
+            ]);
+
         return [
             'id' => $attachment->id,
             'name' => $attachment->name,
             'mime_type' => $attachment->mime_type,
             'size_bytes' => $attachment->size_bytes,
             'uploaded_by_name' => $attachment->uploader?->name,
-            'download_url' => $workOrder->isEstimate()
-                ? route('estimates.attachments.download', [
-                    'estimate' => $workOrder,
-                    'attachment' => $attachment,
-                ])
-                : route('work-orders.attachments.download', [
-                    'work_order' => $workOrder,
-                    'attachment' => $attachment,
-                ]),
+            'download_url' => $downloadUrl,
+            ...AttachmentMime::previewFields($downloadUrl, $attachment->mime_type, $attachment->name),
             'created_at' => $attachment->created_at?->toIso8601String(),
         ];
     }

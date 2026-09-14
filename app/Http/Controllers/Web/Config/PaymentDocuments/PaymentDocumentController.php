@@ -33,7 +33,7 @@ final class PaymentDocumentController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class PaymentDocumentController extends Controller
 
     public function store(StorePaymentDocumentRequest $request): RedirectResponse
     {
-        $this->paymentDocuments->create($request->validated());
+        $record = $this->paymentDocuments->create($request->validated());
 
         return redirect()
-            ->route('config.payment-documents.index')
+            ->route('config.payment-documents.edit', $record)
             ->with('success', 'payment_document_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class PaymentDocumentController extends Controller
         $this->paymentDocuments->update($paymentDocument, $request->validated());
 
         return redirect()
-            ->route('config.payment-documents.index')
+            ->route('config.payment-documents.edit', $paymentDocument)
             ->with('success', 'payment_document_updated_successfully');
     }
 

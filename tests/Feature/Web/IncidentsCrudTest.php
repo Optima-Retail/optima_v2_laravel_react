@@ -118,7 +118,7 @@ final class IncidentsCrudTest extends TestCase
                 'related_type' => null,
                 'related_id' => null,
             ])
-            ->assertRedirect(route('incidents.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'incident_created_successfully');
 
         $incident = Incident::query()->where('subject', 'QC incident follow-up')->firstOrFail();
@@ -193,6 +193,30 @@ final class IncidentsCrudTest extends TestCase
             'user_id' => $admin->id,
         ]);
 
+        $this->assertDatabaseHas('status_change_histories', [
+            'document_type' => 'incident',
+            'document_id' => $incident->id,
+            'old_status_id' => $status->id,
+            'new_status_id' => $review->id,
+            'user_id' => $admin->id,
+        ]);
+
+        $this->assertDatabaseHas('incident_chat_messages', [
+            'type' => 'system',
+            'body' => 'sistema.global.cambio_estado',
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/incidents/{$incident->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Incidents/Edit')
+                ->has('chat.messages')
+                ->where('chat.messages', fn ($messages) => collect($messages)->contains(
+                    fn ($message) => ($message['type'] ?? null) === 'system'
+                        && str_contains((string) ($message['body'] ?? ''), 'En revisión'),
+                )));
+
         $incident->refresh();
         $this->assertSame($review->id, $incident->incident_status_id);
         $this->assertNull($incident->closed_at);
@@ -211,7 +235,7 @@ final class IncidentsCrudTest extends TestCase
                 'origin_id' => $establishment->id,
                 'control_at' => '2026-02-02T11:00',
             ])
-            ->assertRedirect(route('incidents.index'))
+            ->assertRedirect(route('incidents.edit', $incident))
             ->assertSessionHas('success', 'incident_updated_successfully');
 
         $this->assertDatabaseHas('incidents', [

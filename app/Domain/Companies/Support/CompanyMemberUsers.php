@@ -20,7 +20,9 @@ final class CompanyMemberUsers
      */
     public static function query(?int $companyId, bool $activeMembershipOnly = true): Builder
     {
-        $query = User::query()->whereNull('deleted_at');
+        $query = User::query()
+            ->whereNull('deleted_at')
+            ->where('is_active', true);
 
         if ($companyId === null) {
             return $query->whereRaw('0 = 1');

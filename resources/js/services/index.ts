@@ -50,6 +50,14 @@ export { technicianIncidentsService } from '@/services/technicianIncidents';
 export { technicianRequestsService } from '@/services/technicianRequests';
 export { technicianRequestStatusesService } from '@/services/technicianRequestStatuses';
 export { technicianRequestPrioritiesService } from '@/services/technicianRequestPriorities';
+export {
+    fetchTechnicianRates,
+    upsertTechnicianRates,
+} from '@/services/technicianRates';
+export {
+    fetchTechnicianRatings,
+    storeTechnicianRating,
+} from '@/services/technicianRatings';
 export { establishmentsService } from '@/services/establishments';
 export { contractsService } from '@/services/contracts';
 export { estimatesService } from '@/services/estimates';
@@ -63,3 +71,5 @@ export { incidentsService } from '@/services/incidents';
 export { workOrdersService } from '@/services/workOrders';
 export { localeService } from '@/services/locale';
 export { savedFiltersService } from '@/services/savedFilters';
+export { documentChatsService } from '@/services/documentChats';
+

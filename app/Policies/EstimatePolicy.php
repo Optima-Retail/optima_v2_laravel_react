@@ -41,6 +41,13 @@ final class EstimatePolicy
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
 
+    public function updateClosed(User $user, WorkOrder $workOrder): bool
+    {
+        return $workOrder->isEstimate()
+            && $this->allows($user, 'update-closed')
+            && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
+    }
+
     public function delete(User $user, WorkOrder $workOrder): bool
     {
         return $workOrder->isEstimate()

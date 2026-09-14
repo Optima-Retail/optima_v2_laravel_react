@@ -45,7 +45,7 @@ final class IncidentPrioritiesCrudTest extends TestCase
                 'color' => '#FF9999',
                 'resolution_time_hours' => 4,
             ])
-            ->assertRedirect(route('config.incident-priorities.index'))
+            ->assertRedirect()
             ->assertSessionHas('success', 'incident_priority_created_successfully');
 
         $priority = IncidentPriority::query()->where('name', 'Alto impacto')->firstOrFail();
@@ -76,7 +76,7 @@ final class IncidentPrioritiesCrudTest extends TestCase
                 'color' => '#FF9999',
                 'resolution_time_hours' => 2,
             ])
-            ->assertRedirect(route('config.incident-priorities.index'))
+            ->assertRedirect(route('config.incident-priorities.edit', $priority))
             ->assertSessionHas('success', 'incident_priority_updated_successfully');
 
         $this->assertDatabaseHas('incident_priorities', [

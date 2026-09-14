@@ -23,6 +23,9 @@ final class UpdateTechnicianIncidentStatusRequest extends FormRequest
             'color' => filled($this->input('color')) ? $this->input('color') : null,
             'lifecycle' => filled($this->input('lifecycle')) ? $this->input('lifecycle') : null,
             'is_open' => $this->boolean('is_open'),
+            'is_default' => $this->boolean('is_default'),
+            'marks_verified' => $this->boolean('marks_verified'),
+            'sets_response_date' => $this->boolean('sets_response_date'),
         ]);
     }
 
@@ -36,6 +39,9 @@ final class UpdateTechnicianIncidentStatusRequest extends FormRequest
             'color' => ['nullable', 'string', 'max:32', 'regex:/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/'],
             'lifecycle' => ['nullable', 'integer', 'min:0', 'max:255'],
             'is_open' => ['required', 'boolean'],
+            'is_default' => ['required', 'boolean'],
+            'marks_verified' => ['required', 'boolean'],
+            'sets_response_date' => ['required', 'boolean'],
         ];
     }
 }

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domain\TechnicianRequests\Services;
 
+use App\Domain\Chats\Enums\ChatDocumentType;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\Config\NumberingPatterns\Services\NumberingPatternService;
+use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
 use App\Domain\TechnicianRequests\Enums\TechnicianRequestPriorityKey;
 use App\Domain\TechnicianRequests\Enums\TechnicianRequestStatusId;
 use App\Domain\TechnicianRequests\Enums\TechnicianRequestStatusKind;
@@ -32,6 +34,7 @@ final class TechnicianRequestService
 {
     public function __construct(
         private readonly NumberingPatternService $numbering,
+        private readonly StatusChangeHistoryService $statusChanges,
     ) {}
 
     public function canAccess(Company $owner, TechnicianRequest $request): bool
@@ -129,6 +132,16 @@ final class TechnicianRequestService
             $request = TechnicianRequest::query()->create($attributes);
             $this->syncServiceTypes($request, $data['service_type_ids'] ?? []);
 
+            $this->statusChanges->record(
+                ChatDocumentType::TechnicianRequest,
+                (int) $request->id,
+                null,
+                $request->technician_request_status_id !== null
+                    ? (int) $request->technician_request_status_id
+                    : null,
+                $actor,
+            );
+
             return $request->fresh($this->defaultRelations()) ?? $request;
         });
     }
@@ -160,7 +173,18 @@ final class TechnicianRequestService
             $request->update($attributes);
             $this->syncServiceTypes($request, $data['service_type_ids'] ?? []);
 
-            return $request->fresh($this->defaultRelations()) ?? $request;
+            $fresh = $request->fresh($this->defaultRelations()) ?? $request;
+
+            $this->statusChanges->record(
+                ChatDocumentType::TechnicianRequest,
+                (int) $fresh->id,
+                $previousStatusId,
+                $fresh->technician_request_status_id !== null
+                    ? (int) $fresh->technician_request_status_id
+                    : null,
+            );
+
+            return $fresh;
         });
     }
 
@@ -192,12 +216,25 @@ final class TechnicianRequestService
         }
 
         return DB::transaction(function () use ($request): TechnicianRequest {
+            $oldStatusId = $request->technician_request_status_id !== null
+                ? (int) $request->technician_request_status_id
+                : null;
+
             $request->update([
                 'technician_request_status_id' => TechnicianRequestStatusId::RequestCancelled->value,
                 'resolved_at' => $request->resolved_at ?? now(),
             ]);
 
-            return $request->fresh($this->defaultRelations()) ?? $request;
+            $fresh = $request->fresh($this->defaultRelations()) ?? $request;
+
+            $this->statusChanges->record(
+                ChatDocumentType::TechnicianRequest,
+                (int) $fresh->id,
+                $oldStatusId,
+                TechnicianRequestStatusId::RequestCancelled->value,
+            );
+
+            return $fresh;
         });
     }
 
@@ -251,7 +288,18 @@ final class TechnicianRequestService
                 $parent->serviceTypes->pluck('id')->map(fn ($id) => (int) $id)->all(),
             );
 
-            return $screening->fresh($this->defaultRelations()) ?? $screening;
+            $fresh = $screening->fresh($this->defaultRelations()) ?? $screening;
+
+            $this->statusChanges->record(
+                ChatDocumentType::TechnicianRequest,
+                (int) $fresh->id,
+                null,
+                $fresh->technician_request_status_id !== null
+                    ? (int) $fresh->technician_request_status_id
+                    : null,
+            );
+
+            return $fresh;
         });
     }
 
@@ -277,6 +325,13 @@ final class TechnicianRequestService
                     'technician_request_status_id' => TechnicianRequestStatusId::RequestFinished->value,
                     'resolved_at' => $request->resolved_at ?? now(),
                 ]);
+
+                $this->statusChanges->record(
+                    ChatDocumentType::TechnicianRequest,
+                    (int) $request->id,
+                    $statusId,
+                    TechnicianRequestStatusId::RequestFinished->value,
+                );
             }
 
             return $request->fresh($this->defaultRelations()) ?? $request;
@@ -410,7 +465,7 @@ final class TechnicianRequestService
     public function technicianOptions(Company $owner): array
     {
         return CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename')
+            ->with('relatedCompany:id,name,tradename,logo')
             ->where('owner_company_id', $owner->id)
             ->where('kind', CompanyRelationshipKind::Technician->value)
             ->orderBy('id')
@@ -421,10 +476,7 @@ final class TechnicianRequestService
                     ?: $company?->name
                     ?: "#{$relationship->id}";
 
-                return [
-                    'id' => $relationship->id,
-                    'label' => $label,
-                ];
+                return $relationship->toSelectOption($label);
             })
             ->values()
             ->all();
@@ -493,7 +545,7 @@ final class TechnicianRequestService
             'status',
             'priority',
             'serviceTypes:id,name',
-            'technicians.relatedCompany:id,name,tradename',
+            'technicians.relatedCompany:id,name,tradename,logo',
             'screenings.status:id,name,color',
             'requesterUser:id,name',
             'responsibleUser:id,name',

@@ -145,7 +145,7 @@ export default function ExpenseTypesIndex({ filters, can }: ExpenseTypesIndexPro
                         column: filters.sort || 'name',
                         dir: filters.direction === 'desc' ? 'desc' : 'asc',
                     }}
-                    pageSize={Number(filters.per_page) || 12}
+                    pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
                     }}

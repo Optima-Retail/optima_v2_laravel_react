@@ -42,9 +42,14 @@ final class ContractService
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function clientCompanyOptions(Company $owner): array
+    /**
+     * Client companies for selects (active only). Keep `$includeId` for edit forms.
+     *
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function clientCompanyOptions(Company $owner, ?int $includeId = null): array
     {
         $ids = $this->accessibleCompanyIds($owner);
 
@@ -54,24 +59,27 @@ final class ContractService
 
         return Company::query()
             ->whereIn('id', $ids)
+            ->where(function ($query) use ($includeId): void {
+                $query->where('is_active', true);
+
+                if ($includeId !== null) {
+                    $query->orWhereKey($includeId);
+                }
+            })
             ->orderBy('name')
-            ->get(['id', 'name', 'tax_id'])
-            ->map(fn (Company $company): array => [
-                'id' => $company->id,
-                'label' => $company->tax_id
-                    ? "{$company->name} ({$company->tax_id})"
-                    : $company->name,
-            ])
+            ->get(['id', 'name', 'tax_id', 'logo'])
+            ->map(fn (Company $company): array => $company->toSelectOption())
             ->values()
             ->all();
     }
 
     /**
-     * Establishments for accessible client companies (filterable by company_id on the client).
+     * Active establishments for accessible client companies.
      *
+     * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string, company_id: int}>
      */
-    public function establishmentOptions(Company $owner): array
+    public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
         $ids = $this->accessibleCompanyIds($owner);
 
@@ -79,8 +87,20 @@ final class ContractService
             return [];
         }
 
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
         return Establishment::query()
             ->whereIn('company_id', $ids)
+            ->where(function ($query) use ($includeIds): void {
+                $query->where('is_active', true);
+
+                if ($includeIds !== []) {
+                    $query->orWhereIn('id', $includeIds);
+                }
+            })
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'company_id'])
             ->map(fn (Establishment $establishment): array => [

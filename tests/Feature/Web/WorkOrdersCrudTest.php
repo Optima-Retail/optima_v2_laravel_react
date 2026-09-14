@@ -9,10 +9,13 @@ use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
+use App\Models\Contract;
+use App\Models\ContractStatus;
 use App\Models\Establishment;
 use App\Models\User;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderStatus;
+use App\Models\WorkOrderStatusTransition;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -71,7 +74,10 @@ final class WorkOrdersCrudTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('WorkOrders/Edit')
-                ->where('workOrder.subject', 'Install unit'));
+                ->where('workOrder.subject', 'Install unit')
+                ->where('workOrder.status_is_open', true)
+                ->where('fields_locked', false)
+                ->where('can.update_closed', true));
 
         $this->actingAs($admin)
             ->put("/work-orders/{$workOrder->id}", [
@@ -123,6 +129,8 @@ final class WorkOrdersCrudTest extends TestCase
         $workOrder->refresh();
         $this->assertSame($rejected->id, $workOrder->status_id);
         $this->assertTrue($workOrder->isConfirmedWorkOrder());
+        $this->assertNotNull($workOrder->closed_at);
+        $this->assertNotSame(12, $rejected->id);
 
         $clone = WorkOrder::query()
             ->where('source_work_order_id', $workOrder->id)
@@ -134,6 +142,111 @@ final class WorkOrdersCrudTest extends TestCase
         $this->assertNotSame($workOrder->id, $clone->id);
 
         $response->assertRedirect(route('estimates.edit', $clone));
+    }
+
+    public function test_closed_work_order_rejects_field_changes_without_update_closed(): void
+    {
+        [$admin, $establishment, , , $received, , $company] = $this->seedContext();
+        $closed = $this->makeStatus(808, WorkOrderStage::WorkOrder, 'Finalizada', 5, false);
+
+        $workOrder = WorkOrder::factory()->workOrder()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $closed->id,
+            'subject' => 'Locked job',
+            'code' => 'OT-LOCK',
+        ]);
+
+        $editor = User::factory()->create();
+        $editor->givePermissionTo(['work_orders.view', 'work_orders.update', 'work_orders.create']);
+        $this->attachToCompany($editor, $company);
+
+        $this->actingAs($editor)
+            ->from("/work-orders/{$workOrder->id}/edit")
+            ->put("/work-orders/{$workOrder->id}", [
+                'subject' => 'Hacked subject',
+                'status_id' => $closed->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'OT-LOCK',
+            ])
+            ->assertRedirect("/work-orders/{$workOrder->id}/edit")
+            ->assertSessionHasErrors('subject');
+
+        $workOrder->refresh();
+        $this->assertSame('Locked job', $workOrder->subject);
+
+        $this->actingAs($editor)
+            ->put("/work-orders/{$workOrder->id}", [
+                'subject' => 'Locked job',
+                'status_id' => $received->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'OT-LOCK',
+            ])
+            ->assertRedirect(route('work-orders.edit', $workOrder));
+
+        $workOrder->refresh();
+        $this->assertSame($received->id, $workOrder->status_id);
+        $this->assertSame('Locked job', $workOrder->subject);
+
+        $this->actingAs($admin)
+            ->put("/work-orders/{$workOrder->id}", [
+                'subject' => 'Admin can edit closed',
+                'status_id' => $closed->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'OT-LOCK',
+            ])
+            ->assertRedirect(route('work-orders.edit', $workOrder));
+
+        $workOrder->refresh();
+        $this->assertSame('Admin can edit closed', $workOrder->subject);
+    }
+
+    public function test_forbidden_work_order_status_transition_is_rejected(): void
+    {
+        [$admin, $establishment, , , $received] = $this->seedContext();
+        $progress = $this->makeStatus(909, WorkOrderStage::WorkOrder, 'En progreso', 3, true);
+        $other = $this->makeStatus(910, WorkOrderStage::WorkOrder, 'Other OT', 4, true);
+
+        WorkOrderStatusTransition::query()->create([
+            'from_status_id' => $received->id,
+            'to_status_id' => $progress->id,
+            'requires_confirmation' => false,
+            'requires_justification' => false,
+        ]);
+
+        $workOrder = WorkOrder::factory()->workOrder()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $received->id,
+            'subject' => 'Transition OT',
+            'code' => 'OT-TR',
+        ]);
+
+        $this->actingAs($admin)
+            ->from("/work-orders/{$workOrder->id}/edit")
+            ->put("/work-orders/{$workOrder->id}", [
+                'subject' => 'Transition OT',
+                'status_id' => $other->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'OT-TR',
+            ])
+            ->assertRedirect("/work-orders/{$workOrder->id}/edit")
+            ->assertSessionHasErrors('status_id');
+
+        $this->actingAs($admin)
+            ->put("/work-orders/{$workOrder->id}", [
+                'subject' => 'Transition OT',
+                'status_id' => $progress->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'OT-TR',
+            ])
+            ->assertRedirect(route('work-orders.edit', $workOrder));
+
+        $workOrder->refresh();
+        $this->assertSame($progress->id, $workOrder->status_id);
     }
 
     public function test_work_order_routes_reject_estimates(): void
@@ -165,8 +278,70 @@ final class WorkOrdersCrudTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_create_work_order_from_contract_prefills_and_persists_relation(): void
+    {
+        [$admin, $establishment, , , $received, , $company] = $this->seedContext();
+
+        $clientId = (int) $establishment->company_id;
+        $status = ContractStatus::query()->create([
+            'name' => 'Abierto',
+            'color' => '#f6eac2',
+            'lifecycle' => 1,
+            'is_open' => true,
+        ]);
+
+        $contract = Contract::query()->create([
+            'code' => 'C-OT-1',
+            'company_id' => $clientId,
+            'responsible_user_id' => $admin->id,
+            'contract_status_id' => $status->id,
+            'description' => 'Linked contract',
+            'work_order_subject' => 'Visit from contract',
+        ]);
+        $contract->establishments()->sync([$establishment->id]);
+
+        $this->actingAs($admin)
+            ->get('/work-orders/create?contract_id='.$contract->id)
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('WorkOrders/Create')
+                ->where('defaultContractId', $contract->id)
+                ->where('defaultEstablishmentId', $establishment->id)
+                ->where('defaultSubject', 'Visit from contract'));
+
+        $this->actingAs($admin)
+            ->post('/work-orders', [
+                'subject' => 'Visit from contract',
+                'status_id' => $received->id,
+                'establishment_id' => $establishment->id,
+                'contract_id' => $contract->id,
+                'is_urgent' => false,
+                'code' => 'OT-CONTRACT-1',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'work_order_created_successfully');
+
+        $workOrder = WorkOrder::query()->where('code', 'OT-CONTRACT-1')->firstOrFail();
+
+        $this->assertSame($contract->id, (int) $workOrder->contract_id);
+
+        $this->actingAs($admin)
+            ->get("/work-orders/{$workOrder->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('WorkOrders/Edit')
+                ->where('workOrder.contract_id', $contract->id));
+
+        $this->actingAs($admin)
+            ->getJson('/work-orders/data?contract_id='.$contract->id.'&pending=')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $workOrder->id);
+
+        unset($company);
+    }
+
     /**
-     * @return array{0: User, 1: Establishment, 2: WorkOrderStatus, 3: WorkOrderStatus, 4: WorkOrderStatus, 5: WorkOrderStatus}
+     * @return array{0: User, 1: Establishment, 2: WorkOrderStatus, 3: WorkOrderStatus, 4: WorkOrderStatus, 5: WorkOrderStatus, 6: Company}
      */
     private function seedContext(): array
     {
@@ -184,32 +359,36 @@ final class WorkOrdersCrudTest extends TestCase
         ]);
 
         $pending = $this->makeStatus(
-            WorkOrder::DEFAULT_ESTIMATE_STATUS_ID,
+            101,
             WorkOrderStage::Estimate,
             'Pendiente',
             1,
             true,
+            ['is_default' => true],
         );
         $approved = $this->makeStatus(
-            WorkOrder::APPROVED_ESTIMATE_STATUS_ID,
+            202,
             WorkOrderStage::Estimate,
             'Aprobado',
             6,
             false,
+            ['confirms_estimate' => true],
         );
         $received = $this->makeStatus(
-            WorkOrder::DEFAULT_CONFIRMED_STATUS_ID,
+            303,
             WorkOrderStage::WorkOrder,
             'Recibida - OK por Organizar',
             2,
             true,
+            ['is_post_confirm_default' => true],
         );
         $rejected = $this->makeStatus(
-            WorkOrder::REJECTED_TO_ESTIMATE_STATUS_ID,
+            404,
             WorkOrderStage::WorkOrder,
             'Rechazada - Presupuesto',
             2,
             false,
+            ['rejects_to_estimate' => true],
         );
 
         $establishment = Establishment::query()->create([
@@ -218,15 +397,19 @@ final class WorkOrdersCrudTest extends TestCase
             'code' => 'S1',
         ]);
 
-        return [$admin, $establishment, $pending, $approved, $received, $rejected];
+        return [$admin, $establishment, $pending, $approved, $received, $rejected, $company];
     }
 
+    /**
+     * @param  array<string, bool>  $flags
+     */
     private function makeStatus(
         int $id,
         WorkOrderStage $kind,
         string $name,
         int $lifecycle,
         bool $isOpen,
+        array $flags = [],
     ): WorkOrderStatus {
         $status = new WorkOrderStatus;
         $status->forceFill([
@@ -235,6 +418,11 @@ final class WorkOrdersCrudTest extends TestCase
             'kind' => $kind,
             'lifecycle' => $lifecycle,
             'is_open' => $isOpen,
+            'is_default' => $flags['is_default'] ?? false,
+            'confirms_estimate' => $flags['confirms_estimate'] ?? false,
+            'rejects_to_estimate' => $flags['rejects_to_estimate'] ?? false,
+            'is_post_confirm_default' => $flags['is_post_confirm_default'] ?? false,
+            'sets_sent_at' => $flags['sets_sent_at'] ?? false,
         ])->save();
 
         return $status;

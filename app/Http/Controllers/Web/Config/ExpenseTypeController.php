@@ -33,7 +33,7 @@ final class ExpenseTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,10 +73,10 @@ final class ExpenseTypeController extends Controller
 
     public function store(StoreExpenseTypeRequest $request): RedirectResponse
     {
-        $this->expenseTypes->create($request->validated());
+        $record = $this->expenseTypes->create($request->validated());
 
         return redirect()
-            ->route('config.expense-types.index')
+            ->route('config.expense-types.edit', $record)
             ->with('success', 'expense_type_created_successfully');
     }
 
@@ -97,7 +97,7 @@ final class ExpenseTypeController extends Controller
         $this->expenseTypes->update($expenseType, $request->validated());
 
         return redirect()
-            ->route('config.expense-types.index')
+            ->route('config.expense-types.edit', $expenseType)
             ->with('success', 'expense_type_updated_successfully');
     }
 

@@ -33,7 +33,7 @@ final class SeriesController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'key',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -75,10 +75,10 @@ final class SeriesController extends Controller
 
     public function store(StoreSeriesRequest $request): RedirectResponse
     {
-        $this->series->create($request->validated());
+        $record = $this->series->create($request->validated());
 
         return redirect()
-            ->route('config.series.index')
+            ->route('config.series.edit', $record)
             ->with('success', 'series_created_successfully');
     }
 
@@ -88,7 +88,10 @@ final class SeriesController extends Controller
 
         return Inertia::render('Config/Series/Edit', [
             'seriesItem' => $this->series->toFormData($series),
-            'seriesOptions' => $this->series->seriesOptions(),
+            'seriesOptions' => $this->series->seriesOptions(
+                $series->id,
+                $series->credit_note_series_id !== null ? (int) $series->credit_note_series_id : null,
+            ),
             'can' => [
                 'delete' => $request->user()?->can('delete', $series) ?? false,
             ],
@@ -100,7 +103,7 @@ final class SeriesController extends Controller
         $this->series->update($series, $request->validated());
 
         return redirect()
-            ->route('config.series.index')
+            ->route('config.series.edit', $series)
             ->with('success', 'series_updated_successfully');
     }
 

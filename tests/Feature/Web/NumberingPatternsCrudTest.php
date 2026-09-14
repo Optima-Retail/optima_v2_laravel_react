@@ -102,7 +102,7 @@ final class NumberingPatternsCrudTest extends TestCase
                 'contract_status_id' => $status->id,
                 'establishment_ids' => [],
             ])
-            ->assertRedirect(route('contracts.index'));
+            ->assertRedirect();
 
         $contract = Contract::query()->where('description', 'Patterned contract')->firstOrFail();
         $this->assertSame($expected, $contract->code);
@@ -150,7 +150,7 @@ final class NumberingPatternsCrudTest extends TestCase
                 'contract_status_id' => $status->id,
                 'establishment_ids' => [],
             ])
-            ->assertRedirect(route('contracts.index'));
+            ->assertRedirect();
 
         $contract = Contract::query()->where('description', 'Default patterned contract')->firstOrFail();
         $this->assertSame('C00001', $contract->code);

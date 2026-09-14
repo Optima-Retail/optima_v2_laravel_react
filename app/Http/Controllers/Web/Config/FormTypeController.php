@@ -33,7 +33,7 @@ final class FormTypeController extends Controller
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
-                'per_page' => $request->integer('per_page', 12),
+                'per_page' => $request->integer('per_page', 25),
             ]),
         ];
 
@@ -73,12 +73,12 @@ final class FormTypeController extends Controller
 
     public function store(StoreFormTypeRequest $request): RedirectResponse
     {
-        $this->formTypes->create([
+        $record = $this->formTypes->create([
             'name' => $request->string('name')->toString(),
         ]);
 
         return redirect()
-            ->route('config.form-types.index')
+            ->route('config.form-types.edit', $record)
             ->with('success', 'form_type_created_successfully');
     }
 
@@ -101,7 +101,7 @@ final class FormTypeController extends Controller
         ]);
 
         return redirect()
-            ->route('config.form-types.index')
+            ->route('config.form-types.edit', $formType)
             ->with('success', 'form_type_updated_successfully');
     }
 
