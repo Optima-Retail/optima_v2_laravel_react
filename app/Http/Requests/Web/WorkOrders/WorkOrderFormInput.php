@@ -45,6 +45,26 @@ final class WorkOrderFormInput
                 'company_relationship_id' => (int) $item['company_relationship_id'],
                 'is_selected' => filter_var($item['is_selected'] ?? false, FILTER_VALIDATE_BOOLEAN),
                 'quote_net_amount' => filled($item['quote_net_amount'] ?? null) ? $item['quote_net_amount'] : null,
+                'quoted_at' => filled($item['quoted_at'] ?? null) ? (string) $item['quoted_at'] : null,
+                'quote_total_euros' => filled($item['quote_total_euros'] ?? null) ? $item['quote_total_euros'] : null,
+            ];
+        }
+
+        $tasks = [];
+
+        foreach ((array) $request->input('tasks', []) as $row) {
+            $item = is_array($row) ? $row : [];
+            $title = trim((string) ($item['title'] ?? ''));
+
+            if ($title === '') {
+                continue;
+            }
+
+            $tasks[] = [
+                'id' => filled($item['id'] ?? null) ? (int) $item['id'] : null,
+                'title' => $title,
+                'description' => filled($item['description'] ?? null) ? (string) $item['description'] : null,
+                'is_completed' => filter_var($item['is_completed'] ?? false, FILTER_VALIDATE_BOOLEAN),
             ];
         }
 
@@ -59,10 +79,13 @@ final class WorkOrderFormInput
             'is_urgent' => $request->boolean('is_urgent'),
             'establishment_id' => filled($request->input('establishment_id')) ? $request->integer('establishment_id') : null,
             'contract_id' => filled($request->input('contract_id')) ? $request->integer('contract_id') : null,
+            'currency_id' => filled($request->input('currency_id')) ? $request->integer('currency_id') : null,
             'responsible_user_id' => filled($request->input('responsible_user_id')) ? $request->integer('responsible_user_id') : null,
             'requester_id' => filled($request->input('requester_id')) ? $request->integer('requester_id') : null,
             'notes' => filled($request->input('notes')) ? $request->input('notes') : null,
             'internal_notes' => filled($request->input('internal_notes')) ? $request->input('internal_notes') : null,
+            'notes_alert' => $request->boolean('notes_alert'),
+            'internal_notes_alert' => $request->boolean('internal_notes_alert'),
             'received_at' => filled($request->input('received_at')) ? $request->input('received_at') : null,
             'intervention_at' => filled($request->input('intervention_at')) ? $request->input('intervention_at') : null,
             'due_at' => filled($request->input('due_at')) ? $request->input('due_at') : null,
@@ -72,6 +95,7 @@ final class WorkOrderFormInput
             )),
             'lines' => $lines,
             'technicians' => $technicians,
+            'tasks' => $tasks,
             'status_justification' => filled($request->input('status_justification'))
                 ? trim((string) $request->input('status_justification'))
                 : null,
@@ -111,10 +135,13 @@ final class WorkOrderFormInput
             'is_urgent' => ['required', 'boolean'],
             'establishment_id' => ['required', 'integer', Rule::in($establishmentIds)],
             'contract_id' => ['nullable', 'integer', Rule::in($contractIds)],
+            'currency_id' => ['nullable', 'integer', Rule::exists('currencies', 'id')->whereNull('deleted_at')],
             'responsible_user_id' => ['nullable', 'integer', CompanyMemberUsers::existsRule($ownerCompanyId)],
             'requester_id' => ['nullable', 'integer', Rule::exists('requesters', 'id')->whereNull('deleted_at')],
             'notes' => ['nullable', 'string'],
             'internal_notes' => ['nullable', 'string'],
+            'notes_alert' => ['required', 'boolean'],
+            'internal_notes_alert' => ['required', 'boolean'],
             'received_at' => ['nullable', 'date'],
             'intervention_at' => ['nullable', 'date'],
             'due_at' => ['nullable', 'date'],
@@ -135,6 +162,13 @@ final class WorkOrderFormInput
             ],
             'technicians.*.is_selected' => ['required', 'boolean'],
             'technicians.*.quote_net_amount' => ['nullable', 'numeric'],
+            'technicians.*.quoted_at' => ['nullable', 'date'],
+            'technicians.*.quote_total_euros' => ['nullable', 'numeric'],
+            'tasks' => ['nullable', 'array'],
+            'tasks.*.id' => ['nullable', 'integer'],
+            'tasks.*.title' => ['required', 'string', 'max:255'],
+            'tasks.*.description' => ['nullable', 'string'],
+            'tasks.*.is_completed' => ['nullable', 'boolean'],
             'status_justification' => ['nullable', 'string', 'max:2000'],
         ];
     }

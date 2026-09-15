@@ -13,9 +13,21 @@ final class StoreWorkOrderAttachmentRequest extends FormRequest
     {
         /** @var WorkOrder|null $workOrder */
         $workOrder = $this->route('work_order');
+        $user = $this->user();
 
-        return $workOrder instanceof WorkOrder
-            && ($this->user()?->can('uploadAttachments', $workOrder) ?? false);
+        if ($user === null || ! ($workOrder instanceof WorkOrder)) {
+            return false;
+        }
+
+        if (! $user->can('uploadAttachments', $workOrder)) {
+            return false;
+        }
+
+        if ($this->boolean('is_private') && ! $user->can('viewPrivateAttachments', $workOrder)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -25,6 +37,7 @@ final class StoreWorkOrderAttachmentRequest extends FormRequest
     {
         return [
             'file' => ['required', 'file', 'max:20480'],
+            'is_private' => ['sometimes', 'boolean'],
         ];
     }
 }

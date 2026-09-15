@@ -205,11 +205,15 @@ final class FormService
             FormSubjectType::WorkOrder => $form->work_order_id !== null
                 && WorkOrder::query()
                     ->whereKey($form->work_order_id)
-                    ->whereHas('establishment', function (Builder $query) use ($owner): void {
-                        $companyIds = $owner->ownedRelationships()
-                            ->where('kind', CompanyRelationshipKind::Customer->value)
-                            ->pluck('related_company_id');
-                        $query->whereIn('company_id', $companyIds);
+                    ->where(function (Builder $query) use ($owner): void {
+                        $query->where('owner_company_id', $owner->id)
+                            ->orWhere(function (Builder $legacy) use ($owner): void {
+                                $companyIds = $owner->ownedRelationships()
+                                    ->where('kind', CompanyRelationshipKind::Customer->value)
+                                    ->pluck('related_company_id');
+                                $legacy->whereNull('owner_company_id')
+                                    ->whereHas('establishment', fn (Builder $establishment) => $establishment->whereIn('company_id', $companyIds));
+                            });
                     })
                     ->exists(),
             FormSubjectType::Technician => $form->company_relationship_id !== null
@@ -382,12 +386,17 @@ final class FormService
      */
     public function workOrderOptions(Company $owner): array
     {
-        $companyIds = $owner->ownedRelationships()
-            ->where('kind', CompanyRelationshipKind::Customer->value)
-            ->pluck('related_company_id');
-
         return WorkOrder::query()
-            ->whereHas('establishment', fn (Builder $q) => $q->whereIn('company_id', $companyIds))
+            ->where(function (Builder $query) use ($owner): void {
+                $query->where('owner_company_id', $owner->id)
+                    ->orWhere(function (Builder $legacy) use ($owner): void {
+                        $companyIds = $owner->ownedRelationships()
+                            ->where('kind', CompanyRelationshipKind::Customer->value)
+                            ->pluck('related_company_id');
+                        $legacy->whereNull('owner_company_id')
+                            ->whereHas('establishment', fn (Builder $q) => $q->whereIn('company_id', $companyIds));
+                    });
+            })
             ->orderByDesc('id')
             ->limit(300)
             ->get(['id', 'code', 'subject'])

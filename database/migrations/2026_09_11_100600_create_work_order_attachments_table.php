@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('path');
             $table->string('mime_type', 127)->nullable();
             $table->unsignedBigInteger('size_bytes')->nullable();
+            $table->boolean('is_private')->default(false);
             $table->foreignId('uploaded_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
             $table->softDeletes();

@@ -15,11 +15,13 @@ type EditRoleProps = {
     permissionGroups: PermissionGroup[];
     can: {
         delete: boolean;
+        update: boolean;
     };
 };
 
 export default function EditRole({ role, permissionGroups, can }: EditRoleProps) {
     const { t } = useTranslation();
+    const readOnly = role.is_system || !can.update;
     const form = useForm({
         name: role.name,
         permissions: role.permissions,
@@ -27,6 +29,11 @@ export default function EditRole({ role, permissionGroups, can }: EditRoleProps)
 
     function submit(event: FormEvent) {
         event.preventDefault();
+
+        if (readOnly) {
+            return;
+        }
+
         rolesService.update(role.id, form);
     }
 
@@ -51,8 +58,16 @@ export default function EditRole({ role, permissionGroups, can }: EditRoleProps)
             <div className="w-full space-y-6">
                 <PageHeader
                     eyebrow={t('roles.title')}
-                    title={t('common.editResource', { resource: t('roles.resource') })}
-                    description={t('roles.editDescription', { name: role.name })}
+                    title={
+                        readOnly
+                            ? t('common.viewResource', { resource: t('roles.resource') })
+                            : t('common.editResource', { resource: t('roles.resource') })
+                    }
+                    description={
+                        readOnly
+                            ? t('roles.viewDescription', { name: role.name })
+                            : t('roles.editDescription', { name: role.name })
+                    }
                     backHref={rolesService.indexPath}
                     backLabel={t('common.backTo', { resource: t('roles.resourcePlural') })}
                 />
@@ -64,6 +79,7 @@ export default function EditRole({ role, permissionGroups, can }: EditRoleProps)
                     processing={form.processing}
                     permissionGroups={permissionGroups}
                     nameDisabled={role.is_system}
+                    readOnly={readOnly}
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.save')}

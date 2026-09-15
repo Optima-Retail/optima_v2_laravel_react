@@ -10,6 +10,7 @@ use App\Domain\WorkOrders\Services\WorkOrderService;
 use App\Http\Requests\Web\WorkOrders\WorkOrderFormInput;
 use App\Policies\EstimatePolicy;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 final class StoreEstimateRequest extends FormRequest
 {
@@ -48,6 +49,18 @@ final class StoreEstimateRequest extends FormRequest
         ), [
             'stage' => ['required', 'string', 'in:'.WorkOrderStage::Estimate->value],
             'code' => ['nullable', 'string', 'max:64'],
+            'status_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('work_order_statuses', 'id')
+                    ->whereNull('deleted_at')
+                    ->where('kind', WorkOrderStage::Estimate->value),
+            ],
+            'work_order_type_id' => [
+                'required',
+                'integer',
+                Rule::exists('work_order_types', 'id')->whereNull('deleted_at'),
+            ],
         ]);
     }
 }

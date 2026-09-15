@@ -30,6 +30,7 @@ final class RolePolicy
 
     public function update(User $user, Role $role): bool
     {
+        // System admin remains viewable via the edit screen, but updates are blocked in the controller/service.
         return $this->allows($user, 'update');
     }
 

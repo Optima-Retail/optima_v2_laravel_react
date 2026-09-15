@@ -9,11 +9,14 @@ use App\Domain\Chats\Services\DocumentChatService;
 use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\Config\NumberingPatterns\Services\NumberingPatternService;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
+use App\Domain\WorkOrders\Services\TechnicianSearchService;
 use App\Domain\WorkOrders\Services\WorkOrderAttachmentService;
 use App\Domain\WorkOrders\Services\WorkOrderService;
 use App\Http\Controllers\Concerns\AuthorizesEstimates;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Web\Estimates\SearchEstimateClientRatesRequest;
+use App\Http\Requests\Web\Estimates\SearchEstimateTechniciansRequest;
 use App\Http\Requests\Web\Estimates\StoreEstimateAttachmentRequest;
 use App\Http\Requests\Web\Estimates\StoreEstimateRequest;
 use App\Http\Requests\Web\Estimates\UpdateEstimateRequest;
@@ -43,6 +46,7 @@ final class EstimateController extends Controller
         private readonly WorkOrderAttachmentService $attachments,
         private readonly NumberingPatternService $numberingPatterns,
         private readonly DocumentChatService $chats,
+        private readonly TechnicianSearchService $technicianSearch,
     ) {}
 
     public function index(Request $request): Response
@@ -102,6 +106,29 @@ final class EstimateController extends Controller
         );
     }
 
+    public function searchTechnicians(SearchEstimateTechniciansRequest $request): JsonResponse
+    {
+        $owner = $this->activeCompany($request);
+
+        return response()->json(
+            $this->technicianSearch->search($owner, $request->validated()),
+        );
+    }
+
+    public function clientRates(SearchEstimateClientRatesRequest $request): JsonResponse
+    {
+        $owner = $this->activeCompany($request);
+        $validated = $request->validated();
+
+        return response()->json(
+            $this->workOrders->clientRatesForEstimate(
+                $owner,
+                (int) $validated['establishment_id'],
+                (int) $validated['work_order_type_id'],
+            ),
+        );
+    }
+
     public function create(Request $request): Response
     {
         $this->authorizeEstimate('create');
@@ -152,6 +179,7 @@ final class EstimateController extends Controller
         $policy = app(EstimatePolicy::class);
         $estimate->loadMissing('status');
         $canViewAttachments = $user !== null && $policy->viewAttachments($user, $estimate);
+        $canViewPrivateAttachments = $user !== null && $policy->viewPrivateAttachments($user, $estimate);
         $canUpdateClosed = $user !== null && $policy->updateClosed($user, $estimate);
         $isOpen = (bool) ($estimate->status?->is_open ?? true);
         $stage = WorkOrderStage::Estimate;
@@ -159,7 +187,7 @@ final class EstimateController extends Controller
         return Inertia::render('Estimates/Edit', [
             'estimate' => $this->workOrders->toFormData($estimate),
             'attachments' => $canViewAttachments
-                ? $this->attachments->listForWorkOrder($estimate)
+                ? $this->attachments->listForWorkOrder($estimate, $canViewPrivateAttachments)
                 : [],
             ...$this->formOptions($owner, $stage, $estimate),
             'fields_locked' => ! $isOpen && ! $canUpdateClosed,
@@ -170,6 +198,7 @@ final class EstimateController extends Controller
                 'delete' => $user !== null && $policy->delete($user, $estimate),
                 'update_closed' => $canUpdateClosed,
                 'view_attachments' => $canViewAttachments,
+                'view_private_attachments' => $canViewPrivateAttachments,
                 'upload_attachments' => $user !== null && $policy->uploadAttachments($user, $estimate),
                 'download_attachments' => $user !== null && $policy->downloadAttachments($user, $estimate),
                 'delete_attachments' => $user !== null && $policy->deleteAttachments($user, $estimate),
@@ -213,7 +242,7 @@ final class EstimateController extends Controller
 
         /** @var UploadedFile $file */
         $file = $request->file('file');
-        $this->attachments->store($estimate, $user, $file);
+        $this->attachments->store($estimate, $user, $file, $request->boolean('is_private'));
 
         return redirect()
             ->route('estimates.edit', ['estimate' => $estimate, 'tab' => 'attachments'])
@@ -224,12 +253,20 @@ final class EstimateController extends Controller
     {
         $this->authorizeEstimate('downloadAttachments', $estimate);
 
+        if ($attachment->is_private) {
+            $this->authorizeEstimate('viewPrivateAttachments', $estimate);
+        }
+
         return $this->attachments->stream($estimate, $attachment, $request->boolean('inline'));
     }
 
     public function destroyAttachment(Request $request, WorkOrder $estimate, WorkOrderAttachment $attachment): RedirectResponse
     {
         $this->authorizeEstimate('deleteAttachments', $estimate);
+
+        if ($attachment->is_private) {
+            $this->authorizeEstimate('viewPrivateAttachments', $estimate);
+        }
 
         $this->attachments->delete($estimate, $attachment);
 
@@ -271,7 +308,33 @@ final class EstimateController extends Controller
             ),
             'requesterOptions' => $this->workOrders->requesterOptions($owner, $workOrder?->establishment_id),
             'technicianOptions' => $this->workOrders->technicianOptions($owner),
-            'articleOptions' => $this->workOrders->articleOptions(),
+            'articleOptions' => $this->workOrders->articleOptions(
+                $owner,
+                $workOrder?->establishment_id !== null ? (int) $workOrder->establishment_id : null,
+                $workOrder?->client_priority_id !== null ? (int) $workOrder->client_priority_id : null,
+                $workOrder?->work_order_type_id !== null ? (int) $workOrder->work_order_type_id : null,
+                $this->lineArticleIds($workOrder),
+            ),
         ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function lineArticleIds(?WorkOrder $workOrder): array
+    {
+        if ($workOrder === null) {
+            return [];
+        }
+
+        $workOrder->loadMissing('lines');
+
+        return $workOrder->lines
+            ->pluck('article_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

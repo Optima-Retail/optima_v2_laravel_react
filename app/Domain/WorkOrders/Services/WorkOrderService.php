@@ -14,7 +14,9 @@ use App\Domain\QualityScores\Services\QualityScoreProcessor;
 use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
 use App\Models\Article;
+use App\Models\ArticleClient;
 use App\Models\ClientPriority;
+use App\Models\ClientRate;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\Contract;
@@ -30,6 +32,7 @@ use App\Models\WorkOrderType;
 use App\Policies\EstimatePolicy;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -63,13 +66,10 @@ final class WorkOrderService
     }
 
     /**
-     * @return list<array{id: int, label: string, company_id: int}>
-     */
-    /**
      * Active establishments for selects. Keep `$includeIds` so edit still shows saved inactive values.
      *
      * @param  list<int>  $includeIds
-     * @return list<array{id: int, label: string, company_id: int}>
+     * @return list<array{id: int, label: string, company_id: int, company_name: string|null, company_logo_url: string|null, brand_name: string|null, currency_id: int|null, currency_label: string|null}>
      */
     public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
@@ -84,7 +84,22 @@ final class WorkOrderService
             fn (int $id): bool => $id > 0,
         )));
 
+        $brandNames = CompanyRelationship::query()
+            ->with('brand:id,name')
+            ->where('owner_company_id', $owner->id)
+            ->where('kind', CompanyRelationshipKind::Customer->value)
+            ->whereIn('related_company_id', $ids)
+            ->get(['related_company_id', 'brand_id'])
+            ->mapWithKeys(fn (CompanyRelationship $relationship): array => [
+                (int) $relationship->related_company_id => $relationship->brand?->name,
+            ]);
+
         return Establishment::query()
+            ->with([
+                'company:id,name,logo',
+                'delegation:id,currency_id',
+                'delegation.currency:id,name,code',
+            ])
             ->whereIn('company_id', $ids)
             ->where(function ($query) use ($includeIds): void {
                 $query->where('is_active', true);
@@ -94,14 +109,23 @@ final class WorkOrderService
                 }
             })
             ->orderBy('name')
-            ->get(['id', 'name', 'code', 'company_id'])
-            ->map(fn (Establishment $establishment): array => [
-                'id' => $establishment->id,
-                'label' => $establishment->code
-                    ? "{$establishment->name} ({$establishment->code})"
-                    : $establishment->name,
-                'company_id' => (int) $establishment->company_id,
-            ])
+            ->get(['id', 'name', 'code', 'company_id', 'delegation_id'])
+            ->map(function (Establishment $establishment) use ($brandNames): array {
+                $currency = $establishment->delegation?->currency;
+
+                return [
+                    'id' => $establishment->id,
+                    'label' => $establishment->code
+                        ? "{$establishment->name} ({$establishment->code})"
+                        : $establishment->name,
+                    'company_id' => (int) $establishment->company_id,
+                    'company_name' => $establishment->company?->name,
+                    'company_logo_url' => $establishment->company?->logoUrl(),
+                    'brand_name' => $brandNames->get((int) $establishment->company_id),
+                    'currency_id' => $currency?->id !== null ? (int) $currency->id : null,
+                    'currency_label' => $currency?->name,
+                ];
+            })
             ->values()
             ->all();
     }
@@ -332,20 +356,234 @@ final class WorkOrderService
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * Billing-line articles for a document, scoped like legacy articulo_cliente:
+     * articles linked to the customer relationship of the establishment's client.
+     *
+     * Sale price comes from article_clients; DL/DEL/ML/MEL are overridden by client_rates
+     * (tarifas) for the selected priority + work-order type, with P5 / Bajo Impacto fallback.
+     *
+     * @param  list<int>  $includeArticleIds
+     * @return list<array{id: int, label: string, code: string, description: string|null, unit_price: string}>
      */
-    public function articleOptions(): array
+    public function articleOptions(
+        Company $owner,
+        ?int $establishmentId = null,
+        ?int $clientPriorityId = null,
+        ?int $workOrderTypeId = null,
+        array $includeArticleIds = [],
+    ): array {
+        if ($establishmentId === null || $establishmentId <= 0) {
+            return $this->articleOptionsForIds($includeArticleIds);
+        }
+
+        $relationship = $this->customerRelationshipForEstablishment($owner, $establishmentId);
+
+        if ($relationship === null) {
+            return $this->articleOptionsForIds($includeArticleIds);
+        }
+
+        $rows = ArticleClient::query()
+            ->with(['article.languages'])
+            ->where('company_relationship_id', $relationship->id)
+            ->orderBy('article_id')
+            ->get();
+
+        $rate = $this->clientRateFor($relationship->id, $clientPriorityId, $workOrderTypeId);
+        $fallbackRate = $this->fallbackClientRateFor($relationship->id, $workOrderTypeId, $rate);
+
+        $options = $rows
+            ->filter(fn (ArticleClient $row): bool => $row->article !== null)
+            ->map(function (ArticleClient $row) use ($rate, $fallbackRate): array {
+                /** @var Article $article */
+                $article = $row->article;
+                $translation = $article->languages->firstWhere('language_id', 1)
+                    ?? $article->languages->sortBy('language_id')->first();
+                $name = $translation?->name;
+                $code = $article->code;
+                $salePrice = (string) $row->sale_price;
+
+                return [
+                    'id' => $article->id,
+                    'label' => $name ? "{$code} — {$name}" : $code,
+                    'code' => $code,
+                    'description' => $translation?->description,
+                    'unit_price' => $this->unitPriceForArticleCode($code, $salePrice, $rate, $fallbackRate),
+                ];
+            })
+            ->keyBy('id');
+
+        foreach ($this->articleOptionsForIds($includeArticleIds) as $extra) {
+            if (! $options->has($extra['id'])) {
+                $options->put($extra['id'], $extra);
+            }
+        }
+
+        return $options->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)->values()->all();
+    }
+
+    /**
+     * @param  list<int>  $articleIds
+     * @return list<array{id: int, label: string, code: string, description: string|null, unit_price: string}>
+     */
+    private function articleOptionsForIds(array $articleIds): array
     {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $articleIds), fn (int $id): bool => $id > 0)));
+
+        if ($ids === []) {
+            return [];
+        }
+
         return Article::query()
+            ->with('languages')
+            ->whereIn('id', $ids)
             ->orderBy('code')
-            ->limit(200)
-            ->get(['id', 'code'])
-            ->map(fn (Article $article): array => [
-                'id' => $article->id,
-                'label' => $article->code,
+            ->get()
+            ->map(function (Article $article): array {
+                $translation = $article->languages->firstWhere('language_id', 1)
+                    ?? $article->languages->sortBy('language_id')->first();
+                $name = $translation?->name;
+                $code = $article->code;
+
+                return [
+                    'id' => $article->id,
+                    'label' => $name ? "{$code} — {$name}" : $code,
+                    'code' => $code,
+                    'description' => $translation?->description,
+                    'unit_price' => '0',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Read-only client rate rows for the estimate Tarifas tab (legacy presupuestos tarifas).
+     *
+     * @return array{data: list<array<string, mixed>>, client_name: string|null}
+     */
+    public function clientRatesForEstimate(Company $owner, int $establishmentId, int $workOrderTypeId): array
+    {
+        $relationship = $this->customerRelationshipForEstablishment($owner, $establishmentId);
+
+        if ($relationship === null) {
+            return ['data' => [], 'client_name' => null];
+        }
+
+        $relationship->loadMissing('relatedCompany:id,name,tradename');
+
+        $rows = ClientRate::query()
+            ->with(['clientPriority:id,name,code', 'workOrderType:id,name,code'])
+            ->where('company_relationship_id', $relationship->id)
+            ->where('work_order_type_id', $workOrderTypeId)
+            ->orderBy('client_priority_id')
+            ->get()
+            ->map(fn (ClientRate $rate): array => [
+                'id' => $rate->id,
+                'client_priority_id' => (int) $rate->client_priority_id,
+                'client_priority_label' => $rate->clientPriority?->name ?? '#'.$rate->client_priority_id,
+                'work_order_type_id' => (int) $rate->work_order_type_id,
+                'work_order_type_label' => $rate->workOrderType?->name ?? '#'.$rate->work_order_type_id,
+                'travel_amount' => (string) $rate->travel_amount,
+                'extra_travel_amount' => (string) $rate->extra_travel_amount,
+                'labor_amount' => (string) $rate->labor_amount,
+                'extra_labor_amount' => (string) $rate->extra_labor_amount,
+                'is_urgent' => (bool) $rate->is_urgent,
             ])
             ->values()
             ->all();
+
+        $clientName = $relationship->relatedCompany?->tradename
+            ?: $relationship->relatedCompany?->name;
+
+        return [
+            'data' => $rows,
+            'client_name' => $clientName,
+        ];
+    }
+
+    private function customerRelationshipForEstablishment(Company $owner, int $establishmentId): ?CompanyRelationship
+    {
+        $clientCompanyId = Establishment::query()->whereKey($establishmentId)->value('company_id');
+
+        if ($clientCompanyId === null) {
+            return null;
+        }
+
+        return CompanyRelationship::query()
+            ->where('owner_company_id', $owner->id)
+            ->where('related_company_id', $clientCompanyId)
+            ->where('kind', CompanyRelationshipKind::Customer->value)
+            ->first();
+    }
+
+    private function clientRateFor(
+        int $relationshipId,
+        ?int $clientPriorityId,
+        ?int $workOrderTypeId,
+    ): ?ClientRate {
+        if ($clientPriorityId === null || $clientPriorityId <= 0 || $workOrderTypeId === null || $workOrderTypeId <= 0) {
+            return null;
+        }
+
+        return ClientRate::query()
+            ->where('company_relationship_id', $relationshipId)
+            ->where('client_priority_id', $clientPriorityId)
+            ->where('work_order_type_id', $workOrderTypeId)
+            ->first();
+    }
+
+    /**
+     * Legacy fallback: tarifas for Codigo Verde / Bajo Impacto (clave P5).
+     */
+    private function fallbackClientRateFor(int $relationshipId, ?int $workOrderTypeId, ?ClientRate $primary): ?ClientRate
+    {
+        if ($workOrderTypeId === null || $workOrderTypeId <= 0) {
+            return null;
+        }
+
+        $greenPriorityId = ClientPriority::query()
+            ->where(function ($query): void {
+                $query->where('code', 'P5')
+                    ->orWhere('name', 'like', 'Bajo Impacto%')
+                    ->orWhere('name', 'like', 'Código Verde%')
+                    ->orWhere('name', 'like', 'Codigo Verde%');
+            })
+            ->value('id');
+
+        if ($greenPriorityId === null) {
+            return null;
+        }
+
+        if ($primary !== null && (int) $primary->client_priority_id === (int) $greenPriorityId) {
+            return null;
+        }
+
+        return ClientRate::query()
+            ->where('company_relationship_id', $relationshipId)
+            ->where('client_priority_id', $greenPriorityId)
+            ->where('work_order_type_id', $workOrderTypeId)
+            ->first();
+    }
+
+    private function unitPriceForArticleCode(
+        string $code,
+        string $salePrice,
+        ?ClientRate $rate,
+        ?ClientRate $fallback,
+    ): string {
+        $resolved = match (strtoupper($code)) {
+            'DL' => $rate?->travel_amount ?? $fallback?->travel_amount,
+            'DEL' => $rate?->extra_travel_amount ?? $fallback?->extra_travel_amount,
+            'ML' => $rate?->labor_amount ?? $fallback?->labor_amount,
+            'MEL' => $rate?->extra_labor_amount ?? $fallback?->extra_labor_amount,
+            default => null,
+        };
+
+        if ($resolved === null || $resolved === '') {
+            return $salePrice;
+        }
+
+        return (string) $resolved;
     }
 
     public function defaultStatusId(WorkOrderStage $stage): ?int
@@ -385,8 +623,14 @@ final class WorkOrderService
                 'technicians' => fn ($query) => $query->where('is_selected', true),
                 'technicians.technician.relatedCompany',
             ])
-            ->whereHas('establishment', function ($query) use ($companyIds): void {
-                $query->whereIn('company_id', $companyIds);
+            ->where(function ($query) use ($owner, $companyIds): void {
+                $query->where('owner_company_id', $owner->id)
+                    ->orWhere(function ($legacy) use ($companyIds): void {
+                        $legacy->whereNull('owner_company_id')
+                            ->whereHas('establishment', function ($establishment) use ($companyIds): void {
+                                $establishment->whereIn('company_id', $companyIds);
+                            });
+                    });
             })
             ->when($establishmentId > 0, function ($query) use ($establishmentId): void {
                 $query->where('establishment_id', $establishmentId);
@@ -444,8 +688,14 @@ final class WorkOrderService
         $row = WorkOrder::query()
             ->where('establishment_id', $establishmentId)
             ->where('stage', $stage->value)
-            ->whereHas('establishment', function ($query) use ($companyIds): void {
-                $query->whereIn('company_id', $companyIds);
+            ->where(function ($query) use ($owner, $companyIds): void {
+                $query->where('owner_company_id', $owner->id)
+                    ->orWhere(function ($legacy) use ($companyIds): void {
+                        $legacy->whereNull('owner_company_id')
+                            ->whereHas('establishment', function ($establishment) use ($companyIds): void {
+                                $establishment->whereIn('company_id', $companyIds);
+                            });
+                    });
             })
             ->selectRaw('COUNT(*) as quantity')
             ->selectRaw('COALESCE(SUM(COALESCE(total_euros, total_amount, 0)), 0) as total_amount')
@@ -467,8 +717,14 @@ final class WorkOrderService
         $row = WorkOrder::query()
             ->where('contract_id', $contractId)
             ->where('stage', $stage->value)
-            ->whereHas('establishment', function ($query) use ($companyIds): void {
-                $query->whereIn('company_id', $companyIds);
+            ->where(function ($query) use ($owner, $companyIds): void {
+                $query->where('owner_company_id', $owner->id)
+                    ->orWhere(function ($legacy) use ($companyIds): void {
+                        $legacy->whereNull('owner_company_id')
+                            ->whereHas('establishment', function ($establishment) use ($companyIds): void {
+                                $establishment->whereIn('company_id', $companyIds);
+                            });
+                    });
             })
             ->selectRaw('COUNT(*) as quantity')
             ->selectRaw('COALESCE(SUM(COALESCE(total_euros, total_amount, 0)), 0) as total_amount')
@@ -503,10 +759,32 @@ final class WorkOrderService
     {
         return DB::transaction(function () use ($owner, $data): WorkOrder {
             $stage = WorkOrderStage::from((string) $data['stage']);
-            $attributes = $this->attributes($data, $stage);
 
-            if (($attributes['code'] ?? null) === null) {
-                $attributes['code'] = $this->allocateCode($owner, $stage);
+            if ($stage === WorkOrderStage::Estimate) {
+                if (! filled($data['status_id'] ?? null)) {
+                    $data['status_id'] = $this->defaultStatusId($stage);
+                }
+
+                if (! filled($data['due_at'] ?? null)) {
+                    $data['due_at'] = now()->addDay()->format('Y-m-d\TH:i');
+                }
+            }
+
+            // optima_back: establecimiento → delegacion → moneda (sets both on the document)
+            if (filled($data['establishment_id'] ?? null)) {
+                $fromEstablishment = $this->delegationAndCurrencyFromEstablishment((int) $data['establishment_id']);
+                $data['delegation_id'] = $fromEstablishment['delegation_id'];
+                $data['currency_id'] = $fromEstablishment['currency_id'];
+            }
+
+            $attributes = $this->attributes($data, $stage);
+            $attributes['owner_company_id'] = $owner->id;
+
+            // Always allocate when the pattern is missing/active (ignore client peek of suggestedCode).
+            $allocatedCode = $this->allocateCode($owner, $stage);
+
+            if ($allocatedCode !== null) {
+                $attributes['code'] = $allocatedCode;
             }
 
             if (($attributes['billing_company_id'] ?? null) === null) {
@@ -520,6 +798,16 @@ final class WorkOrderService
             }
 
             $workOrder = WorkOrder::query()->create($attributes);
+
+            // optima_back: if no trabajos_a_realizar, seed one from asunto
+            if ($stage === WorkOrderStage::Estimate && ($data['tasks'] ?? []) === [] && filled($attributes['subject'] ?? null)) {
+                $data['tasks'] = [[
+                    'title' => (string) $attributes['subject'],
+                    'description' => (string) $attributes['subject'],
+                    'is_completed' => false,
+                ]];
+            }
+
             $this->syncChildren($workOrder, $data);
 
             $createdStatusId = $workOrder->status_id !== null ? (int) $workOrder->status_id : null;
@@ -730,7 +1018,14 @@ final class WorkOrderService
      */
     public function toFormData(WorkOrder $workOrder): array
     {
-        $workOrder->loadMissing(['status', 'lines', 'technicians', 'collaborators', 'sourceWorkOrder:id,code,subject']);
+        $workOrder->loadMissing([
+            'status',
+            'lines',
+            'technicians',
+            'collaborators',
+            'currency:id,name,code',
+            'sourceWorkOrder:id,code,subject',
+        ]);
 
         return [
             'id' => $workOrder->id,
@@ -753,14 +1048,22 @@ final class WorkOrderService
             'is_urgent' => $workOrder->is_urgent,
             'establishment_id' => $workOrder->establishment_id,
             'contract_id' => $workOrder->contract_id,
+            'delegation_id' => $workOrder->delegation_id,
+            'currency_id' => $workOrder->currency_id,
+            'currency_label' => $workOrder->currency?->name,
             'billing_company_id' => $workOrder->billing_company_id,
             'responsible_user_id' => $workOrder->responsible_user_id,
             'requester_id' => $workOrder->requester_id,
             'notes' => $workOrder->notes,
             'internal_notes' => $workOrder->internal_notes,
+            'notes_alert' => (bool) $workOrder->notes_alert,
+            'internal_notes_alert' => (bool) $workOrder->internal_notes_alert,
             'received_at' => $workOrder->received_at?->format('Y-m-d\TH:i'),
             'intervention_at' => $workOrder->intervention_at?->format('Y-m-d\TH:i'),
             'due_at' => $workOrder->due_at?->format('Y-m-d\TH:i'),
+            'sent_at' => $workOrder->sent_at?->format('Y-m-d\TH:i'),
+            'closed_at' => $workOrder->closed_at?->format('Y-m-d\TH:i'),
+            'created_at' => $workOrder->created_at?->format('Y-m-d\TH:i'),
             'collaborator_ids' => $workOrder->collaborators->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
             'lines' => $workOrder->lines->map(fn (WorkOrderLine $line): array => [
                 'id' => $line->id,
@@ -774,6 +1077,14 @@ final class WorkOrderService
                 'company_relationship_id' => $technician->company_relationship_id,
                 'is_selected' => $technician->is_selected,
                 'quote_net_amount' => $technician->quote_net_amount,
+                'quoted_at' => $technician->quoted_at?->format('Y-m-d'),
+                'quote_total_euros' => $technician->quote_total_euros,
+            ])->values()->all(),
+            'tasks' => $this->tasksForDocument($workOrder)->map(fn (TaskToPerform $task): array => [
+                'id' => $task->id,
+                'title' => $task->title,
+                'description' => $task->description,
+                'is_completed' => $task->is_completed,
             ])->values()->all(),
         ];
     }
@@ -852,11 +1163,15 @@ final class WorkOrderService
             'is_urgent' => (bool) ($data['is_urgent'] ?? false),
             'establishment_id' => $data['establishment_id'] ?? null,
             'contract_id' => $data['contract_id'] ?? null,
+            'delegation_id' => $data['delegation_id'] ?? null,
+            'currency_id' => $data['currency_id'] ?? null,
             'billing_company_id' => $data['billing_company_id'] ?? null,
             'responsible_user_id' => $data['responsible_user_id'] ?? null,
             'requester_id' => $data['requester_id'] ?? null,
             'notes' => $data['notes'] ?? null,
             'internal_notes' => $data['internal_notes'] ?? null,
+            'notes_alert' => (bool) ($data['notes_alert'] ?? false),
+            'internal_notes_alert' => (bool) ($data['internal_notes_alert'] ?? false),
             'received_at' => $data['received_at'] ?? null,
             'intervention_at' => $data['intervention_at'] ?? null,
             'due_at' => $data['due_at'] ?? null,
@@ -961,6 +1276,81 @@ final class WorkOrderService
 
         $this->syncLines($workOrder, (array) ($data['lines'] ?? []));
         $this->syncTechnicians($workOrder, (array) ($data['technicians'] ?? []));
+        $this->syncTasks($workOrder, (array) ($data['tasks'] ?? []));
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $tasks
+     */
+    private function syncTasks(WorkOrder $workOrder, array $tasks): void
+    {
+        $documentType = $this->taskDocumentType($workOrder);
+        $kept = [];
+
+        foreach (array_values($tasks) as $task) {
+            if (! is_array($task)) {
+                continue;
+            }
+
+            $title = trim((string) ($task['title'] ?? ''));
+
+            if ($title === '') {
+                continue;
+            }
+
+            $payload = [
+                'title' => $title,
+                'description' => filled($task['description'] ?? null) ? (string) $task['description'] : null,
+                'is_completed' => (bool) ($task['is_completed'] ?? false),
+                'document_type' => $documentType,
+                'document_id' => $workOrder->id,
+            ];
+
+            $id = isset($task['id']) ? (int) $task['id'] : 0;
+            $existing = $id > 0
+                ? TaskToPerform::query()
+                    ->whereKey($id)
+                    ->where('document_id', $workOrder->id)
+                    ->where('document_type', $documentType->value)
+                    ->first()
+                : null;
+
+            if ($existing instanceof TaskToPerform) {
+                $existing->update($payload);
+                $kept[] = $existing->id;
+            } else {
+                $created = TaskToPerform::query()->create($payload);
+                $kept[] = $created->id;
+            }
+        }
+
+        TaskToPerform::query()
+            ->where('document_id', $workOrder->id)
+            ->where('document_type', $documentType->value)
+            ->when($kept !== [], fn ($query) => $query->whereNotIn('id', $kept))
+            ->get()
+            ->each(function (TaskToPerform $task): void {
+                $task->delete();
+            });
+    }
+
+    private function taskDocumentType(WorkOrder $workOrder): TaskDocumentType
+    {
+        return $workOrder->isEstimate()
+            ? TaskDocumentType::Estimate
+            : TaskDocumentType::WorkOrder;
+    }
+
+    /**
+     * @return Collection<int, TaskToPerform>
+     */
+    private function tasksForDocument(WorkOrder $workOrder)
+    {
+        return TaskToPerform::query()
+            ->where('document_id', $workOrder->id)
+            ->where('document_type', $this->taskDocumentType($workOrder)->value)
+            ->orderBy('id')
+            ->get();
     }
 
     /**
@@ -1009,26 +1399,48 @@ final class WorkOrderService
     private function syncTechnicians(WorkOrder $workOrder, array $technicians): void
     {
         $kept = [];
+        $seenRelationships = [];
 
         foreach (array_values($technicians) as $row) {
             if (! is_array($row) || ! filled($row['company_relationship_id'] ?? null)) {
                 continue;
             }
 
+            $relationshipId = (int) $row['company_relationship_id'];
+
+            // Unique (work_order_id, company_relationship_id): keep one row per technician.
+            if (isset($seenRelationships[$relationshipId])) {
+                continue;
+            }
+            $seenRelationships[$relationshipId] = true;
+
             $payload = [
-                'company_relationship_id' => (int) $row['company_relationship_id'],
+                'company_relationship_id' => $relationshipId,
                 'is_selected' => (bool) ($row['is_selected'] ?? false),
                 'quote_net_amount' => filled($row['quote_net_amount'] ?? null) ? $row['quote_net_amount'] : null,
+                'quoted_at' => filled($row['quoted_at'] ?? null) ? $row['quoted_at'] : null,
+                'quote_total_euros' => filled($row['quote_total_euros'] ?? null) ? $row['quote_total_euros'] : null,
             ];
 
             $id = isset($row['id']) ? (int) $row['id'] : 0;
-            $existing = $id > 0
-                ? $workOrder->technicians()->whereKey($id)->first()
-                : $workOrder->technicians()
-                    ->where('company_relationship_id', $payload['company_relationship_id'])
+            $existing = null;
+
+            if ($id > 0) {
+                $existing = $workOrder->technicians()->withTrashed()->whereKey($id)->first();
+            }
+
+            if ($existing === null) {
+                $existing = $workOrder->technicians()
+                    ->withTrashed()
+                    ->where('company_relationship_id', $relationshipId)
                     ->first();
+            }
 
             if ($existing instanceof WorkOrderTechnician) {
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+
                 $existing->update($payload);
                 $kept[] = $existing->id;
             } else {
@@ -1038,6 +1450,32 @@ final class WorkOrderService
         }
 
         $workOrder->technicians()->whereNotIn('id', $kept === [] ? [0] : $kept)->delete();
+    }
+
+    /**
+     * Same source as optima_back OT/presupuesto: establecimiento → delegacion → moneda.
+     *
+     * @return array{delegation_id: int|null, currency_id: int|null}
+     */
+    private function delegationAndCurrencyFromEstablishment(int $establishmentId): array
+    {
+        $establishment = Establishment::query()
+            ->whereKey($establishmentId)
+            ->with('delegation:id,currency_id')
+            ->first(['id', 'delegation_id']);
+
+        if ($establishment === null) {
+            return ['delegation_id' => null, 'currency_id' => null];
+        }
+
+        return [
+            'delegation_id' => $establishment->delegation_id !== null
+                ? (int) $establishment->delegation_id
+                : null,
+            'currency_id' => $establishment->delegation?->currency_id !== null
+                ? (int) $establishment->delegation->currency_id
+                : null,
+        ];
     }
 
     private function assertStatusMatchesStage(WorkOrderStage $stage, int $statusId): void
@@ -1064,13 +1502,12 @@ final class WorkOrderService
         $resource = $this->numberingResourceFor($stage);
         $existing = $this->numbering->findForResource($owner, $resource);
 
+        // Inactive pattern → manual codes only (caller keeps request code).
         if ($existing !== null && ! $existing->is_active) {
             return null;
         }
 
-        $allocated = $this->numbering->allocateNext($owner, $resource);
-
-        return is_string($allocated) && $allocated !== '' ? $allocated : null;
+        return $this->numbering->allocateNext($owner, $resource);
     }
 
     /**

@@ -16,9 +16,21 @@ final class StoreEstimateAttachmentRequest extends FormRequest
         $estimate = $this->route('estimate');
         $user = $this->user();
 
-        return $user !== null
-            && $estimate instanceof WorkOrder
-            && app(EstimatePolicy::class)->uploadAttachments($user, $estimate);
+        if ($user === null || ! ($estimate instanceof WorkOrder)) {
+            return false;
+        }
+
+        $policy = app(EstimatePolicy::class);
+
+        if (! $policy->uploadAttachments($user, $estimate)) {
+            return false;
+        }
+
+        if ($this->boolean('is_private') && ! $policy->viewPrivateAttachments($user, $estimate)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -28,6 +40,7 @@ final class StoreEstimateAttachmentRequest extends FormRequest
     {
         return [
             'file' => ['required', 'file', 'max:20480'],
+            'is_private' => ['sometimes', 'boolean'],
         ];
     }
 }

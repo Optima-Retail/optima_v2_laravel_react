@@ -12,7 +12,7 @@ type BaseModalProps = {
     footer?: ReactNode;
     /** Disable overlay/Escape close (e.g. while saving). */
     closeDisabled?: boolean;
-    size?: 'md' | 'lg' | 'xl';
+    size?: 'md' | 'lg' | 'xl' | 'full';
     className?: string;
 };
 
@@ -20,6 +20,7 @@ const sizeClassName: Record<NonNullable<BaseModalProps['size']>, string> = {
     md: 'max-w-md',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
+    full: 'max-w-6xl',
 };
 
 export function BaseModal({
@@ -76,7 +77,7 @@ export function BaseModal({
                 aria-labelledby={titleId}
                 aria-describedby={description ? descriptionId : undefined}
                 className={cn(
-                    'relative flex max-h-[min(90vh,40rem)] w-full flex-col rounded-2xl border border-line bg-surface shadow-lg',
+                    'relative flex max-h-[min(92vh,48rem)] w-full flex-col rounded-2xl border border-line bg-surface shadow-lg',
                     sizeClassName[size],
                     className,
                 )}

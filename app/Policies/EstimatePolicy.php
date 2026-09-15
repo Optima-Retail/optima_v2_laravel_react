@@ -82,4 +82,11 @@ final class EstimatePolicy
             && $this->allows($user, 'delete-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
+
+    public function viewPrivateAttachments(User $user, WorkOrder $workOrder): bool
+    {
+        return $workOrder->isEstimate()
+            && $this->allows($user, 'view-private-attachments')
+            && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
+    }
 }

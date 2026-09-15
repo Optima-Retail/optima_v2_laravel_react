@@ -13,7 +13,7 @@ import { confirmWorkOrderStatusChange } from '@/helpers/workOrderStatusChange';
 import { AppLayout } from '@/layouts/AppLayout';
 import { workOrdersService } from '@/services';
 import type { DocumentChatPayload } from '@/support/types/domain/chat';
-import type { UserOption } from '@/support/types/domain/common';
+import type { UserOption, WorkOrderArticleOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type { WorkOrderAttachmentItem, WorkOrderFormData } from '@/support/types/domain/work-order';
 import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
@@ -29,13 +29,14 @@ type EditWorkOrderProps = {
     contractOptions: UserOption[];
     requesterOptions: UserOption[];
     technicianOptions: UserOption[];
-    articleOptions: UserOption[];
+    articleOptions: WorkOrderArticleOption[];
     fields_locked?: boolean;
     chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
         update_closed: boolean;
         view_attachments: boolean;
+        view_private_attachments: boolean;
         upload_attachments: boolean;
         download_attachments: boolean;
         delete_attachments: boolean;
@@ -94,6 +95,8 @@ export default function EditWorkOrder({
             requester_id: workOrder.requester_id ? String(workOrder.requester_id) : '',
             notes: workOrder.notes ?? '',
             internal_notes: workOrder.internal_notes ?? '',
+            notes_alert: workOrder.notes_alert ?? false,
+            internal_notes_alert: workOrder.internal_notes_alert ?? false,
             received_at: workOrder.received_at ?? '',
             intervention_at: workOrder.intervention_at ?? '',
             due_at: workOrder.due_at ?? '',
@@ -112,6 +115,11 @@ export default function EditWorkOrder({
                 quote_net_amount:
                     technician.quote_net_amount !== null && technician.quote_net_amount !== undefined
                         ? String(technician.quote_net_amount)
+                        : '',
+                quoted_at: technician.quoted_at ?? '',
+                quote_total_euros:
+                    technician.quote_total_euros !== null && technician.quote_total_euros !== undefined
+                        ? String(technician.quote_total_euros)
                         : '',
             })),
         }),
@@ -240,6 +248,7 @@ export default function EditWorkOrder({
                                     upload_attachments: can.upload_attachments,
                                     download_attachments: can.download_attachments,
                                     delete_attachments: can.delete_attachments,
+                                    view_private_attachments: can.view_private_attachments,
                                 }}
                                 onUpload={workOrdersService.storeAttachment}
                                 onDestroy={workOrdersService.destroyAttachment}

@@ -322,6 +322,47 @@ final class DocumentChatTest extends TestCase
         );
     }
 
+    public function test_estimate_chat_mark_read_uses_estimate_policy(): void
+    {
+        [$admin, $establishment, $company] = $this->seedWorkOrderContext();
+
+        WorkOrderStatus::query()->firstOrCreate(
+            [
+                'name' => 'Pendiente',
+                'kind' => WorkOrderStage::Estimate,
+            ],
+            [
+                'color' => '#f6eac2',
+                'lifecycle' => 1,
+                'is_open' => true,
+                'is_default' => true,
+            ],
+        );
+
+        $estimate = WorkOrder::factory()->create([
+            'establishment_id' => $establishment->id,
+            'owner_company_id' => $company->id,
+            'responsible_user_id' => $admin->id,
+            'stage' => WorkOrderStage::Estimate,
+            'subject' => 'Estimate chat',
+        ]);
+
+        $this->assertTrue($estimate->isEstimate());
+
+        $this->actingAs($admin)
+            ->postJson("/document-chats/work_order/{$estimate->id}/read")
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $this->actingAs($admin)
+            ->postJson("/document-chats/work_order/{$estimate->id}/messages", [
+                'body' => 'Estimate note',
+                'is_private' => false,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('message.body', 'Estimate note');
+    }
+
     /**
      * @return array{0: User, 1: Establishment, 2: Company}
      */

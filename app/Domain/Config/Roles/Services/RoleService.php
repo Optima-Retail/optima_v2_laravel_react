@@ -82,11 +82,13 @@ final class RoleService
      */
     public function update(Role $role, array $data): Role
     {
+        if ($this->isSystem($role)) {
+            abort(403);
+        }
+
         return DB::transaction(function () use ($role, $data): Role {
-            if (! $this->isSystem($role)) {
-                $role->name = $data['name'];
-                $role->save();
-            }
+            $role->name = $data['name'];
+            $role->save();
 
             $role->syncPermissions($data['permissions'] ?? []);
 
@@ -114,7 +116,24 @@ final class RoleService
 
     public function syncDiscoveredPermissions(bool $prune = false): array
     {
-        return $this->permissionSync->sync(prune: $prune);
+        $result = $this->permissionSync->sync(prune: $prune);
+        $this->ensureSystemRoleHasAllPermissions($result['all']);
+
+        return $result;
+    }
+
+    /**
+     * System admin always keeps every discovered permission (read-only in the UI).
+     *
+     * @param  list<string>|null  $permissionNames
+     */
+    public function ensureSystemRoleHasAllPermissions(?array $permissionNames = null): void
+    {
+        $guard = config('auth.defaults.guard', 'web');
+        $admin = Role::findOrCreate(RoleEnum::Admin->value, $guard);
+        $permissionNames ??= $this->permissionDiscoverer->discover();
+
+        $admin->syncPermissions($permissionNames);
     }
 
     /**

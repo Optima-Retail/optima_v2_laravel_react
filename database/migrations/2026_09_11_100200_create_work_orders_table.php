@@ -38,6 +38,8 @@ return new class extends Migration
             $table->foreignId('client_priority_id')->nullable()->constrained('client_priorities')->nullOnDelete();
             $table->boolean('is_urgent')->default(false);
             $table->foreignId('establishment_id')->constrained('establishments')->restrictOnDelete();
+            // Tenant ownership (active company switcher); mirrors incidents.company_id.
+            $table->foreignId('owner_company_id')->nullable()->constrained('companies')->restrictOnDelete();
             $table->foreignId('billing_company_id')->nullable()->constrained('companies')->nullOnDelete();
             $table->foreignId('responsible_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('requester_id')->nullable()->constrained('requesters')->nullOnDelete();
@@ -87,6 +89,7 @@ return new class extends Migration
 
             $table->index(['stage', 'status_id']);
             $table->index(['establishment_id', 'stage']);
+            $table->index(['owner_company_id', 'stage']);
             $table->index('code');
             $table->index('legacy_erp_id');
         });

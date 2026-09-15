@@ -6,8 +6,10 @@ namespace App\Domain\WorkOrders\Services;
 
 use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\Config\NumberingPatterns\Services\NumberingPatternService;
+use App\Domain\Config\TasksToPerform\Enums\TaskDocumentType;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
 use App\Models\Company;
+use App\Models\TaskToPerform;
 use App\Models\WorkOrder;
 use InvalidArgumentException;
 
@@ -54,6 +56,12 @@ final class WorkOrderConfirmationService
         }
 
         $workOrder->forceFill($payload)->save();
+
+        // Same document id keeps tasks; flip type estimate → work_order (optima_back modelo change).
+        TaskToPerform::query()
+            ->where('document_id', $workOrder->id)
+            ->where('document_type', TaskDocumentType::Estimate->value)
+            ->update(['document_type' => TaskDocumentType::WorkOrder->value]);
 
         return $workOrder->refresh();
     }

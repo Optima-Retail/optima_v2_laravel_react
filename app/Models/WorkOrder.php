@@ -44,6 +44,7 @@ class WorkOrder extends Model
         'client_priority_id',
         'is_urgent',
         'establishment_id',
+        'owner_company_id',
         'billing_company_id',
         'responsible_user_id',
         'requester_id',
@@ -202,6 +203,16 @@ class WorkOrder extends Model
     public function establishment(): BelongsTo
     {
         return $this->belongsTo(Establishment::class);
+    }
+
+    /**
+     * Operating company that owns this document (active company at create time).
+     *
+     * @return BelongsTo<Company, $this>
+     */
+    public function ownerCompany(): BelongsTo
+    {
+        return $this->belongsTo(Company::class, 'owner_company_id');
     }
 
     /**

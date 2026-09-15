@@ -37,6 +37,7 @@ class WorkOrderFactory extends Factory
                 ],
             )->id,
             'establishment_id' => Establishment::factory(),
+            'owner_company_id' => null,
         ];
     }
 

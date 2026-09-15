@@ -501,10 +501,17 @@ final class TechnicianRequestService
         $companyIds = array_values(array_unique($companyIds));
 
         $query = WorkOrder::query()
-            ->where(function (Builder $inner) use ($companyIds): void {
+            ->where(function (Builder $inner) use ($owner, $companyIds): void {
                 $inner
-                    ->whereIn('billing_company_id', $companyIds)
-                    ->orWhereHas('establishment', fn (Builder $establishment) => $establishment->whereIn('company_id', $companyIds));
+                    ->where('owner_company_id', $owner->id)
+                    ->orWhere(function (Builder $legacy) use ($companyIds): void {
+                        $legacy->whereNull('owner_company_id')
+                            ->where(function (Builder $scope) use ($companyIds): void {
+                                $scope
+                                    ->whereIn('billing_company_id', $companyIds)
+                                    ->orWhereHas('establishment', fn (Builder $establishment) => $establishment->whereIn('company_id', $companyIds));
+                            });
+                    });
             })
             ->orderByDesc('id')
             ->limit(100);

@@ -23,6 +23,7 @@ class WorkOrderTechnician extends Model
         'status_id',
         'attendance_confirmation_type_id',
         'quote_net_amount',
+        'quoted_at',
         'quote_tax_amount',
         'quote_total_amount',
         'quote_total_euros',
@@ -42,6 +43,7 @@ class WorkOrderTechnician extends Model
         return [
             'is_selected' => 'boolean',
             'quote_net_amount' => 'decimal:2',
+            'quoted_at' => 'date',
             'quote_tax_amount' => 'decimal:2',
             'quote_total_amount' => 'decimal:2',
             'quote_total_euros' => 'decimal:2',

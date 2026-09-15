@@ -141,6 +141,7 @@ final class WorkOrderController extends Controller
         $user = $request->user();
         $workOrder->loadMissing('status');
         $canViewAttachments = $user?->can('viewAttachments', $workOrder) ?? false;
+        $canViewPrivateAttachments = $user?->can('viewPrivateAttachments', $workOrder) ?? false;
         $canUpdateClosed = $user?->can('updateClosed', $workOrder) ?? false;
         $isOpen = (bool) ($workOrder->status?->is_open ?? true);
         $stage = WorkOrderStage::WorkOrder;
@@ -148,7 +149,7 @@ final class WorkOrderController extends Controller
         return Inertia::render('WorkOrders/Edit', [
             'workOrder' => $this->workOrders->toFormData($workOrder),
             'attachments' => $canViewAttachments
-                ? $this->attachments->listForWorkOrder($workOrder)
+                ? $this->attachments->listForWorkOrder($workOrder, $canViewPrivateAttachments)
                 : [],
             ...$this->formOptions($owner, $stage, $workOrder),
             'fields_locked' => ! $isOpen && ! $canUpdateClosed,
@@ -159,6 +160,7 @@ final class WorkOrderController extends Controller
                 'delete' => $user?->can('delete', $workOrder) ?? false,
                 'update_closed' => $canUpdateClosed,
                 'view_attachments' => $canViewAttachments,
+                'view_private_attachments' => $canViewPrivateAttachments,
                 'upload_attachments' => $user?->can('uploadAttachments', $workOrder) ?? false,
                 'download_attachments' => $user?->can('downloadAttachments', $workOrder) ?? false,
                 'delete_attachments' => $user?->can('deleteAttachments', $workOrder) ?? false,
@@ -202,7 +204,7 @@ final class WorkOrderController extends Controller
 
         /** @var UploadedFile $file */
         $file = $request->file('file');
-        $this->attachments->store($workOrder, $user, $file);
+        $this->attachments->store($workOrder, $user, $file, $request->boolean('is_private'));
 
         return redirect()
             ->route('work-orders.edit', ['work_order' => $workOrder, 'tab' => 'attachments'])
@@ -213,12 +215,20 @@ final class WorkOrderController extends Controller
     {
         $this->authorize('downloadAttachments', $workOrder);
 
+        if ($attachment->is_private) {
+            $this->authorize('viewPrivateAttachments', $workOrder);
+        }
+
         return $this->attachments->stream($workOrder, $attachment, $request->boolean('inline'));
     }
 
     public function destroyAttachment(WorkOrder $workOrder, WorkOrderAttachment $attachment): RedirectResponse
     {
         $this->authorize('deleteAttachments', $workOrder);
+
+        if ($attachment->is_private) {
+            $this->authorize('viewPrivateAttachments', $workOrder);
+        }
 
         $this->attachments->delete($workOrder, $attachment);
 
@@ -260,7 +270,33 @@ final class WorkOrderController extends Controller
             ),
             'requesterOptions' => $this->workOrders->requesterOptions($owner, $workOrder?->establishment_id),
             'technicianOptions' => $this->workOrders->technicianOptions($owner),
-            'articleOptions' => $this->workOrders->articleOptions(),
+            'articleOptions' => $this->workOrders->articleOptions(
+                $owner,
+                $workOrder?->establishment_id !== null ? (int) $workOrder->establishment_id : null,
+                $workOrder?->client_priority_id !== null ? (int) $workOrder->client_priority_id : null,
+                $workOrder?->work_order_type_id !== null ? (int) $workOrder->work_order_type_id : null,
+                $this->lineArticleIds($workOrder),
+            ),
         ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function lineArticleIds(?WorkOrder $workOrder): array
+    {
+        if ($workOrder === null) {
+            return [];
+        }
+
+        $workOrder->loadMissing('lines');
+
+        return $workOrder->lines
+            ->pluck('article_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 }

@@ -2,11 +2,15 @@ import { FormEvent } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { defaultWorkOrderFormValues, WorkOrderForm } from '@/components/work-orders/WorkOrderForm';
+import {
+    EstimateForm,
+    type EstimateRequesterOption,
+} from '@/components/estimates/EstimateCreateForm';
+import { defaultWorkOrderFormValues } from '@/components/work-orders/WorkOrderForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { estimatesService } from '@/services';
-import type { UserOption } from '@/support/types/domain/common';
+import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 
 type CreateEstimateProps = {
@@ -16,48 +20,45 @@ type CreateEstimateProps = {
     defaultEstablishmentId: number | null;
     defaultContractId: number | null;
     defaultSubject: string | null;
-    statusOptions: UserOption[];
     typeOptions: UserOption[];
-    priorityOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
-    contractOptions: UserOption[];
-    requesterOptions: UserOption[];
-    technicianOptions: UserOption[];
+    requesterOptions: EstimateRequesterOption[];
+    technicianOptions: CompanyOption[];
     articleOptions: UserOption[];
 };
 
 export default function CreateEstimate({
-    suggestedCode,
-    codeIsAutomatic,
     defaultStatusId,
     defaultEstablishmentId,
-    defaultContractId,
     defaultSubject,
-    statusOptions,
     typeOptions,
-    priorityOptions,
     userOptions,
     establishmentOptions,
-    contractOptions,
     requesterOptions,
     technicianOptions,
     articleOptions,
 }: CreateEstimateProps) {
     const { t } = useTranslation();
+    const defaultEstablishment = defaultEstablishmentId
+        ? establishmentOptions.find((option) => option.id === defaultEstablishmentId)
+        : null;
+
     const form = useForm(
         defaultWorkOrderFormValues({
-            code: suggestedCode ?? '',
             subject: defaultSubject ?? '',
             stage: 'estimate',
             status_id: defaultStatusId ? String(defaultStatusId) : '',
             establishment_id: defaultEstablishmentId ? String(defaultEstablishmentId) : '',
-            contract_id: defaultContractId ? String(defaultContractId) : '',
+            currency_id: defaultEstablishment?.currency_id ? String(defaultEstablishment.currency_id) : '',
+            is_urgent: false,
         }),
     );
 
     function submit(event: FormEvent) {
         event.preventDefault();
+        // Never send a peeked preview code — the backend allocates and increments.
+        form.transform((data) => ({ ...data, code: '' }));
         estimatesService.store(form);
     }
 
@@ -73,18 +74,15 @@ export default function CreateEstimate({
                     backLabel={t('common.backTo', { resource: t('estimates.resourcePlural') })}
                 />
 
-                <WorkOrderForm
+                <EstimateForm
+                    mode="create"
+                    section="details"
                     values={form.data}
                     errors={form.errors}
                     processing={form.processing}
-                    codeDisabled={codeIsAutomatic}
-                    stageLocked
-                    statusOptions={statusOptions}
                     typeOptions={typeOptions}
-                    priorityOptions={priorityOptions}
                     userOptions={userOptions}
                     establishmentOptions={establishmentOptions}
-                    contractOptions={contractOptions}
                     requesterOptions={requesterOptions}
                     technicianOptions={technicianOptions}
                     articleOptions={articleOptions}

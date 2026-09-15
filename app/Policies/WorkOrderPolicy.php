@@ -78,4 +78,11 @@ final class WorkOrderPolicy
             && $this->allows($user, 'delete-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
+
+    public function viewPrivateAttachments(User $user, WorkOrder $workOrder): bool
+    {
+        return $workOrder->isConfirmedWorkOrder()
+            && $this->allows($user, 'view-private-attachments')
+            && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
+    }
 }

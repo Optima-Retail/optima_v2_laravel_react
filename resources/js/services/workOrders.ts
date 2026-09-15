@@ -29,9 +29,10 @@ export const workOrdersService = {
         router.delete(`${base}/${id}`, options);
     },
 
-    storeAttachment(id: number, file: File, options: Record<string, unknown> = {}) {
+    storeAttachment(id: number, file: File, isPrivate = false, options: Record<string, unknown> = {}) {
         const data = new FormData();
         data.append('file', file);
+        data.append('is_private', isPrivate ? '1' : '0');
 
         router.post(`${base}/${id}/attachments`, data, {
             forceFormData: true,

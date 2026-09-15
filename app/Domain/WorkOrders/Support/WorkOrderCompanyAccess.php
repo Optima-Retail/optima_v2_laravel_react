@@ -24,6 +24,11 @@ final class WorkOrderCompanyAccess
             return false;
         }
 
+        if ($workOrder->owner_company_id !== null) {
+            return (int) $workOrder->owner_company_id === (int) $active->id;
+        }
+
+        // Legacy rows before owner_company_id: fall back to establishment client linkage.
         $workOrder->loadMissing('establishment');
         $companyId = $workOrder->establishment?->company_id;
 

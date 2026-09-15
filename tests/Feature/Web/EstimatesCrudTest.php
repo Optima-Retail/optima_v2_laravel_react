@@ -6,16 +6,30 @@ namespace Tests\Feature\Web;
 
 use App\Domain\Auth\Enums\RoleEnum;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
+use App\Models\Article;
+use App\Models\ArticleClient;
+use App\Models\ArticleLanguage;
+use App\Models\Brand;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
+use App\Models\Currency;
+use App\Models\Delegation;
 use App\Models\Establishment;
+use App\Models\Language;
+use App\Models\NumberingPattern;
+use App\Models\TaskToPerform;
 use App\Models\User;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderStatus;
 use App\Models\WorkOrderStatusTransition;
+use App\Models\WorkOrderType;
+use Carbon\Carbon;
+use Database\Seeders\LanguageSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\InteractsWithCompanies;
 use Tests\TestCase;
@@ -30,11 +44,12 @@ final class EstimatesCrudTest extends TestCase
         parent::setUp();
 
         $this->seed(RolesAndPermissionsSeeder::class);
+        $this->seed(LanguageSeeder::class);
     }
 
     public function test_admin_can_create_update_and_delete_estimates(): void
     {
-        [$admin, $establishment, $pending] = $this->seedContext();
+        [$admin, $establishment, $pending, , , , , $type] = $this->seedContext();
 
         $this->actingAs($admin)
             ->get('/estimates')
@@ -49,6 +64,7 @@ final class EstimatesCrudTest extends TestCase
                 'subject' => 'Replace filter',
                 'status_id' => $pending->id,
                 'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
                 'is_urgent' => false,
                 'code' => 'EST-100',
             ])
@@ -74,6 +90,9 @@ final class EstimatesCrudTest extends TestCase
                 ->component('Estimates/Edit')
                 ->where('estimate.subject', 'Replace filter')
                 ->where('estimate.status_is_open', true)
+                ->has('estimate.currency_id')
+                ->has('estimate.currency_label')
+                ->has('estimate.created_at')
                 ->where('fields_locked', false)
                 ->where('can.update_closed', true));
 
@@ -82,6 +101,7 @@ final class EstimatesCrudTest extends TestCase
                 'subject' => 'Replace filter updated',
                 'status_id' => $pending->id,
                 'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
                 'is_urgent' => true,
                 'code' => 'EST-100',
             ])
@@ -101,6 +121,235 @@ final class EstimatesCrudTest extends TestCase
             ->assertSessionHas('success', 'estimate_deleted_successfully');
 
         $this->assertSoftDeleted($estimate);
+    }
+
+    public function test_create_page_exposes_enriched_establishment_options(): void
+    {
+        [$admin, $establishment, , , , , , , $currency] = $this->seedContext();
+
+        $this->actingAs($admin)
+            ->get('/estimates/create')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Estimates/Create')
+                ->where('establishmentOptions.0.id', $establishment->id)
+                ->where('establishmentOptions.0.company_name', 'Client Co')
+                ->where('establishmentOptions.0.brand_name', 'Acme Brand')
+                ->where('establishmentOptions.0.currency_id', $currency->id)
+                ->where('establishmentOptions.0.currency_label', 'Euro')
+                ->where('establishmentOptions.0.company_logo_url', null));
+    }
+
+    public function test_estimate_create_auto_assigns_default_status_due_at_and_currency(): void
+    {
+        Carbon::setTestNow('2026-09-15 10:00:00');
+
+        [$admin, $establishment, $pending, , , , , $type, $currency] = $this->seedContext();
+
+        $this->actingAs($admin)
+            ->post('/estimates', [
+                'subject' => 'Auto defaults',
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'is_urgent' => false,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'estimate_created_successfully');
+
+        $estimate = WorkOrder::query()->where('subject', 'Auto defaults')->firstOrFail();
+
+        $this->assertSame($pending->id, $estimate->status_id);
+        $this->assertSame($currency->id, $estimate->currency_id);
+        $this->assertSame($establishment->delegation_id, $estimate->delegation_id);
+        $this->assertNotNull($estimate->due_at);
+        $this->assertTrue($estimate->due_at->equalTo(Carbon::parse('2026-09-16 10:00:00')));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_estimate_codes_increment_even_when_client_sends_peeked_code(): void
+    {
+        Carbon::setTestNow('2026-09-15 10:00:00');
+
+        [$admin, $establishment, , , , , $company, $type] = $this->seedContext();
+
+        $this->actingAs($admin)
+            ->put('/config/numbering-patterns/resource/estimates', [
+                'segments' => [
+                    ['type' => 'letters', 'value' => 'PR'],
+                    ['type' => 'year', 'digit_length' => 2],
+                    ['type' => 'letters', 'value' => '/'],
+                    ['type' => 'sequence', 'digit_length' => 5],
+                ],
+                'reset_yearly' => false,
+                'is_active' => true,
+            ])
+            ->assertRedirect();
+
+        $peeked = 'PR26/00001';
+
+        $this->actingAs($admin)
+            ->post('/estimates', [
+                'subject' => 'First numbered',
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'is_urgent' => false,
+                'code' => $peeked,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'estimate_created_successfully');
+
+        $this->actingAs($admin)
+            ->post('/estimates', [
+                'subject' => 'Second numbered',
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'is_urgent' => false,
+                'code' => $peeked,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'estimate_created_successfully');
+
+        $first = WorkOrder::query()->where('subject', 'First numbered')->firstOrFail();
+        $second = WorkOrder::query()->where('subject', 'Second numbered')->firstOrFail();
+
+        $this->assertSame('PR26/00001', $first->code);
+        $this->assertSame('PR26/00002', $second->code);
+
+        $pattern = NumberingPattern::query()
+            ->where('company_id', $company->id)
+            ->where('resource', NumberingResource::Estimates->value)
+            ->firstOrFail();
+
+        $this->assertSame(2, $pattern->last_sequence);
+
+        Carbon::setTestNow();
+    }
+
+    public function test_estimate_create_seeds_task_from_subject_and_edit_exposes_tasks(): void
+    {
+        [$admin, $establishment, , , , , , $type] = $this->seedContext();
+
+        $this->actingAs($admin)
+            ->post('/estimates', [
+                'subject' => 'Replace HVAC filter',
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'is_urgent' => false,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'estimate_created_successfully');
+
+        $estimate = WorkOrder::query()->where('subject', 'Replace HVAC filter')->firstOrFail();
+
+        $this->assertDatabaseHas('tasks_to_perform', [
+            'document_id' => $estimate->id,
+            'document_type' => 'estimate',
+            'title' => 'Replace HVAC filter',
+            'description' => 'Replace HVAC filter',
+            'is_completed' => 0,
+        ]);
+
+        $this->actingAs($admin)
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Replace HVAC filter',
+                'status_id' => $estimate->status_id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'is_urgent' => false,
+                'code' => $estimate->code,
+                'tasks' => [
+                    [
+                        'title' => 'Inspect unit',
+                        'description' => 'Check airflow',
+                        'is_completed' => false,
+                    ],
+                    [
+                        'title' => 'Replace filter',
+                        'description' => 'Install new filter',
+                        'is_completed' => false,
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('estimates.edit', $estimate));
+
+        $this->assertSame(
+            2,
+            TaskToPerform::query()
+                ->where('document_id', $estimate->id)
+                ->where('document_type', 'estimate')
+                ->count(),
+        );
+        $this->assertDatabaseHas('tasks_to_perform', [
+            'document_id' => $estimate->id,
+            'document_type' => 'estimate',
+            'title' => 'Inspect unit',
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/estimates/{$estimate->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Estimates/Edit')
+                ->has('estimate.tasks', 2)
+                ->where('estimate.tasks.0.title', 'Inspect unit'));
+    }
+
+    public function test_estimate_billing_line_articles_come_from_article_clients(): void
+    {
+        [$admin, $establishment, $pending, , , , $company, $type] = $this->seedContext();
+
+        $relationship = CompanyRelationship::query()
+            ->where('owner_company_id', $company->id)
+            ->where('related_company_id', $establishment->company_id)
+            ->where('kind', CompanyRelationshipKind::Customer)
+            ->firstOrFail();
+
+        $linked = Article::query()->create(['code' => 'CLI-ART', 'is_deletable' => true]);
+        $other = Article::query()->create(['code' => 'OTHER-ART', 'is_deletable' => true]);
+
+        $languageId = (int) Language::query()->where('code', 'en')->value('id');
+
+        ArticleLanguage::query()->create([
+            'article_id' => $linked->id,
+            'language_id' => $languageId,
+            'name' => 'Client article',
+            'description' => 'From client catalog',
+        ]);
+        ArticleLanguage::query()->create([
+            'article_id' => $other->id,
+            'language_id' => $languageId,
+            'name' => 'Other article',
+            'description' => 'Not for this client',
+        ]);
+
+        ArticleClient::query()->create([
+            'article_id' => $linked->id,
+            'company_relationship_id' => $relationship->id,
+            'sale_price' => 42.50,
+        ]);
+
+        $estimate = WorkOrder::factory()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $pending->id,
+            'stage' => WorkOrderStage::Estimate,
+            'work_order_type_id' => $type->id,
+            'subject' => 'Articles scoped',
+            'code' => 'EST-ART',
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/estimates/{$estimate->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Estimates/Edit')
+                ->has('articleOptions', 1)
+                ->where('articleOptions.0.id', $linked->id)
+                ->where('articleOptions.0.unit_price', '42.50')
+                ->where('articleOptions.0.description', 'From client catalog')
+                ->where('articleOptions.0.code', 'CLI-ART'));
+
+        $this->assertDatabaseHas('articles', ['id' => $other->id]);
     }
 
     public function test_approving_an_estimate_confirms_it_and_redirects_to_work_orders(): void
@@ -342,8 +591,128 @@ final class EstimatesCrudTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_technician_search_returns_active_technicians_for_owner(): void
+    {
+        [$admin, $establishment, , , , , $company] = $this->seedContext();
+
+        $techCompany = Company::factory()->create([
+            'name' => 'Tech Co',
+            'tradename' => 'FastFix',
+            'phone' => '600111222',
+            'is_active' => true,
+            'latitude' => 40.42,
+            'longitude' => -3.70,
+        ]);
+
+        $relationship = CompanyRelationship::factory()->create([
+            'owner_company_id' => $company->id,
+            'related_company_id' => $techCompany->id,
+            'kind' => CompanyRelationshipKind::Technician,
+            'optima_score' => 8.5,
+            'customer_score' => 9.0,
+            'average_score' => 8.75,
+            'has_health_and_safety' => true,
+        ]);
+
+        CompanyRelationship::factory()->create([
+            'owner_company_id' => $company->id,
+            'related_company_id' => Company::factory()->create(['name' => 'Other Tech', 'is_active' => false])->id,
+            'kind' => CompanyRelationshipKind::Technician,
+        ]);
+
+        $establishment->forceFill([
+            'latitude' => 40.4168,
+            'longitude' => -3.7038,
+        ])->save();
+
+        DB::table('establishment_technician_blacklist')->insert([
+            'establishment_id' => $establishment->id,
+            'company_relationship_id' => $relationship->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->actingAs($admin)
+            ->getJson('/estimates/technician-search?'.http_build_query([
+                'establishment_id' => $establishment->id,
+                'tab' => 'all',
+                'search' => 'FastFix',
+            ]))
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.id', $relationship->id)
+            ->assertJsonPath('data.0.label', 'FastFix')
+            ->assertJsonPath('data.0.phone', '600111222')
+            ->assertJsonPath('data.0.is_blacklisted', true)
+            ->assertJsonPath('meta.establishment_id', $establishment->id)
+            ->assertJsonPath('meta.has_coordinates', true)
+            ->assertJsonPath('data.0.distance_km', 0.5);
+    }
+
+    public function test_readding_a_soft_deleted_technician_restores_the_row(): void
+    {
+        [$admin, $establishment, $pending, , , , $company, $type] = $this->seedContext();
+
+        $techCompany = Company::factory()->create(['name' => 'Restore Tech', 'is_active' => true]);
+        $relationship = CompanyRelationship::factory()->create([
+            'owner_company_id' => $company->id,
+            'related_company_id' => $techCompany->id,
+            'kind' => CompanyRelationshipKind::Technician,
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/estimates', [
+                'subject' => 'Technician restore',
+                'status_id' => $pending->id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'is_urgent' => false,
+                'technicians' => [
+                    [
+                        'company_relationship_id' => $relationship->id,
+                        'is_selected' => true,
+                        'quote_net_amount' => 10,
+                        'quoted_at' => '2026-09-15',
+                        'quote_total_euros' => 10,
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $estimate = WorkOrder::query()->where('subject', 'Technician restore')->firstOrFail();
+        $row = $estimate->technicians()->firstOrFail();
+        $row->delete();
+
+        $this->assertSoftDeleted($row);
+
+        $this->actingAs($admin)
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Technician restore',
+                'status_id' => $pending->id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'is_urgent' => false,
+                'technicians' => [
+                    [
+                        'company_relationship_id' => $relationship->id,
+                        'is_selected' => true,
+                        'quote_net_amount' => 28,
+                        'quoted_at' => '2026-09-16',
+                        'quote_total_euros' => 28,
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('estimates.edit', $estimate));
+
+        $restored = $estimate->technicians()->where('company_relationship_id', $relationship->id)->first();
+        $this->assertNotNull($restored);
+        $this->assertNull($restored->deleted_at);
+        $this->assertSame('28.00', (string) $restored->quote_net_amount);
+        $this->assertSame($row->id, $restored->id);
+    }
+
     /**
-     * @return array{0: User, 1: Establishment, 2: WorkOrderStatus, 3: WorkOrderStatus, 4: WorkOrderStatus, 5: WorkOrderStatus, 6: Company}
+     * @return array{0: User, 1: Establishment, 2: WorkOrderStatus, 3: WorkOrderStatus, 4: WorkOrderStatus, 5: WorkOrderStatus, 6: Company, 7: WorkOrderType}
      */
     private function seedContext(): array
     {
@@ -351,13 +720,16 @@ final class EstimatesCrudTest extends TestCase
         $admin->assignRole(RoleEnum::Admin->value);
 
         $company = Company::factory()->create();
-        $client = Company::factory()->create();
+        $client = Company::factory()->create(['name' => 'Client Co']);
         $this->attachToCompany($admin, $company);
+
+        $brand = Brand::query()->create(['name' => 'Acme Brand']);
 
         CompanyRelationship::factory()->create([
             'owner_company_id' => $company->id,
             'related_company_id' => $client->id,
             'kind' => CompanyRelationshipKind::Customer,
+            'brand_id' => $brand->id,
         ]);
 
         $pending = $this->makeStatus(
@@ -393,13 +765,33 @@ final class EstimatesCrudTest extends TestCase
             ['rejects_to_estimate' => true],
         );
 
+        $currency = Currency::query()->create([
+            'name' => 'Euro',
+            'code' => 'EUR',
+        ]);
+
+        $delegation = Delegation::query()->create([
+            'name' => 'Madrid',
+            'company_id' => $client->id,
+            'currency_id' => $currency->id,
+            'cost_includes_vat' => false,
+            'recovers_vat' => true,
+        ]);
+
         $establishment = Establishment::query()->create([
             'company_id' => $client->id,
+            'delegation_id' => $delegation->id,
             'name' => 'Store 1',
             'code' => 'S1',
         ]);
 
-        return [$admin, $establishment, $pending, $approved, $received, $rejected, $company];
+        $type = WorkOrderType::query()->create([
+            'name' => 'Corrective',
+            'code' => 'COR',
+            'color' => '#aabbcc',
+        ]);
+
+        return [$admin, $establishment, $pending, $approved, $received, $rejected, $company, $type, $currency];
     }
 
     /**

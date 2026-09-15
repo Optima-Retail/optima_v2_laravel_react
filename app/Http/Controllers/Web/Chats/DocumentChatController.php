@@ -13,6 +13,8 @@ use App\Http\Requests\Web\Chats\StoreDocumentChatAttachmentRequest;
 use App\Http\Requests\Web\Chats\StoreDocumentChatMessageRequest;
 use App\Models\CompanyRelationship;
 use App\Models\User;
+use App\Models\WorkOrder;
+use App\Policies\EstimatePolicy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -129,6 +131,21 @@ final class DocumentChatController extends Controller
                 && $parent->kind === CompanyRelationshipKind::Technician,
                 404,
             );
+        }
+
+        // Estimates reuse work_order chat tables/routes but authorize via EstimatePolicy
+        // (WorkOrderPolicy only allows confirmed work orders).
+        if ($parent instanceof WorkOrder && $parent->isEstimate()) {
+            $policy = app(EstimatePolicy::class);
+            $allowed = match ($ability) {
+                'view' => $policy->view($user, $parent),
+                'update' => $policy->update($user, $parent),
+                default => false,
+            };
+
+            abort_unless($allowed, 403);
+
+            return;
         }
 
         $this->authorize($ability, $parent);

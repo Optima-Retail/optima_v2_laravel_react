@@ -104,6 +104,43 @@ final class RolesCrudTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_admin_role_is_viewable_but_not_editable_and_keeps_all_permissions(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleEnum::Admin->value);
+
+        $adminRole = Role::findByName(RoleEnum::Admin->value);
+        $allPermissions = $adminRole->permissions->pluck('name')->sort()->values()->all();
+
+        $this->assertNotEmpty($allPermissions);
+
+        $this->actingAs($admin)
+            ->get("/config/roles/{$adminRole->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Config/Roles/Edit')
+                ->where('role.name', RoleEnum::Admin->value)
+                ->where('role.is_system', true)
+                ->where('can.update', false)
+                ->where('can.delete', false)
+                ->has('role.permissions', count($allPermissions))
+                ->has('permissionGroups'));
+
+        $this->actingAs($admin)
+            ->put("/config/roles/{$adminRole->id}", [
+                'name' => 'admin',
+                'permissions' => ['users.view'],
+            ])
+            ->assertForbidden();
+
+        $adminRole->refresh();
+        $this->assertSame(
+            $allPermissions,
+            $adminRole->permissions->pluck('name')->sort()->values()->all(),
+        );
+        $this->assertTrue($adminRole->hasPermissionTo('roles.update'));
+    }
+
     public function test_user_without_roles_permission_cannot_view_roles(): void
     {
         $viewer = User::factory()->create();

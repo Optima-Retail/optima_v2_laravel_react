@@ -348,6 +348,10 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:estimates.view')->group(function (): void {
             Route::get('/estimates', [EstimateController::class, 'index'])->name('estimates.index');
             Route::get('/estimates/data', [EstimateController::class, 'data'])->name('estimates.data');
+            Route::get('/estimates/technician-search', [EstimateController::class, 'searchTechnicians'])
+                ->name('estimates.technician-search');
+            Route::get('/estimates/client-rates', [EstimateController::class, 'clientRates'])
+                ->name('estimates.client-rates');
         });
 
         Route::middleware('permission:estimates.create')->group(function (): void {

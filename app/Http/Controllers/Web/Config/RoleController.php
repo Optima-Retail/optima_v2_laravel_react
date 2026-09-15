@@ -105,12 +105,15 @@ final class RoleController extends Controller
             'permissionGroups' => $this->roles->permissionGroups(),
             'can' => [
                 'delete' => $request->user()?->can('delete', $role) ?? false,
+                'update' => ! $this->roles->isSystem($role) && ($request->user()?->can('update', $role) ?? false),
             ],
         ]);
     }
 
     public function update(UpdateRoleRequest $request, Role $role): RedirectResponse
     {
+        abort_if($this->roles->isSystem($role), 403);
+
         $this->roles->update($role, [
             'name' => $request->string('name')->toString(),
             'permissions' => $request->validated('permissions') ?? [],

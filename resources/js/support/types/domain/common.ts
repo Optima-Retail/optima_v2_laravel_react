@@ -7,6 +7,13 @@ export type UserOption = {
     is_open?: boolean;
 };
 
+/** Articles for estimate/work-order billing lines (scoped via article_clients). */
+export type WorkOrderArticleOption = UserOption & {
+    code?: string;
+    description?: string | null;
+    unit_price?: string | null;
+};
+
 /** Option shape for company pickers (SearchableSelect / MultiSelect). */
 export type CompanyOption = UserOption & {
     logo_url?: string | null;

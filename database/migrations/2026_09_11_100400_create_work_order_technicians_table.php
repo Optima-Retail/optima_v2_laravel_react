@@ -28,6 +28,8 @@ return new class extends Migration
                 ->constrained('technician_attendance_confirmation_types')
                 ->nullOnDelete();
             $table->decimal('quote_net_amount', 10, 2)->nullable();
+            // Legacy presupuestos_solicitados.fecha_moneda
+            $table->date('quoted_at')->nullable();
             $table->decimal('quote_tax_amount', 10, 2)->nullable();
             $table->decimal('quote_total_amount', 10, 2)->nullable();
             $table->decimal('quote_total_euros', 10, 2)->nullable();

@@ -62,6 +62,10 @@ final class WorkOrdersCrudTest extends TestCase
         $this->assertTrue($workOrder->isConfirmedWorkOrder());
         $this->assertSame($received->id, $workOrder->status_id);
         $this->assertNotNull($workOrder->confirmed_at);
+        $this->assertSame(
+            (int) $admin->fresh()?->active_company_id,
+            (int) $workOrder->owner_company_id,
+        );
 
         $this->actingAs($admin)
             ->getJson('/work-orders/data')
@@ -278,6 +282,75 @@ final class WorkOrdersCrudTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_work_orders_are_isolated_by_active_company(): void
+    {
+        [$admin, $establishmentA, , , $received, , $companyA] = $this->seedContext();
+
+        $companyB = Company::factory()->create(['name' => 'Company B']);
+        $this->attachToCompany($admin, $companyB, active: false);
+
+        $clientB = Company::factory()->create(['name' => 'Client B']);
+        CompanyRelationship::factory()->create([
+            'owner_company_id' => $companyB->id,
+            'related_company_id' => $clientB->id,
+            'kind' => CompanyRelationshipKind::Customer,
+        ]);
+
+        $establishmentB = Establishment::query()->create([
+            'company_id' => $clientB->id,
+            'name' => 'Store B',
+            'code' => 'SB',
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/work-orders', [
+                'subject' => 'Owned by A',
+                'status_id' => $received->id,
+                'establishment_id' => $establishmentA->id,
+                'is_urgent' => false,
+                'code' => 'OT-A-1',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'work_order_created_successfully');
+
+        $workOrderA = WorkOrder::query()->where('subject', 'Owned by A')->firstOrFail();
+        $this->assertSame($companyA->id, (int) $workOrderA->owner_company_id);
+
+        $admin->forceFill(['active_company_id' => $companyB->id])->save();
+
+        $this->actingAs($admin)
+            ->post('/work-orders', [
+                'subject' => 'Owned by B',
+                'status_id' => $received->id,
+                'establishment_id' => $establishmentB->id,
+                'is_urgent' => false,
+                'code' => 'OT-B-1',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'work_order_created_successfully');
+
+        $workOrderB = WorkOrder::query()->where('subject', 'Owned by B')->firstOrFail();
+        $this->assertSame($companyB->id, (int) $workOrderB->owner_company_id);
+
+        $this->actingAs($admin)
+            ->getJson('/work-orders/data')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $workOrderB->id])
+            ->assertJsonMissing(['id' => $workOrderA->id]);
+
+        $this->actingAs($admin)
+            ->get("/work-orders/{$workOrderA->id}/edit")
+            ->assertForbidden();
+
+        $admin->forceFill(['active_company_id' => $companyA->id])->save();
+
+        $this->actingAs($admin)
+            ->getJson('/work-orders/data')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $workOrderA->id])
+            ->assertJsonMissing(['id' => $workOrderB->id]);
+    }
+
     public function test_create_work_order_from_contract_prefills_and_persists_relation(): void
     {
         [$admin, $establishment, , , $received, , $company] = $this->seedContext();
@@ -321,7 +394,7 @@ final class WorkOrdersCrudTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success', 'work_order_created_successfully');
 
-        $workOrder = WorkOrder::query()->where('code', 'OT-CONTRACT-1')->firstOrFail();
+        $workOrder = WorkOrder::query()->where('subject', 'Visit from contract')->firstOrFail();
 
         $this->assertSame($contract->id, (int) $workOrder->contract_id);
 

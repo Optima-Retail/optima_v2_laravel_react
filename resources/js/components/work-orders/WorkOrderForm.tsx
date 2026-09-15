@@ -9,11 +9,15 @@ import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
-import { cn } from '@/support/cn';
+import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { toCompanySelectOptions } from '@/support/companySelect';
-import type { CompanyOption, UserOption } from '@/support/types/domain/common';
+import type { CompanyOption, UserOption, WorkOrderArticleOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
-import type { WorkOrderLineForm, WorkOrderTechnicianForm } from '@/support/types/domain/work-order';
+import type {
+    WorkOrderLineForm,
+    WorkOrderTaskForm,
+    WorkOrderTechnicianForm,
+} from '@/support/types/domain/work-order';
 import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
 
 export type WorkOrderFormValues = {
@@ -28,16 +32,20 @@ export type WorkOrderFormValues = {
     is_urgent: boolean;
     establishment_id: string;
     contract_id: string;
+    currency_id: string;
     responsible_user_id: string;
     requester_id: string;
     notes: string;
     internal_notes: string;
+    notes_alert: boolean;
+    internal_notes_alert: boolean;
     received_at: string;
     intervention_at: string;
     due_at: string;
     collaborator_ids: string[];
     lines: WorkOrderLineForm[];
     technicians: WorkOrderTechnicianForm[];
+    tasks: WorkOrderTaskForm[];
 };
 
 type WorkOrderFormProps = {
@@ -55,7 +63,7 @@ type WorkOrderFormProps = {
     contractOptions?: UserOption[];
     requesterOptions: UserOption[];
     technicianOptions: CompanyOption[];
-    articleOptions: UserOption[];
+    articleOptions: WorkOrderArticleOption[];
     sourceLabel?: string | null;
     onChange: (key: keyof WorkOrderFormValues, value: WorkOrderFormValues[keyof WorkOrderFormValues]) => void;
     onSubmit: (event: FormEvent) => void;
@@ -72,6 +80,20 @@ function toSelectOptions(options: UserOption[]) {
     }));
 }
 
+function applyArticleToLine(line: WorkOrderLineForm, articleId: string, articleOptions: WorkOrderArticleOption[]) {
+    const article = articleOptions.find((option) => String(option.id) === articleId);
+
+    return {
+        ...line,
+        article_id: articleId,
+        description: article?.description?.trim() ? article.description : line.description,
+        unit_price:
+            article?.unit_price !== undefined && article.unit_price !== null
+                ? String(article.unit_price)
+                : line.unit_price,
+    };
+}
+
 export function emptyWorkOrderLine(): WorkOrderLineForm {
     return {
         article_id: '',
@@ -86,6 +108,16 @@ export function emptyWorkOrderTechnician(): WorkOrderTechnicianForm {
         company_relationship_id: '',
         is_selected: false,
         quote_net_amount: '',
+        quoted_at: '',
+        quote_total_euros: '',
+    };
+}
+
+export function emptyWorkOrderTask(): WorkOrderTaskForm {
+    return {
+        title: '',
+        description: '',
+        is_completed: false,
     };
 }
 
@@ -104,16 +136,20 @@ export function defaultWorkOrderFormValues(
         is_urgent: false,
         establishment_id: '',
         contract_id: '',
+        currency_id: '',
         responsible_user_id: '',
         requester_id: '',
         notes: '',
         internal_notes: '',
+        notes_alert: false,
+        internal_notes_alert: false,
         received_at: '',
         intervention_at: '',
         due_at: '',
         collaborator_ids: [],
         lines: [],
         technicians: [],
+        tasks: [],
         ...overrides,
     };
 }
@@ -382,37 +418,47 @@ export function WorkOrderForm({
                     />
                 </Field>
 
-                <Field label={t('workOrders.notes')} htmlFor="notes" error={errors.notes}>
-                    <textarea
+                <Field label={t('workOrders.notes')} htmlFor="notes" error={errors.notes} className="sm:col-span-2">
+                    <RichTextEditor
                         id="notes"
-                        rows={3}
                         value={values.notes}
+                        invalid={Boolean(errors.notes)}
                         disabled={locked}
-                        onChange={(event) => onChange('notes', event.target.value)}
-                        className={cn(
-                            'w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition',
-                            'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20',
-                            'disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-muted disabled:opacity-80',
-                            errors.notes ? 'border-danger' : 'border-line',
-                        )}
+                        onChange={(html) => onChange('notes', html)}
                     />
                 </Field>
 
-                <Field label={t('workOrders.internalNotes')} htmlFor="internal_notes" error={errors.internal_notes}>
-                    <textarea
+                <Field
+                    label={t('workOrders.internalNotes')}
+                    htmlFor="internal_notes"
+                    error={errors.internal_notes}
+                    className="sm:col-span-2"
+                >
+                    <RichTextEditor
                         id="internal_notes"
-                        rows={3}
                         value={values.internal_notes}
+                        invalid={Boolean(errors.internal_notes)}
                         disabled={locked}
-                        onChange={(event) => onChange('internal_notes', event.target.value)}
-                        className={cn(
-                            'w-full rounded-lg border bg-surface px-3 py-2 text-sm text-ink shadow-sm transition',
-                            'focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20',
-                            'disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-muted disabled:opacity-80',
-                            errors.internal_notes ? 'border-danger' : 'border-line',
-                        )}
+                        onChange={(html) => onChange('internal_notes', html)}
                     />
                 </Field>
+
+                <Toggle
+                    name="notes_alert"
+                    checked={values.notes_alert}
+                    disabled={locked}
+                    onCheckedChange={(checked) => onChange('notes_alert', checked)}
+                    checkedLabel={t('workOrders.notesAlert')}
+                    uncheckedLabel={t('workOrders.notesAlertOff')}
+                />
+                <Toggle
+                    name="internal_notes_alert"
+                    checked={values.internal_notes_alert}
+                    disabled={locked}
+                    onCheckedChange={(checked) => onChange('internal_notes_alert', checked)}
+                    checkedLabel={t('workOrders.internalNotesAlert')}
+                    uncheckedLabel={t('workOrders.internalNotesAlertOff')}
+                />
 
                 <div className="space-y-3 border-t border-line pt-5">
                     <div className="flex items-center justify-between gap-3">
@@ -440,7 +486,7 @@ export function WorkOrderForm({
                                             disabled={locked}
                                             onChange={(value) => {
                                                 const next = [...values.lines];
-                                                next[index] = { ...line, article_id: value };
+                                                next[index] = applyArticleToLine(line, value, articleOptions);
                                                 onChange('lines', next);
                                             }}
                                             emptyLabel={t('common.select')}
@@ -546,7 +592,12 @@ export function WorkOrderForm({
                                             disabled={locked}
                                             onChange={(event) => {
                                                 const next = [...values.technicians];
-                                                next[index] = { ...technician, quote_net_amount: event.target.value };
+                                                const net = event.target.value;
+                                                next[index] = {
+                                                    ...technician,
+                                                    quote_net_amount: net,
+                                                    quote_total_euros: net,
+                                                };
                                                 onChange('technicians', next);
                                             }}
                                         />

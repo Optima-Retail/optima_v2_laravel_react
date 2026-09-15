@@ -7,9 +7,11 @@ namespace Tests\Feature\Web;
 use App\Domain\Auth\Enums\RoleEnum;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Models\ClientPriority;
+use App\Models\ClientRate;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\User;
+use App\Models\WorkOrderType;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -133,6 +135,89 @@ final class ClientsSuppliersCrudTest extends TestCase
             ->assertSessionHas('success', 'client_deleted_successfully');
 
         $this->assertSoftDeleted($relationship);
+    }
+
+    public function test_unlinking_a_client_priority_soft_deletes_its_rates(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleEnum::Admin->value);
+
+        $owner = Company::factory()->create();
+        $this->attachToCompany($admin, $owner);
+
+        $related = Company::factory()->create(['name' => 'Rates Client']);
+        $priorityA = ClientPriority::query()->create([
+            'name' => 'Keep',
+            'code' => 'KEEP',
+            'level' => 1,
+        ]);
+        $priorityB = ClientPriority::query()->create([
+            'name' => 'Drop',
+            'code' => 'DROP',
+            'level' => 2,
+        ]);
+        $workOrderType = WorkOrderType::query()->create([
+            'name' => 'Corrective',
+            'code' => 'COR',
+            'color' => '#112233',
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/clients', [
+                'related_mode' => 'existing',
+                'related_company_id' => $related->id,
+                'kind' => CompanyRelationshipKind::Customer->value,
+                'classification' => 'commercial',
+                'status' => 'active',
+                'priority_ids' => [$priorityA->id, $priorityB->id],
+            ])
+            ->assertRedirect();
+
+        $relationship = CompanyRelationship::query()
+            ->where('owner_company_id', $owner->id)
+            ->where('related_company_id', $related->id)
+            ->firstOrFail();
+
+        $keepRate = ClientRate::query()->create([
+            'company_relationship_id' => $relationship->id,
+            'client_priority_id' => $priorityA->id,
+            'work_order_type_id' => $workOrderType->id,
+            'travel_amount' => 10,
+            'extra_travel_amount' => 0,
+            'labor_amount' => 20,
+            'extra_labor_amount' => 0,
+            'due_hours' => 4,
+            'sla_hours' => 8,
+            'is_urgent' => false,
+        ]);
+        $dropRate = ClientRate::query()->create([
+            'company_relationship_id' => $relationship->id,
+            'client_priority_id' => $priorityB->id,
+            'work_order_type_id' => $workOrderType->id,
+            'travel_amount' => 11,
+            'extra_travel_amount' => 0,
+            'labor_amount' => 21,
+            'extra_labor_amount' => 0,
+            'due_hours' => 4,
+            'sla_hours' => 8,
+            'is_urgent' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->put("/clients/{$relationship->id}", [
+                'related_company_id' => $related->id,
+                'kind' => CompanyRelationshipKind::Customer->value,
+                'classification' => 'commercial',
+                'status' => 'active',
+                'priority_ids' => [$priorityA->id],
+            ])
+            ->assertRedirect(route('clients.edit', $relationship));
+
+        $this->assertDatabaseHas('client_rates', [
+            'id' => $keepRate->id,
+            'deleted_at' => null,
+        ]);
+        $this->assertSoftDeleted($dropRate);
     }
 
     public function test_clients_data_is_scoped_to_active_company_and_supports_search_sort_and_pagination(): void

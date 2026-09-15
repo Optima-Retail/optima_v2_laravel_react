@@ -3,17 +3,23 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
+import {
+    EstimateForm,
+    type EstimateFormSection,
+    type EstimateRequesterOption,
+} from '@/components/estimates/EstimateCreateForm';
+import { EstimateRatesPanel } from '@/components/estimates/EstimateRatesPanel';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { WorkOrderAttachmentsPanel } from '@/components/work-orders/WorkOrderAttachmentsPanel';
-import { defaultWorkOrderFormValues, WorkOrderForm } from '@/components/work-orders/WorkOrderForm';
+import { defaultWorkOrderFormValues } from '@/components/work-orders/WorkOrderForm';
 import { confirmAction } from '@/helpers/confirm';
 import { confirmWorkOrderStatusChange } from '@/helpers/workOrderStatusChange';
 import { AppLayout } from '@/layouts/AppLayout';
 import { estimatesService } from '@/services';
 import type { DocumentChatPayload } from '@/support/types/domain/chat';
-import type { UserOption } from '@/support/types/domain/common';
+import type { CompanyOption, UserOption, WorkOrderArticleOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type { WorkOrderAttachmentItem, WorkOrderFormData } from '@/support/types/domain/work-order';
 import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
@@ -23,19 +29,18 @@ type EditEstimateProps = {
     attachments: WorkOrderAttachmentItem[];
     statusOptions: WorkOrderStatusOption[];
     typeOptions: UserOption[];
-    priorityOptions: UserOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
-    contractOptions: UserOption[];
-    requesterOptions: UserOption[];
-    technicianOptions: UserOption[];
-    articleOptions: UserOption[];
+    requesterOptions: EstimateRequesterOption[];
+    technicianOptions: CompanyOption[];
+    articleOptions: WorkOrderArticleOption[];
     fields_locked?: boolean;
     chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
         update_closed: boolean;
         view_attachments: boolean;
+        view_private_attachments: boolean;
         upload_attachments: boolean;
         download_attachments: boolean;
         delete_attachments: boolean;
@@ -43,12 +48,18 @@ type EditEstimateProps = {
     };
 };
 
-function tabFromUrl(url: string): string {
+const FORM_TABS: EstimateFormSection[] = ['details', 'tasks', 'technicians', 'rates', 'notes', 'lines'];
+
+function tabFromUrl(url: string, canViewAttachments: boolean): string {
     try {
         const query = url.includes('?') ? url.slice(url.indexOf('?')) : '';
-        const tab = new URLSearchParams(query).get('tab');
+        const tab = new URLSearchParams(query).get('tab') ?? 'details';
 
-        return tab === 'attachments' ? 'attachments' : 'details';
+        if (tab === 'attachments') {
+            return canViewAttachments ? 'attachments' : 'details';
+        }
+
+        return FORM_TABS.includes(tab as EstimateFormSection) ? tab : 'details';
     } catch {
         return 'details';
     }
@@ -59,10 +70,8 @@ export default function EditEstimate({
     attachments,
     statusOptions,
     typeOptions,
-    priorityOptions,
     userOptions,
     establishmentOptions,
-    contractOptions,
     requesterOptions,
     technicianOptions,
     articleOptions,
@@ -72,11 +81,7 @@ export default function EditEstimate({
 }: EditEstimateProps) {
     const { t } = useTranslation();
     const { url } = usePage();
-    const [activeTab, setActiveTab] = useState(() => {
-        const tab = tabFromUrl(url);
-
-        return tab === 'attachments' && !can.view_attachments ? 'details' : tab;
-    });
+    const [activeTab, setActiveTab] = useState(() => tabFromUrl(url, can.view_attachments));
     const form = useForm(
         defaultWorkOrderFormValues({
             code: estimate.code ?? '',
@@ -90,10 +95,13 @@ export default function EditEstimate({
             is_urgent: estimate.is_urgent,
             establishment_id: estimate.establishment_id ? String(estimate.establishment_id) : '',
             contract_id: estimate.contract_id ? String(estimate.contract_id) : '',
+            currency_id: estimate.currency_id ? String(estimate.currency_id) : '',
             responsible_user_id: estimate.responsible_user_id ? String(estimate.responsible_user_id) : '',
             requester_id: estimate.requester_id ? String(estimate.requester_id) : '',
             notes: estimate.notes ?? '',
             internal_notes: estimate.internal_notes ?? '',
+            notes_alert: estimate.notes_alert ?? false,
+            internal_notes_alert: estimate.internal_notes_alert ?? false,
             received_at: estimate.received_at ?? '',
             intervention_at: estimate.intervention_at ?? '',
             due_at: estimate.due_at ?? '',
@@ -113,12 +121,32 @@ export default function EditEstimate({
                     technician.quote_net_amount !== null && technician.quote_net_amount !== undefined
                         ? String(technician.quote_net_amount)
                         : '',
+                quoted_at: technician.quoted_at ?? '',
+                quote_total_euros:
+                    technician.quote_total_euros !== null && technician.quote_total_euros !== undefined
+                        ? String(technician.quote_total_euros)
+                        : '',
+            })),
+            tasks: (estimate.tasks ?? []).map((task) => ({
+                id: task.id,
+                title: task.title ?? '',
+                description: task.description ?? '',
+                is_completed: task.is_completed,
             })),
         }),
     );
 
+    const fieldsLocked = fields_locked || (estimate.status_is_open === false && !can.update_closed);
+
     const tabItems = useMemo<TabItem[]>(() => {
-        const items: TabItem[] = [{ id: 'details', label: t('estimates.tabDetails') }];
+        const items: TabItem[] = [
+            { id: 'details', label: t('estimates.tabDetails') },
+            { id: 'tasks', label: t('estimates.tabTasks') },
+            { id: 'technicians', label: t('estimates.tabTechnicians') },
+            { id: 'rates', label: t('estimates.tabRates') },
+            { id: 'notes', label: t('estimates.tabNotes') },
+            { id: 'lines', label: t('estimates.tabLines') },
+        ];
 
         if (can.view_attachments) {
             items.push({
@@ -168,6 +196,40 @@ export default function EditEstimate({
         estimatesService.destroy(estimate.id);
     }
 
+    const formProps = {
+        mode: 'edit' as const,
+        values: form.data,
+        errors: form.errors,
+        processing: form.processing,
+        fieldsLocked,
+        statusOptions,
+        typeOptions,
+        userOptions,
+        establishmentOptions,
+        requesterOptions,
+        technicianOptions,
+        articleOptions,
+        sourceLabel: estimate.source_work_order_label,
+        currencyLabel: estimate.currency_label,
+        createdAt: estimate.created_at,
+        sentAt: estimate.sent_at,
+        closedAt: estimate.closed_at,
+        onChange: (key: keyof typeof form.data, value: (typeof form.data)[keyof typeof form.data]) =>
+            form.setData(key, value),
+        onSubmit: submit,
+        submitLabel: t('common.save'),
+        submitIcon: <Save className="size-4" aria-hidden />,
+        actions:
+            can.delete && activeTab === 'details' ? (
+                <Button type="button" variant="danger" onClick={destroyEstimate}>
+                    <Trash2 className="size-4" aria-hidden />
+                    {t('common.delete')}
+                </Button>
+            ) : null,
+    };
+
+    const title = [estimate.code, estimate.subject].filter(Boolean).join(' - ') || String(estimate.id);
+
     return (
         <AppLayout
             title={t('common.editResource', { resource: t('estimates.resource') })}
@@ -182,15 +244,11 @@ export default function EditEstimate({
                 ) : null
             }
         >
-            <Head
-                title={t('common.editItem', {
-                    name: estimate.subject || estimate.code || estimate.id,
-                })}
-            />
+            <Head title={t('common.editItem', { name: title })} />
             <div className="w-full space-y-6">
                 <PageHeader
                     eyebrow={t('estimates.title')}
-                    title={estimate.subject || estimate.code || String(estimate.id)}
+                    title={title}
                     description={t('common.updateDetails', {
                         name: estimate.subject || estimate.code || estimate.id,
                     })}
@@ -199,37 +257,22 @@ export default function EditEstimate({
                 />
 
                 <Tabs items={tabItems} value={activeTab} onValueChange={setActiveTab}>
-                    <TabPanel id="details">
-                        <WorkOrderForm
-                            values={form.data}
-                            errors={form.errors}
-                            processing={form.processing}
-                            stageLocked
-                            fieldsLocked={fields_locked || (estimate.status_is_open === false && !can.update_closed)}
-                            statusOptions={statusOptions}
-                            typeOptions={typeOptions}
-                            priorityOptions={priorityOptions}
-                            userOptions={userOptions}
-                            establishmentOptions={establishmentOptions}
-                            contractOptions={contractOptions}
-                            requesterOptions={requesterOptions}
-                            technicianOptions={technicianOptions}
-                            articleOptions={articleOptions}
-                            sourceLabel={estimate.source_work_order_label}
-                            onChange={(key, value) => form.setData(key, value)}
-                            onSubmit={submit}
-                            submitLabel={t('common.save')}
-                            submitIcon={<Save className="size-4" aria-hidden />}
-                            actions={
-                                can.delete ? (
-                                    <Button type="button" variant="danger" onClick={destroyEstimate}>
-                                        <Trash2 className="size-4" aria-hidden />
-                                        {t('common.delete')}
-                                    </Button>
-                                ) : null
-                            }
-                        />
-                    </TabPanel>
+                    {FORM_TABS.map((section) => (
+                        <TabPanel key={section} id={section}>
+                            {section === 'rates' ? (
+                                <EstimateRatesPanel
+                                    establishmentId={
+                                        form.data.establishment_id ? Number(form.data.establishment_id) : null
+                                    }
+                                    workOrderTypeId={
+                                        form.data.work_order_type_id ? Number(form.data.work_order_type_id) : null
+                                    }
+                                />
+                            ) : (
+                                <EstimateForm {...formProps} section={section} />
+                            )}
+                        </TabPanel>
+                    ))}
 
                     {can.view_attachments ? (
                         <TabPanel id="attachments">
@@ -241,6 +284,7 @@ export default function EditEstimate({
                                     upload_attachments: can.upload_attachments,
                                     download_attachments: can.download_attachments,
                                     delete_attachments: can.delete_attachments,
+                                    view_private_attachments: can.view_private_attachments,
                                 }}
                                 onUpload={estimatesService.storeAttachment}
                                 onDestroy={estimatesService.destroyAttachment}

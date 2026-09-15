@@ -14,6 +14,7 @@ use App\Domain\Config\TechnicianGlobalServiceTypes\Services\TechnicianGlobalServ
 use App\Domain\Config\TechnicianServiceTypes\Services\TechnicianServiceTypeService;
 use App\Models\Brand;
 use App\Models\ClientPriority;
+use App\Models\ClientRate;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\Delegation;
@@ -563,6 +564,20 @@ final class CompanyRelationshipService
                     'deleted_at' => now(),
                     'updated_at' => now(),
                 ]);
+
+            // Drop client rates for priorities no longer linked to this client company.
+            $customerRelationshipIds = CompanyRelationship::query()
+                ->where('related_company_id', $company->id)
+                ->where('kind', CompanyRelationshipKind::Customer->value)
+                ->pluck('id')
+                ->all();
+
+            if ($customerRelationshipIds !== []) {
+                ClientRate::query()
+                    ->whereIn('company_relationship_id', $customerRelationshipIds)
+                    ->whereIn('client_priority_id', $toDetach)
+                    ->delete();
+            }
         }
 
         foreach ($toAttach as $priorityId) {

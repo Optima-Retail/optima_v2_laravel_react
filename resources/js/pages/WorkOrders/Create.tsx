@@ -58,6 +58,9 @@ export default function CreateWorkOrder({
 
     function submit(event: FormEvent) {
         event.preventDefault();
+        if (codeIsAutomatic) {
+            form.transform((data) => ({ ...data, code: '' }));
+        }
         workOrdersService.store(form);
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Web\Config\Roles;
 
+use App\Domain\Auth\Enums\RoleEnum;
 use App\Models\Role;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -28,6 +29,7 @@ final class StoreRoleRequest extends FormRequest
                 'string',
                 'max:125',
                 'alpha_dash',
+                Rule::notIn([RoleEnum::Admin->value]),
                 Rule::unique('roles', 'name')->where(
                     fn ($query) => $query->where('guard_name', $guard)->whereNull('deleted_at'),
                 ),

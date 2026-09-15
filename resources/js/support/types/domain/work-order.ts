@@ -37,6 +37,15 @@ export type WorkOrderTechnicianForm = {
     company_relationship_id: string;
     is_selected: boolean;
     quote_net_amount: string;
+    quoted_at: string;
+    quote_total_euros: string;
+};
+
+export type WorkOrderTaskForm = {
+    id?: number | null;
+    title: string;
+    description: string;
+    is_completed: boolean;
 };
 
 export type WorkOrderFormData = {
@@ -57,14 +66,22 @@ export type WorkOrderFormData = {
     is_urgent: boolean;
     establishment_id: number | null;
     contract_id: number | null;
+    delegation_id?: number | null;
+    currency_id: number | null;
+    currency_label?: string | null;
     billing_company_id: number | null;
     responsible_user_id: number | null;
     requester_id: number | null;
     notes: string | null;
     internal_notes: string | null;
+    notes_alert?: boolean;
+    internal_notes_alert?: boolean;
     received_at: string | null;
     intervention_at: string | null;
     due_at: string | null;
+    sent_at?: string | null;
+    closed_at?: string | null;
+    created_at?: string | null;
     collaborator_ids: number[];
     lines: Array<{
         id: number;
@@ -78,6 +95,14 @@ export type WorkOrderFormData = {
         company_relationship_id: number;
         is_selected: boolean;
         quote_net_amount: string | number | null;
+        quoted_at: string | null;
+        quote_total_euros: string | number | null;
+    }>;
+    tasks?: Array<{
+        id: number;
+        title: string | null;
+        description: string | null;
+        is_completed: boolean;
     }>;
 };
 
@@ -86,6 +111,7 @@ export type WorkOrderAttachmentItem = {
     name: string;
     mime_type: string | null;
     size_bytes: number | null;
+    is_private?: boolean;
     uploaded_by_name: string | null;
     download_url: string;
     view_url: string;

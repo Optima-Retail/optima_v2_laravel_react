@@ -21,6 +21,7 @@ type RoleFormProps = {
     processing: boolean;
     permissionGroups: PermissionGroup[];
     nameDisabled?: boolean;
+    readOnly?: boolean;
     onChange: (key: keyof RoleFormValues, value: RoleFormValues[keyof RoleFormValues]) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
@@ -35,6 +36,7 @@ export function RoleForm({
     processing,
     permissionGroups,
     nameDisabled = false,
+    readOnly = false,
     onChange,
     onSubmit,
     submitLabel,
@@ -57,10 +59,18 @@ export function RoleForm({
     );
 
     function togglePermission(permission: string) {
+        if (readOnly) {
+            return;
+        }
+
         onChange('permissions', toggleItem(values.permissions, permission));
     }
 
     function toggleGroup(group: PermissionGroup) {
+        if (readOnly) {
+            return;
+        }
+
         onChange('permissions', toggleGroupItems(values.permissions, group.permissions));
     }
 
@@ -79,7 +89,7 @@ export function RoleForm({
                     value={values.name}
                     placeholder={mode === 'create' ? t('roles.namePlaceholder') : undefined}
                     invalid={Boolean(errors.name)}
-                    disabled={nameDisabled}
+                    disabled={nameDisabled || readOnly}
                     onChange={(event) => onChange('name', event.target.value)}
                 />
             </Field>
@@ -87,7 +97,11 @@ export function RoleForm({
             <fieldset className="space-y-3">
                 <legend className="text-sm font-semibold text-ink">{t('roles.permissions')}</legend>
                 <p className="text-sm text-ink-muted">
-                    {mode === 'create' ? t('roles.permissionsCreate') : t('roles.permissionsEdit')}
+                    {readOnly
+                        ? t('roles.permissionsReadOnly')
+                        : mode === 'create'
+                          ? t('roles.permissionsCreate')
+                          : t('roles.permissionsEdit')}
                 </p>
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -124,13 +138,17 @@ export function RoleForm({
                                         </span>
                                     </button>
 
-                                    <button
-                                        type="button"
-                                        onClick={() => toggleGroup(group)}
-                                        className="shrink-0 text-xs font-medium text-brand transition-colors hover:text-brand-strong"
-                                    >
-                                        {selectedCount === group.permissions.length ? t('roles.clear') : t('roles.all')}
-                                    </button>
+                                    {!readOnly ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleGroup(group)}
+                                            className="shrink-0 text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+                                        >
+                                            {selectedCount === group.permissions.length
+                                                ? t('roles.clear')
+                                                : t('roles.all')}
+                                        </button>
+                                    ) : null}
                                 </div>
 
                                 {open ? (
@@ -143,12 +161,15 @@ export function RoleForm({
                                                     <button
                                                         key={permission}
                                                         type="button"
+                                                        disabled={readOnly}
                                                         onClick={() => togglePermission(permission)}
                                                         className={cn(
                                                             'w-full rounded-md px-2 py-1.5 text-left text-sm font-mono transition-colors',
                                                             active
                                                                 ? 'bg-brand-soft font-medium text-brand'
                                                                 : 'text-ink-muted hover:bg-canvas hover:text-ink',
+                                                            readOnly && 'cursor-default hover:bg-transparent',
+                                                            readOnly && !active && 'hover:text-ink-muted',
                                                         )}
                                                     >
                                                         {permission}
@@ -168,10 +189,12 @@ export function RoleForm({
 
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
                 {actions}
-                <Button type="submit" loading={processing}>
-                    {submitIcon}
-                    {submitLabel}
-                </Button>
+                {!readOnly ? (
+                    <Button type="submit" loading={processing}>
+                        {submitIcon}
+                        {submitLabel}
+                    </Button>
+                ) : null}
             </div>
         </form>
         </FieldHelpScope>

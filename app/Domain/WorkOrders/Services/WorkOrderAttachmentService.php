@@ -21,18 +21,23 @@ final class WorkOrderAttachmentService
     /**
      * @return list<array<string, mixed>>
      */
-    public function listForWorkOrder(WorkOrder $workOrder): array
+    public function listForWorkOrder(WorkOrder $workOrder, bool $includePrivate): array
     {
         return $workOrder->attachments()
             ->with('uploader:id,name')
+            ->when(! $includePrivate, fn ($query) => $query->where('is_private', false))
             ->get()
             ->map(fn (WorkOrderAttachment $attachment): array => $this->toListItem($workOrder, $attachment))
             ->values()
             ->all();
     }
 
-    public function store(WorkOrder $workOrder, User $uploader, UploadedFile $file): WorkOrderAttachment
-    {
+    public function store(
+        WorkOrder $workOrder,
+        User $uploader,
+        UploadedFile $file,
+        bool $isPrivate = false,
+    ): WorkOrderAttachment {
         $extension = strtolower($file->getClientOriginalExtension() ?: 'bin');
         $directory = 'work-orders/'.$workOrder->id.'/attachments/'.now()->format('Y-m');
         $filename = Str::uuid()->toString().'.'.$extension;
@@ -43,6 +48,7 @@ final class WorkOrderAttachmentService
             'path' => $path,
             'mime_type' => $file->getClientMimeType(),
             'size_bytes' => $file->getSize() ?: null,
+            'is_private' => $isPrivate,
             'uploaded_by' => $uploader->id,
         ]);
     }
@@ -103,6 +109,7 @@ final class WorkOrderAttachmentService
             'name' => $attachment->name,
             'mime_type' => $attachment->mime_type,
             'size_bytes' => $attachment->size_bytes,
+            'is_private' => (bool) $attachment->is_private,
             'uploaded_by_name' => $attachment->uploader?->name,
             'download_url' => $downloadUrl,
             ...AttachmentMime::previewFields($downloadUrl, $attachment->mime_type, $attachment->name),

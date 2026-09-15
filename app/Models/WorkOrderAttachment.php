@@ -21,6 +21,7 @@ class WorkOrderAttachment extends Model
         'path',
         'mime_type',
         'size_bytes',
+        'is_private',
         'uploaded_by',
     ];
 
@@ -31,6 +32,7 @@ class WorkOrderAttachment extends Model
     {
         return [
             'size_bytes' => 'integer',
+            'is_private' => 'boolean',
         ];
     }
 

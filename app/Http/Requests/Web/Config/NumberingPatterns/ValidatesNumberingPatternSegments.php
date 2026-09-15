@@ -32,6 +32,10 @@ trait ValidatesNumberingPatternSegments
                 $row['value'] = isset($segment['value']) ? (string) $segment['value'] : '';
             }
 
+            if ($type === NumberingSegmentType::Year->value && filled($segment['digit_length'] ?? null)) {
+                $row['digit_length'] = max(2, min(4, (int) $segment['digit_length']));
+            }
+
             if ($type === NumberingSegmentType::Sequence->value) {
                 $row['digit_length'] = filled($segment['digit_length'] ?? null)
                     ? (int) $segment['digit_length']

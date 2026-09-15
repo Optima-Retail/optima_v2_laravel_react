@@ -2,6 +2,11 @@ export type EstablishmentOption = {
     id: number;
     label: string;
     company_id: number;
+    company_name?: string | null;
+    company_logo_url?: string | null;
+    brand_name?: string | null;
+    currency_id?: number | null;
+    currency_label?: string | null;
 };
 
 export type EstablishmentListItem = {
