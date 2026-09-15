@@ -66,7 +66,7 @@ export function EstablishmentDocumentTotals({
             {items.map((item) => (
                 <div
                     key={item.key}
-                    className="rounded-xl border border-line bg-canvas/60 px-4 py-3"
+                    className="rounded-xl border border-line bg-surface px-4 py-3 shadow-sm"
                 >
                     <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
                         {item.label}

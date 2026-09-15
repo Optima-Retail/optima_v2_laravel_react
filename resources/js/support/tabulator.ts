@@ -123,6 +123,11 @@ export function tabulatorEditLink(href: string, ariaLabel: string): string {
     return `<a href="${href}" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${ariaLabel}" data-action="edit">${editIcon}</a>`;
 }
 
+/** Clickable row label (e.g. "CODE - Subject") linking to the edit page. */
+export function tabulatorTextLink(href: string, label: string): string {
+    return `<a href="${escapeHtml(href)}" class="font-medium text-brand transition-colors hover:text-brand-strong">${escapeHtml(label)}</a>`;
+}
+
 export function tabulatorDeleteButton(ariaLabel: string): string {
     return `<button type="button" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-danger/40 hover:text-danger" aria-label="${ariaLabel}" data-action="delete">${deleteIcon}</button>`;
 }

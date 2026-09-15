@@ -348,6 +348,7 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:estimates.view')->group(function (): void {
             Route::get('/estimates', [EstimateController::class, 'index'])->name('estimates.index');
             Route::get('/estimates/data', [EstimateController::class, 'data'])->name('estimates.data');
+            Route::get('/estimates/totals', [EstimateController::class, 'totals'])->name('estimates.totals');
             Route::get('/estimates/technician-search', [EstimateController::class, 'searchTechnicians'])
                 ->name('estimates.technician-search');
             Route::get('/estimates/client-rates', [EstimateController::class, 'clientRates'])
@@ -360,6 +361,8 @@ Route::middleware('auth')->group(function (): void {
         });
 
         Route::middleware('permission:estimates.update')->group(function (): void {
+            Route::post('/estimates/bulk-status', [EstimateController::class, 'bulkStatus'])
+                ->name('estimates.bulk-status');
             Route::get('/estimates/{estimate}/edit', [EstimateController::class, 'edit'])
                 ->whereNumber('estimate')
                 ->name('estimates.edit');

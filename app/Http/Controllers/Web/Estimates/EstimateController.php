@@ -15,6 +15,7 @@ use App\Domain\WorkOrders\Services\WorkOrderService;
 use App\Http\Controllers\Concerns\AuthorizesEstimates;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Web\Estimates\BulkUpdateEstimateStatusRequest;
 use App\Http\Requests\Web\Estimates\SearchEstimateClientRatesRequest;
 use App\Http\Requests\Web\Estimates\SearchEstimateTechniciansRequest;
 use App\Http\Requests\Web\Estimates\StoreEstimateAttachmentRequest;
@@ -71,6 +72,7 @@ final class EstimateController extends Controller
 
         return Inertia::render('Estimates/Index', [
             'filters' => $filters,
+            'statusOptions' => $this->workOrders->statusOptions(WorkOrderStage::Estimate),
             'can' => [
                 'create' => $user !== null && app(EstimatePolicy::class)->create($user),
                 'update' => $user?->can('estimates.update') ?? false,
@@ -104,6 +106,46 @@ final class EstimateController extends Controller
         return TabulatorResponse::fromPaginator(
             $this->workOrders->paginateForWeb($owner, $filters),
         );
+    }
+
+    public function totals(Request $request): JsonResponse
+    {
+        $this->authorizeEstimate('viewAny');
+
+        $owner = $this->activeCompany($request);
+        $filters = [
+            'search' => $request->string('search')->trim()->toString(),
+            'pending' => $request->has('pending')
+                ? $request->string('pending')->trim()->toString()
+                : '1',
+            'created_from' => $request->string('created_from')->trim()->toString(),
+            'created_to' => $request->string('created_to')->trim()->toString(),
+            'establishment_id' => $request->integer('establishment_id') ?: null,
+            'stage' => WorkOrderStage::Estimate->value,
+        ];
+
+        if (! $request->has('pending') && ($filters['pending'] ?? '') === '') {
+            $filters['pending'] = '1';
+        }
+
+        return response()->json($this->workOrders->totalsForOwner($owner, $filters));
+    }
+
+    public function bulkStatus(BulkUpdateEstimateStatusRequest $request): JsonResponse
+    {
+        $owner = $this->activeCompany($request);
+        $validated = $request->validated();
+
+        $result = $this->workOrders->bulkChangeStatus(
+            $owner,
+            array_map('intval', $validated['ids']),
+            (int) $validated['status_id'],
+            WorkOrderStage::Estimate,
+            $request->user(),
+            isset($validated['status_justification']) ? (string) $validated['status_justification'] : null,
+        );
+
+        return response()->json($result);
     }
 
     public function searchTechnicians(SearchEstimateTechniciansRequest $request): JsonResponse

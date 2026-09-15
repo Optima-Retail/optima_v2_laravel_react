@@ -597,13 +597,6 @@ final class WorkOrderService
      */
     public function paginateForOwner(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator
     {
-        $search = trim((string) ($filters['search'] ?? ''));
-        $stage = trim((string) ($filters['stage'] ?? ''));
-        $pending = trim((string) ($filters['pending'] ?? ''));
-        $establishmentId = (int) ($filters['establishment_id'] ?? 0);
-        $contractId = (int) ($filters['contract_id'] ?? 0);
-        $createdFrom = trim((string) ($filters['created_from'] ?? ''));
-        $createdTo = trim((string) ($filters['created_to'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
         [$sort, $direction] = ListQuery::sort(
             $filters,
@@ -611,18 +604,69 @@ final class WorkOrderService
             'id',
         );
 
-        $companyIds = $this->accessibleCompanyIds($owner);
-
-        return WorkOrder::query()
+        return $this->filteredQueryForOwner($owner, $filters)
             ->with([
                 'establishment',
                 'status',
                 'responsibleUser',
                 'type',
                 'priority',
+                'lines:id,work_order_id,quantity,unit_price,net_amount',
                 'technicians' => fn ($query) => $query->where('is_selected', true),
                 'technicians.technician.relatedCompany',
             ])
+            ->orderBy($sort, $direction)
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
+    /**
+     * Aggregate totals for the active list filters (legacy presupuestos indexTotales).
+     * Amounts come from billing lines + selected technicians (not only denormalized header cols).
+     *
+     * @param  array{search?: string|null, stage?: string|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
+     * @return array{count: int, total_amount: float, cost_amount: float, margin_percentage: float}
+     */
+    public function totalsForOwner(Company $owner, array $filters = []): array
+    {
+        $filteredIds = $this->filteredQueryForOwner($owner, $filters)->select('work_orders.id');
+
+        $quantity = (int) $this->filteredQueryForOwner($owner, $filters)->count();
+
+        $totalAmount = round((float) WorkOrderLine::query()
+            ->whereIn('work_order_id', $filteredIds)
+            ->selectRaw('COALESCE(SUM(COALESCE(net_amount, quantity * unit_price, 0)), 0) as aggregate')
+            ->value('aggregate'), 2);
+
+        $costAmount = round((float) WorkOrderTechnician::query()
+            ->whereIn('work_order_id', $filteredIds)
+            ->where('is_selected', true)
+            ->selectRaw('COALESCE(SUM(COALESCE(quote_total_euros, quote_net_amount, 0)), 0) as aggregate')
+            ->value('aggregate'), 2);
+
+        return $this->formatTotalsRow((object) [
+            'quantity' => $quantity,
+            'total_amount' => $totalAmount,
+            'cost_amount' => $costAmount,
+        ]);
+    }
+
+    /**
+     * @param  array{search?: string|null, stage?: string|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
+     * @return \Illuminate\Database\Eloquent\Builder<WorkOrder>
+     */
+    private function filteredQueryForOwner(Company $owner, array $filters = [])
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+        $stage = trim((string) ($filters['stage'] ?? ''));
+        $pending = trim((string) ($filters['pending'] ?? ''));
+        $establishmentId = (int) ($filters['establishment_id'] ?? 0);
+        $contractId = (int) ($filters['contract_id'] ?? 0);
+        $createdFrom = trim((string) ($filters['created_from'] ?? ''));
+        $createdTo = trim((string) ($filters['created_to'] ?? ''));
+        $companyIds = $this->accessibleCompanyIds($owner);
+
+        return WorkOrder::query()
             ->where(function ($query) use ($owner, $companyIds): void {
                 $query->where('owner_company_id', $owner->id)
                     ->orWhere(function ($legacy) use ($companyIds): void {
@@ -660,10 +704,7 @@ final class WorkOrderService
                 });
             })
             ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
-            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
-            ->orderBy($sort, $direction)
-            ->paginate($perPage)
-            ->withQueryString();
+            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo));
     }
 
     /**
@@ -742,7 +783,15 @@ final class WorkOrderService
     {
         $total = round((float) ($row?->total_amount ?? 0), 2);
         $cost = round((float) ($row?->cost_amount ?? 0), 2);
-        $margin = $total > 0.0 ? round((($total - $cost) / $total) * 100, 2) : 0.0;
+
+        if ($total === 0.0 && $cost !== 0.0) {
+            $margin = -100.0;
+        } elseif ($total === 0.0 && $cost === 0.0) {
+            $margin = 0.0;
+        } else {
+            $margin = round((1 - ($cost / $total)) * 100, 2);
+            $margin = max(-100.0, min(100.0, $margin));
+        }
 
         return [
             'count' => (int) ($row?->quantity ?? 0),
@@ -809,6 +858,7 @@ final class WorkOrderService
             }
 
             $this->syncChildren($workOrder, $data);
+            $this->refreshHeaderTotals($workOrder);
 
             $createdStatusId = $workOrder->status_id !== null ? (int) $workOrder->status_id : null;
             $this->statusChanges->record(
@@ -892,6 +942,7 @@ final class WorkOrderService
 
             if (! $fieldsLocked) {
                 $this->syncChildren($workOrder, $data);
+                $this->refreshHeaderTotals($workOrder);
             }
 
             $clone = null;
@@ -943,6 +994,141 @@ final class WorkOrderService
                 'cloned_estimate' => $clone,
             ];
         });
+    }
+
+    /**
+     * Status-only update (index bulk actions / inline status change).
+     */
+    public function changeStatus(
+        Company $owner,
+        WorkOrder $workOrder,
+        int $newStatusId,
+        ?User $actor = null,
+        ?string $justification = null,
+    ): WorkOrder {
+        return DB::transaction(function () use ($owner, $workOrder, $newStatusId, $actor, $justification): WorkOrder {
+            $workOrder->loadMissing('status');
+            $oldStatusId = (int) $workOrder->status_id;
+            $previousSentAt = $workOrder->sent_at?->toDateTimeString();
+            $wasOpen = (bool) ($workOrder->status?->is_open ?? true);
+            $fieldsLocked = ! $wasOpen && ! $this->actorCanUpdateClosed($actor, $workOrder);
+            $approving = $workOrder->isEstimate() && $this->statuses->statusConfirmsEstimate($newStatusId);
+            $rejecting = $workOrder->isConfirmedWorkOrder() && $this->statuses->statusRejectsToEstimate($newStatusId);
+
+            if ($fieldsLocked && $newStatusId === $oldStatusId) {
+                return $workOrder;
+            }
+
+            if ($newStatusId !== $oldStatusId && ! $this->statuses->canTransition($oldStatusId, $newStatusId)) {
+                throw ValidationException::withMessages([
+                    'status_id' => 'This status change is not allowed.',
+                ]);
+            }
+
+            $comment = trim((string) $justification);
+
+            if ($newStatusId !== $oldStatusId) {
+                $edge = $this->statuses->transition($oldStatusId, $newStatusId);
+
+                if ($edge?->requires_justification && mb_strlen($comment) < 10) {
+                    throw ValidationException::withMessages([
+                        'status_justification' => 'A justification of at least 10 characters is required.',
+                    ]);
+                }
+            }
+
+            if ($approving) {
+                $this->confirmation->confirm(
+                    $workOrder,
+                    $this->statuses->postConfirmDefaultId(),
+                    $owner,
+                );
+            } elseif ($rejecting) {
+                $this->rejectToEstimate($owner, $workOrder);
+            } elseif ($newStatusId !== $oldStatusId) {
+                $this->assertStatusMatchesStage($workOrder->stage, $newStatusId);
+                $workOrder->forceFill(['status_id' => $newStatusId])->save();
+            }
+
+            $fresh = $workOrder->fresh($this->defaultRelations()) ?? $workOrder;
+            $this->applyStatusSideEffects($fresh, $oldStatusId, $wasOpen);
+            $fresh = $fresh->fresh($this->defaultRelations()) ?? $fresh;
+
+            $this->statusChanges->record(
+                ChatDocumentType::WorkOrder,
+                (int) $fresh->id,
+                $oldStatusId,
+                $fresh->status_id !== null ? (int) $fresh->status_id : null,
+                $actor,
+                $comment !== '' ? $comment : null,
+            );
+
+            $this->qualityScores->handleEstimateSent($fresh, $previousSentAt);
+
+            $isOpen = (bool) ($fresh->status?->is_open ?? true);
+            $this->qualityScores->handleWorkOrderClosed($fresh, $wasOpen, $isOpen);
+
+            return $fresh;
+        });
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return array{updated: int, failed: list<array{id: int, message: string}>}
+     */
+    public function bulkChangeStatus(
+        Company $owner,
+        array $ids,
+        int $statusId,
+        WorkOrderStage $stage,
+        ?User $actor = null,
+        ?string $justification = null,
+    ): array {
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', $ids),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        $updated = 0;
+        $failed = [];
+
+        $documents = $this->filteredQueryForOwner($owner, ['stage' => $stage->value])
+            ->whereIn('work_orders.id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        foreach ($ids as $id) {
+            $document = $documents->get($id);
+
+            if (! $document instanceof WorkOrder) {
+                $failed[] = ['id' => $id, 'message' => 'Document not found.'];
+
+                continue;
+            }
+
+            try {
+                if ($actor !== null && ! app(EstimatePolicy::class)->update($actor, $document)) {
+                    $failed[] = ['id' => $id, 'message' => 'Not authorized.'];
+
+                    continue;
+                }
+
+                $this->changeStatus($owner, $document, $statusId, $actor, $justification);
+                $updated++;
+            } catch (ValidationException $exception) {
+                $messages = $exception->errors();
+                $first = collect($messages)->flatten()->first();
+                $failed[] = [
+                    'id' => $id,
+                    'message' => is_string($first) ? $first : 'Status change failed.',
+                ];
+            }
+        }
+
+        return [
+            'updated' => $updated,
+            'failed' => $failed,
+        ];
     }
 
     public function delete(WorkOrder $workOrder): void
@@ -1094,14 +1280,18 @@ final class WorkOrderService
      */
     public function toListItem(WorkOrder $workOrder): array
     {
-        $totalEuros = $workOrder->total_euros !== null
-            ? (float) $workOrder->total_euros
-            : ($workOrder->total_amount !== null ? (float) $workOrder->total_amount : null);
-        $costAmount = $workOrder->cost_amount !== null ? (float) $workOrder->cost_amount : null;
+        [$totalEuros, $costAmount] = $this->moneyFromDocument($workOrder);
         $marginPercentage = null;
 
-        if ($totalEuros !== null && $totalEuros > 0.0 && $costAmount !== null) {
-            $marginPercentage = round((($totalEuros - $costAmount) / $totalEuros) * 100, 2);
+        if ($totalEuros !== null && $costAmount !== null) {
+            if ($totalEuros === 0.0 && $costAmount !== 0.0) {
+                $marginPercentage = -100.0;
+            } elseif ($totalEuros === 0.0 && $costAmount === 0.0) {
+                $marginPercentage = 0.0;
+            } else {
+                $marginPercentage = round((1 - ($costAmount / $totalEuros)) * 100, 2);
+                $marginPercentage = max(-100.0, min(100.0, $marginPercentage));
+            }
         }
 
         $selectedTechnician = $workOrder->relationLoaded('technicians')
@@ -1123,6 +1313,7 @@ final class WorkOrderService
             'priority_color' => $workOrder->priority?->color,
             'type_name' => $workOrder->type?->name,
             'type_color' => $workOrder->type?->color,
+            'status_id' => $workOrder->status_id !== null ? (int) $workOrder->status_id : null,
             'responsible_user_name' => $workOrder->responsibleUser?->name,
             'technician_name' => $technicianCompany?->tradename ?: $technicianCompany?->name,
             'is_urgent' => $workOrder->is_urgent,
@@ -1130,10 +1321,54 @@ final class WorkOrderService
             'cost_amount' => $costAmount,
             'margin_percentage' => $marginPercentage,
             'intervention_at' => $workOrder->intervention_at?->toIso8601String(),
-            'expected_close_at' => $workOrder->expected_close_at?->toIso8601String(),
+            // Estimates use due_at as expected close (legacy fecha_cierre_esperado).
+            'expected_close_at' => ($workOrder->due_at ?? $workOrder->expected_close_at)?->toIso8601String(),
             'closed_at' => $workOrder->closed_at?->toIso8601String(),
             'created_at' => $workOrder->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * Prefer live lines/technicians (same as edit header); fall back to denormalized columns.
+     *
+     * @return array{0: float|null, 1: float|null}
+     */
+    private function moneyFromDocument(WorkOrder $workOrder): array
+    {
+        $totalEuros = null;
+        $costAmount = null;
+
+        if ($workOrder->relationLoaded('lines')) {
+            $totalEuros = round((float) $workOrder->lines->sum(function (WorkOrderLine $line): float {
+                if ($line->net_amount !== null) {
+                    return (float) $line->net_amount;
+                }
+
+                return (float) $line->quantity * (float) $line->unit_price;
+            }), 2);
+        } elseif ($workOrder->total_euros !== null) {
+            $totalEuros = (float) $workOrder->total_euros;
+        } elseif ($workOrder->total_amount !== null) {
+            $totalEuros = (float) $workOrder->total_amount;
+        } elseif ($workOrder->net_amount !== null) {
+            $totalEuros = (float) $workOrder->net_amount;
+        }
+
+        if ($workOrder->relationLoaded('technicians')) {
+            $costAmount = round((float) $workOrder->technicians
+                ->where('is_selected', true)
+                ->sum(function (WorkOrderTechnician $technician): float {
+                    if ($technician->quote_total_euros !== null) {
+                        return (float) $technician->quote_total_euros;
+                    }
+
+                    return (float) ($technician->quote_net_amount ?? 0);
+                }), 2);
+        } elseif ($workOrder->cost_amount !== null) {
+            $costAmount = (float) $workOrder->cost_amount;
+        }
+
+        return [$totalEuros, $costAmount];
     }
 
     /**
@@ -1391,6 +1626,45 @@ final class WorkOrderService
         }
 
         $workOrder->lines()->whereNotIn('id', $kept === [] ? [0] : $kept)->delete();
+    }
+
+    /**
+     * Header money like optima_prod ResumenDeTrabajo:
+     * - Base = sum of billing line nets (qty × unit price)
+     * - Coste = sum of selected technicians' quote_total_euros
+     * - Margen = base − coste
+     */
+    private function refreshHeaderTotals(WorkOrder $workOrder): void
+    {
+        $workOrder->load(['lines', 'technicians']);
+
+        $base = round((float) $workOrder->lines->sum(function (WorkOrderLine $line): float {
+            if ($line->net_amount !== null) {
+                return (float) $line->net_amount;
+            }
+
+            return (float) $line->quantity * (float) $line->unit_price;
+        }), 2);
+
+        $cost = round((float) $workOrder->technicians
+            ->where('is_selected', true)
+            ->sum(function (WorkOrderTechnician $technician): float {
+                if ($technician->quote_total_euros !== null) {
+                    return (float) $technician->quote_total_euros;
+                }
+
+                return (float) ($technician->quote_net_amount ?? 0);
+            }), 2);
+
+        $margin = round($base - $cost, 2);
+
+        $workOrder->forceFill([
+            'net_amount' => $base,
+            'total_amount' => $base,
+            'total_euros' => $base,
+            'cost_amount' => $cost,
+            'margin_amount' => $margin,
+        ])->save();
     }
 
     /**

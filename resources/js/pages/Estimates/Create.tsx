@@ -6,6 +6,7 @@ import {
     EstimateForm,
     type EstimateRequesterOption,
 } from '@/components/estimates/EstimateCreateForm';
+import { EstimateWorkSummary } from '@/components/estimates/EstimateWorkSummary';
 import { defaultWorkOrderFormValues } from '@/components/work-orders/WorkOrderForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
@@ -72,6 +73,9 @@ export default function CreateEstimate({
                     description={t('estimates.createDescription')}
                     backHref={estimatesService.indexPath}
                     backLabel={t('common.backTo', { resource: t('estimates.resourcePlural') })}
+                    actions={
+                        <EstimateWorkSummary lines={form.data.lines} technicians={form.data.technicians} />
+                    }
                 />
 
                 <EstimateForm

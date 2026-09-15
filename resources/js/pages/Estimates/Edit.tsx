@@ -9,6 +9,7 @@ import {
     type EstimateRequesterOption,
 } from '@/components/estimates/EstimateCreateForm';
 import { EstimateRatesPanel } from '@/components/estimates/EstimateRatesPanel';
+import { EstimateWorkSummary } from '@/components/estimates/EstimateWorkSummary';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
@@ -254,6 +255,9 @@ export default function EditEstimate({
                     })}
                     backHref={estimatesService.indexPath}
                     backLabel={t('common.backTo', { resource: t('estimates.resourcePlural') })}
+                    actions={
+                        <EstimateWorkSummary lines={form.data.lines} technicians={form.data.technicians} />
+                    }
                 />
 
                 <Tabs items={tabItems} value={activeTab} onValueChange={setActiveTab}>

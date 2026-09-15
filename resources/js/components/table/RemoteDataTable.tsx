@@ -50,7 +50,7 @@ export type RemoteDataColumnHelpers = {
 
 export type RemoteQueryState = Record<string, string>;
 
-type RemoteDataTableProps = {
+type RemoteDataTableProps<T = unknown> = {
     ajaxURL: string;
     /** Extra ajax params merged with active filter values. */
     ajaxParams?: () => Record<string, unknown>;
@@ -63,6 +63,8 @@ type RemoteDataTableProps = {
     savedFiltersPageKey?: string;
     /** Called when filters, page size, or sort change. Prefer URL-only sync — do not refetch list data here. */
     onQueryChange?: (query: RemoteQueryState) => void;
+    /** Fired when Tabulator row selection changes (requires selectableRows via options). */
+    onRowSelectionChanged?: (rows: T[]) => void;
     /** If set, sync query string via history.replaceState (no network request). */
     syncUrlBase?: string;
     emptyIcon?: ReactNode;
@@ -99,6 +101,10 @@ function columnFloorWidth(definition: ColumnDefinition): number {
 
 /** Size the host to max(column floors, card width) so fitColumns fills wide cards and scrolls on mobile. */
 function applyTableWidthFloor(table: Tabulator): void {
+    if (!table.element?.isConnected) {
+        return;
+    }
+
     const floor = table.getColumns().reduce((sum, column) => {
         if (!column.isVisible()) {
             return sum;
@@ -116,6 +122,28 @@ function applyTableWidthFloor(table: Tabulator): void {
 
     table.element.style.width = `${width}px`;
     table.element.style.minWidth = `${floor}px`;
+
+    // fitColumns measures .tabulator-tableholder — keep it matching the host so
+    // leftover space is distributed into columns instead of sitting empty on the right.
+    const holder = table.element.querySelector('.tabulator-tableholder');
+
+    if (holder instanceof HTMLElement) {
+        holder.style.width = '100%';
+    }
+}
+
+function relayoutTable(table: Tabulator): void {
+    if (!table.element?.isConnected) {
+        return;
+    }
+
+    applyTableWidthFloor(table);
+
+    try {
+        table.redraw(true);
+    } catch {
+        // Tabulator can throw while rows/headers are mid-mount or mid-destroy.
+    }
 }
 
 function withColumnFloors(columns: ColumnDefinition[]): ColumnDefinition[] {
@@ -161,6 +189,7 @@ function RemoteDataTableInner<T = unknown>(
         initialFilters = {},
         savedFiltersPageKey,
         onQueryChange,
+        onRowSelectionChanged,
         syncUrlBase,
         emptyIcon,
         emptyMessage,
@@ -168,7 +197,7 @@ function RemoteDataTableInner<T = unknown>(
         className,
         deps = EMPTY_DEPS,
         options,
-    }: RemoteDataTableProps,
+    }: RemoteDataTableProps<T>,
     ref: React.ForwardedRef<RemoteDataTableHandle>,
 ) {
     const { t, i18n } = useTranslation();
@@ -184,6 +213,7 @@ function RemoteDataTableInner<T = unknown>(
     const pageSizeRef = useRef(pageSize);
     const initialSortRef = useRef(initialSort);
     const onQueryChangeRef = useRef(onQueryChange);
+    const onRowSelectionChangedRef = useRef(onRowSelectionChanged);
     const syncUrlBaseRef = useRef(syncUrlBase);
     const filterValuesRef = useRef(initialFilters);
     const allowQueryEmitRef = useRef(false);
@@ -210,6 +240,7 @@ function RemoteDataTableInner<T = unknown>(
     pageSizeRef.current = pageSize;
     initialSortRef.current = initialSort;
     onQueryChangeRef.current = onQueryChange;
+    onRowSelectionChangedRef.current = onRowSelectionChanged;
     syncUrlBaseRef.current = syncUrlBase;
     filterValuesRef.current = filterValues;
 
@@ -369,8 +400,9 @@ function RemoteDataTableInner<T = unknown>(
 
         table.on('dataLoaded', () => {
             setLoading(false);
-            applyTableWidthFloor(table);
-            table.redraw(true);
+            table.deselectRow();
+            onRowSelectionChangedRef.current?.([]);
+            relayoutTable(table);
             // Enable URL sync only after bootstrap load (prevents extra /companies Inertia visit on entry).
             window.setTimeout(() => {
                 allowQueryEmitRef.current = true;
@@ -382,17 +414,19 @@ function RemoteDataTableInner<T = unknown>(
         });
 
         table.on('dataSorted', () => {
-            applyTableWidthFloor(table);
-            table.redraw(true);
+            relayoutTable(table);
 
             if (allowQueryEmitRef.current) {
                 emitQueryChange();
             }
         });
 
+        table.on('rowSelectionChanged', (data: T[]) => {
+            onRowSelectionChangedRef.current?.(data);
+        });
+
         const onWindowResize = () => {
-            applyTableWidthFloor(table);
-            table.redraw(true);
+            relayoutTable(table);
         };
         window.addEventListener('resize', onWindowResize);
 
@@ -521,5 +555,5 @@ function RemoteDataTableInner<T = unknown>(
 }
 
 export const RemoteDataTable = forwardRef(RemoteDataTableInner) as <T = unknown>(
-    props: RemoteDataTableProps & { ref?: React.Ref<RemoteDataTableHandle> },
+    props: RemoteDataTableProps<T> & { ref?: React.Ref<RemoteDataTableHandle> },
 ) => ReturnType<typeof RemoteDataTableInner<T>>;

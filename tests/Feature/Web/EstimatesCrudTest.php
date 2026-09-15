@@ -563,6 +563,54 @@ final class EstimatesCrudTest extends TestCase
         $this->assertNotNull($estimate->sent_at);
     }
 
+    public function test_admin_can_bulk_change_estimate_status(): void
+    {
+        [$admin, $establishment, $pending] = $this->seedContext();
+        $sent = $this->makeStatus(616, WorkOrderStage::Estimate, 'Sent bulk', 5, true, ['sets_sent_at' => true]);
+
+        WorkOrderStatusTransition::query()->create([
+            'from_status_id' => $pending->id,
+            'to_status_id' => $sent->id,
+            'requires_confirmation' => false,
+            'requires_justification' => false,
+        ]);
+
+        $first = WorkOrder::factory()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $pending->id,
+            'stage' => WorkOrderStage::Estimate,
+            'subject' => 'Bulk one',
+            'code' => 'EST-B1',
+        ]);
+        $second = WorkOrder::factory()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $pending->id,
+            'stage' => WorkOrderStage::Estimate,
+            'subject' => 'Bulk two',
+            'code' => 'EST-B2',
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/estimates')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Estimates/Index')
+                ->has('statusOptions'));
+
+        $this->actingAs($admin)
+            ->postJson('/estimates/bulk-status', [
+                'ids' => [$first->id, $second->id],
+                'status_id' => $sent->id,
+            ])
+            ->assertOk()
+            ->assertJsonPath('updated', 2)
+            ->assertJsonPath('failed', []);
+
+        $this->assertSame($sent->id, $first->fresh()->status_id);
+        $this->assertSame($sent->id, $second->fresh()->status_id);
+        $this->assertNotNull($first->fresh()->sent_at);
+    }
+
     public function test_estimate_routes_reject_confirmed_work_orders(): void
     {
         [$admin, $establishment, , , $received] = $this->seedContext();
@@ -709,6 +757,74 @@ final class EstimatesCrudTest extends TestCase
         $this->assertNull($restored->deleted_at);
         $this->assertSame('28.00', (string) $restored->quote_net_amount);
         $this->assertSame($row->id, $restored->id);
+    }
+
+    public function test_estimate_header_totals_follow_billing_lines_and_selected_technician(): void
+    {
+        [$admin, $establishment, $pending, , , , $company, $type] = $this->seedContext();
+
+        $article = Article::query()->create([
+            'code' => 'HDR-ART',
+            'is_deletable' => true,
+        ]);
+
+        $techCompany = Company::factory()->create(['name' => 'Cost Tech', 'is_active' => true]);
+        $selected = CompanyRelationship::factory()->create([
+            'owner_company_id' => $company->id,
+            'related_company_id' => $techCompany->id,
+            'kind' => CompanyRelationshipKind::Technician,
+        ]);
+        $otherTech = Company::factory()->create(['name' => 'Other Tech', 'is_active' => true]);
+        $unselected = CompanyRelationship::factory()->create([
+            'owner_company_id' => $company->id,
+            'related_company_id' => $otherTech->id,
+            'kind' => CompanyRelationshipKind::Technician,
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/estimates', [
+                'subject' => 'Header totals',
+                'status_id' => $pending->id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'is_urgent' => false,
+                'lines' => [
+                    [
+                        'article_id' => $article->id,
+                        'description' => 'Line 1',
+                        'quantity' => 2,
+                        'unit_price' => 50,
+                    ],
+                    [
+                        'article_id' => $article->id,
+                        'description' => 'Line 2',
+                        'quantity' => 1,
+                        'unit_price' => 25,
+                    ],
+                ],
+                'technicians' => [
+                    [
+                        'company_relationship_id' => $selected->id,
+                        'is_selected' => true,
+                        'quote_net_amount' => 40,
+                        'quote_total_euros' => 40,
+                    ],
+                    [
+                        'company_relationship_id' => $unselected->id,
+                        'is_selected' => false,
+                        'quote_net_amount' => 999,
+                        'quote_total_euros' => 999,
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $estimate = WorkOrder::query()->where('subject', 'Header totals')->firstOrFail();
+
+        $this->assertSame('125.00', (string) $estimate->net_amount);
+        $this->assertSame('125.00', (string) $estimate->total_euros);
+        $this->assertSame('40.00', (string) $estimate->cost_amount);
+        $this->assertSame('85.00', (string) $estimate->margin_amount);
     }
 
     /**

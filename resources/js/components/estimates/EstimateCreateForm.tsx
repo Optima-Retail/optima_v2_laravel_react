@@ -66,6 +66,17 @@ function toSelectOptions(options: UserOption[]) {
     }));
 }
 
+function lineNetTotal(quantity: string, unitPrice: string): string {
+    const qty = Number.parseFloat(quantity);
+    const price = Number.parseFloat(unitPrice);
+
+    if (!Number.isFinite(qty) || !Number.isFinite(price)) {
+        return '';
+    }
+
+    return (qty * price).toFixed(2);
+}
+
 function applyArticleToLine(
     line: WorkOrderFormValues['lines'][number],
     articleId: string,
@@ -814,7 +825,7 @@ export function EstimateForm({
                                     <Field
                                         label={t('workOrders.article')}
                                         htmlFor={`line-article-${index}`}
-                                        className="sm:col-span-3"
+                                        className="sm:col-span-2"
                                         error={errors[`lines.${index}.article_id`]}
                                     >
                                         <SearchableSelect
@@ -833,7 +844,7 @@ export function EstimateForm({
                                     <Field
                                         label={t('workOrders.lineDescription')}
                                         htmlFor={`line-description-${index}`}
-                                        className="sm:col-span-4"
+                                        className="sm:col-span-3"
                                         error={errors[`lines.${index}.description`]}
                                     >
                                         <Input
@@ -884,6 +895,20 @@ export function EstimateForm({
                                                 next[index] = { ...line, unit_price: event.target.value };
                                                 onChange('lines', next);
                                             }}
+                                        />
+                                    </Field>
+                                    <Field
+                                        label={t('workOrders.lineTotal')}
+                                        htmlFor={`line-total-${index}`}
+                                        className="sm:col-span-2"
+                                    >
+                                        <Input
+                                            id={`line-total-${index}`}
+                                            type="number"
+                                            step="0.01"
+                                            value={lineNetTotal(line.quantity, line.unit_price)}
+                                            disabled
+                                            readOnly
                                         />
                                     </Field>
                                     <div className="flex items-end sm:col-span-1">

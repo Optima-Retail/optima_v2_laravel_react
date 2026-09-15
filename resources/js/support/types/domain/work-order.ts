@@ -8,6 +8,7 @@ export type WorkOrderListItem = {
     establishment_name: string | null;
     status_name: string | null;
     status_color: string | null;
+    status_id: number | null;
     priority_name: string | null;
     priority_color: string | null;
     type_name: string | null;
