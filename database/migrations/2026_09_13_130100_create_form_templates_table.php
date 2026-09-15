@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Schema;
  * Legacy `plantillas` → `form_templates`.
  * Morph modelo_id+relacion_id → typed owner_type + FKs. Bigint PK (no string id).
  * Scoped by company_id (active company).
+ * Bible owner is enum-only (`owner_type=bible`) — no form_bibles catalog table.
  */
 return new class extends Migration
 {
@@ -27,7 +28,6 @@ return new class extends Migration
             $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete();
             $table->foreignId('company_relationship_id')->nullable()->constrained('company_relationships')->nullOnDelete();
             $table->foreignId('establishment_id')->nullable()->constrained('establishments')->nullOnDelete();
-            $table->foreignId('form_bible_id')->nullable()->constrained('form_bibles')->nullOnDelete();
             $table->timestamps();
             $table->softDeletes();
 
@@ -35,7 +35,6 @@ return new class extends Migration
             $table->index(['owner_type', 'brand_id']);
             $table->index(['owner_type', 'company_relationship_id']);
             $table->index(['owner_type', 'establishment_id']);
-            $table->index(['owner_type', 'form_bible_id']);
         });
     }
 

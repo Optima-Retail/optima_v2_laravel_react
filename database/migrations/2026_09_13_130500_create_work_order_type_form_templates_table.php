@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Legacy `ots_tipos_plantillas` → `work_order_type_form_templates`.
  * Drop modelo_id morph; typed owner FKs + work_order_type + template.
+ * Bible owner is enum-only (`owner_type=bible`) — no form_bibles catalog table.
  */
 return new class extends Migration
 {
@@ -20,7 +21,6 @@ return new class extends Migration
             $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete();
             $table->foreignId('company_relationship_id')->nullable()->constrained('company_relationships')->nullOnDelete();
             $table->foreignId('establishment_id')->nullable()->constrained('establishments')->nullOnDelete();
-            $table->foreignId('form_bible_id')->nullable()->constrained('form_bibles')->nullOnDelete();
             $table->foreignId('work_order_type_id')->constrained('work_order_types')->cascadeOnDelete();
             $table->foreignId('form_template_id')->constrained('form_templates')->cascadeOnDelete();
             $table->timestamps();

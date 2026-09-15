@@ -29,7 +29,6 @@ class FormTemplate extends Model
         'brand_id',
         'company_relationship_id',
         'establishment_id',
-        'form_bible_id',
     ];
 
     /**
@@ -100,14 +99,6 @@ class FormTemplate extends Model
     }
 
     /**
-     * @return BelongsTo<FormBible, $this>
-     */
-    public function bible(): BelongsTo
-    {
-        return $this->belongsTo(FormBible::class, 'form_bible_id');
-    }
-
-    /**
      * @return HasMany<FormTemplateSection, $this>
      */
     public function sections(): HasMany
@@ -135,7 +126,7 @@ class FormTemplate extends Model
                 ?? ''
             ),
             FormTemplateOwnerType::Establishment => (string) ($this->establishment?->name ?? ''),
-            FormTemplateOwnerType::Bible => (string) ($this->bible?->name ?? ''),
+            FormTemplateOwnerType::Bible => FormTemplateOwnerType::Bible->label(),
             default => '',
         };
     }

@@ -9,7 +9,7 @@ import {
     type DependencyList,
     type ReactNode,
 } from 'react';
-import { usePage } from '@inertiajs/react';
+import { usePage, router } from '@inertiajs/react';
 import { useTranslation } from 'react-i18next';
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
 import type { ColumnDefinition, Options } from 'tabulator-tables';
@@ -33,6 +33,47 @@ import type { SharedPageProps } from '@/types';
 
 export const REMOTE_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const EMPTY_DEPS: DependencyList = [];
+
+/**
+ * Tabulator formatters emit raw <a href> HTML (not Inertia <Link>).
+ * Intercept same-origin left-clicks so navigation stays SPA.
+ */
+function visitTabulatorLink(event: React.MouseEvent<HTMLElement>) {
+    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+    }
+
+    const anchor = (event.target as HTMLElement | null)?.closest('a[href]') as HTMLAnchorElement | null;
+
+    if (!anchor || !event.currentTarget.contains(anchor)) {
+        return;
+    }
+
+    if (anchor.hasAttribute('download') || anchor.target === '_blank' || anchor.getAttribute('data-inertia') === 'false') {
+        return;
+    }
+
+    const href = anchor.getAttribute('href');
+
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) {
+        return;
+    }
+
+    let url: URL;
+
+    try {
+        url = new URL(href, window.location.origin);
+    } catch {
+        return;
+    }
+
+    if (url.origin !== window.location.origin) {
+        return;
+    }
+
+    event.preventDefault();
+    router.visit(`${url.pathname}${url.search}${url.hash}`);
+}
 
 export type RemoteDataTableHandle = {
     replaceData: () => void;
@@ -525,6 +566,7 @@ function RemoteDataTableInner<T = unknown>(
                 show={loading}
                 className="app-scroll overflow-x-auto overscroll-x-contain rounded-2xl border border-line bg-surface"
                 label={loadingLabel ?? t('common.loading')}
+                onClickCapture={visitTabulatorLink}
             >
                 <div className={showEmpty ? 'hidden' : 'w-max min-w-full'}>
                     <div ref={tableHostRef} />

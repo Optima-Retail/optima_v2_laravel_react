@@ -41,7 +41,6 @@ export type FormTemplateFormValues = {
     brand_id: string;
     company_relationship_id: string;
     establishment_id: string;
-    form_bible_id: string;
     sections: FormTemplateSectionValues[];
 };
 
@@ -57,7 +56,6 @@ type FormTemplateFormProps = {
     brandOptions: Option[];
     customerOptions: CompanyOption[];
     establishmentOptions: Option[];
-    bibleOptions: Option[];
     onChange: (key: keyof FormTemplateFormValues, value: FormTemplateFormValues[keyof FormTemplateFormValues]) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
@@ -96,7 +94,6 @@ export function defaultFormTemplateFormValues(
         brand_id: '',
         company_relationship_id: '',
         establishment_id: '',
-        form_bible_id: '',
         sections: [],
         ...overrides,
     };
@@ -136,7 +133,6 @@ export function FormTemplateForm({
     brandOptions,
     customerOptions,
     establishmentOptions,
-    bibleOptions,
     onChange,
     onSubmit,
     submitLabel,
@@ -270,23 +266,6 @@ export function FormTemplateForm({
                             >
                                 <option value="">{t('common.select')}</option>
                                 {establishmentOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </Select>
-                        </Field>
-                    ) : null}
-
-                    {values.owner_type === 'bible' ? (
-                        <Field label={t('formTemplates.bible')} htmlFor="form_bible_id" error={errors.form_bible_id} required>
-                            <Select
-                                id="form_bible_id"
-                                value={values.form_bible_id}
-                                onChange={(event) => onChange('form_bible_id', event.target.value)}
-                            >
-                                <option value="">{t('common.select')}</option>
-                                {bibleOptions.map((option) => (
                                     <option key={option.id} value={option.id}>
                                         {option.label}
                                     </option>

@@ -16,7 +16,7 @@
 | `plataformas` | — | Skip table — `forms.app_platform_id` uses AppPlatform ints (1–3) |
 | `idiomas` / `users` | `languages` / `users` | Already exist |
 | `modelos` | — | **Ignore** (morph catalog) |
-| `biblias` | `form_bibles` | Minimal catalog for template owner |
+| `biblias` | — | **Skip table** — use `FormTemplateOwnerType::Bible` (`owner_type=bible`) only; prod hardcoded a single row |
 | `plantillas` | `form_templates` | Transform — bigint PK, typed owner, **scoped by `company_id`**, no morph |
 | `secciones_plantillas` | `form_template_sections` | Transform |
 | `campos_plantillas` | `form_template_fields` | Transform |
@@ -46,7 +46,7 @@
 | 5 Marca | `owner_type=brand` + `brand_id` |
 | 6 Cliente | `owner_type=customer` + `company_relationship_id` |
 | 7 Establecimiento | `owner_type=establishment` + `establishment_id` |
-| 31 Biblia | `owner_type=bible` + `form_bible_id` |
+| 31 Biblia | `owner_type=bible` (no FK; enum only) |
 | null | `owner_type=global` |
 
 ### Form subject
@@ -66,4 +66,4 @@
 ## UI
 
 - Main sidebar: `/forms`, `/form-templates`
-- Config: existing form types / statuses; `/config/form-bibles`
+- Config: existing form types / statuses (no form-bibles catalog)

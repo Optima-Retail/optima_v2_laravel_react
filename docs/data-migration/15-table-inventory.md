@@ -108,7 +108,7 @@ See also: [01-table-mapping.md](01-table-mapping.md), [09](09-work-orders.md)–
 | `establecimiento_tecnico_fav` | `establishment_favorite_technicians` |
 | `formularios_tipos` | `form_types` |
 | `formularios_estados` | `form_statuses` |
-| `biblias` | `form_bibles` |
+| `biblias` | — (enum `FormTemplateOwnerType::Bible`) |
 | `plantillas` | `form_templates` |
 | `secciones_plantillas` | `form_template_sections` |
 | `campos_plantillas` | `form_template_fields` |

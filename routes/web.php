@@ -23,7 +23,6 @@ use App\Http\Controllers\Web\Config\EstablishmentTypeController;
 use App\Http\Controllers\Web\Config\EvaluationStatusController;
 use App\Http\Controllers\Web\Config\ExpenseTypeController;
 use App\Http\Controllers\Web\Config\FieldHelpController as ConfigFieldHelpController;
-use App\Http\Controllers\Web\Config\FormBibleController;
 use App\Http\Controllers\Web\Config\FormStatusController;
 use App\Http\Controllers\Web\Config\FormTypeController;
 use App\Http\Controllers\Web\Config\GlobalServiceTypeController;
@@ -730,25 +729,6 @@ Route::middleware('auth')->group(function (): void {
 
         Route::middleware('permission:form_types.delete')->group(function (): void {
             Route::delete('/form-types/{form_type}', [FormTypeController::class, 'destroy'])->name('form-types.destroy');
-        });
-
-        Route::middleware('permission:form_bibles.view')->group(function (): void {
-            Route::get('/form-bibles', [FormBibleController::class, 'index'])->name('form-bibles.index');
-            Route::get('/form-bibles/data', [FormBibleController::class, 'data'])->name('form-bibles.data');
-        });
-
-        Route::middleware('permission:form_bibles.create')->group(function (): void {
-            Route::get('/form-bibles/create', [FormBibleController::class, 'create'])->name('form-bibles.create');
-            Route::post('/form-bibles', [FormBibleController::class, 'store'])->name('form-bibles.store');
-        });
-
-        Route::middleware('permission:form_bibles.update')->group(function (): void {
-            Route::get('/form-bibles/{form_bible}/edit', [FormBibleController::class, 'edit'])->name('form-bibles.edit');
-            Route::put('/form-bibles/{form_bible}', [FormBibleController::class, 'update'])->name('form-bibles.update');
-        });
-
-        Route::middleware('permission:form_bibles.delete')->group(function (): void {
-            Route::delete('/form-bibles/{form_bible}', [FormBibleController::class, 'destroy'])->name('form-bibles.destroy');
         });
 
         Route::middleware('permission:technician_attendance_confirmation_types.view')->group(function (): void {

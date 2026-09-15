@@ -26,7 +26,6 @@ type TemplateData = {
     brand_id: number | null;
     company_relationship_id: number | null;
     establishment_id: number | null;
-    form_bible_id: number | null;
     owner_label: string;
     type_name: string | null;
     sections: FormTemplateSectionValues[];
@@ -40,7 +39,6 @@ type EditProps = {
     brandOptions: Option[];
     customerOptions: Option[];
     establishmentOptions: Option[];
-    bibleOptions: Option[];
     can: { delete: boolean };
 };
 
@@ -52,7 +50,6 @@ export default function EditFormTemplate({
     brandOptions,
     customerOptions,
     establishmentOptions,
-    bibleOptions,
     can,
 }: EditProps) {
     const { t } = useTranslation();
@@ -70,7 +67,6 @@ export default function EditFormTemplate({
                 ? String(template.company_relationship_id)
                 : '',
             establishment_id: template.establishment_id ? String(template.establishment_id) : '',
-            form_bible_id: template.form_bible_id ? String(template.form_bible_id) : '',
             sections: template.sections.map((section) => ({
                 ...section,
                 label: section.label ?? '',
@@ -125,7 +121,6 @@ export default function EditFormTemplate({
                     brandOptions={brandOptions}
                     customerOptions={customerOptions}
                     establishmentOptions={establishmentOptions}
-                    bibleOptions={bibleOptions}
                     onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.save')}

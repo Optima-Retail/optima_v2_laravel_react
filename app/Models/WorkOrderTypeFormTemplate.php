@@ -18,7 +18,6 @@ class WorkOrderTypeFormTemplate extends Model
         'brand_id',
         'company_relationship_id',
         'establishment_id',
-        'form_bible_id',
         'work_order_type_id',
         'form_template_id',
     ];

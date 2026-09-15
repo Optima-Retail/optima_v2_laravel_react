@@ -27,7 +27,6 @@ class StoreFormTemplateRequest extends FormRequest
                 ? $this->integer('company_relationship_id')
                 : null,
             'establishment_id' => $this->filled('establishment_id') ? $this->integer('establishment_id') : null,
-            'form_bible_id' => $this->filled('form_bible_id') ? $this->integer('form_bible_id') : null,
             'is_default' => $this->boolean('is_default'),
             'establishment_ids' => array_values(array_map(
                 static fn ($id): int => (int) $id,
@@ -68,12 +67,6 @@ class StoreFormTemplateRequest extends FormRequest
                 'nullable',
                 'integer',
                 'exists:establishments,id',
-            ],
-            'form_bible_id' => [
-                Rule::requiredIf($ownerType === FormTemplateOwnerType::Bible->value),
-                'nullable',
-                'integer',
-                'exists:form_bibles,id',
             ],
             'establishment_ids' => ['array'],
             'establishment_ids.*' => ['integer', 'exists:establishments,id'],

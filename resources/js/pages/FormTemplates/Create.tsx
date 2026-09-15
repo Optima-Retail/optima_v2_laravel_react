@@ -19,7 +19,6 @@ type CreateProps = {
     brandOptions: Option[];
     customerOptions: Option[];
     establishmentOptions: Option[];
-    bibleOptions: Option[];
 };
 
 export default function CreateFormTemplate({
@@ -29,7 +28,6 @@ export default function CreateFormTemplate({
     brandOptions,
     customerOptions,
     establishmentOptions,
-    bibleOptions,
 }: CreateProps) {
     const { t } = useTranslation();
     const form = useForm(defaultFormTemplateFormValues());
@@ -61,7 +59,6 @@ export default function CreateFormTemplate({
                     brandOptions={brandOptions}
                     customerOptions={customerOptions}
                     establishmentOptions={establishmentOptions}
-                    bibleOptions={bibleOptions}
                     onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.createItem', { resource: t('formTemplates.resource') })}

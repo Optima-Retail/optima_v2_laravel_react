@@ -1,6 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
 import {
-    BookOpen,
     Briefcase,
     Building2,
     Cable,
@@ -89,13 +88,6 @@ const configItems: ConfigItem[] = [
         matches: ['/config/field-helps'],
         icon: CircleHelp,
         permission: 'field_helps.view',
-    },
-    {
-        href: '/config/form-bibles',
-        labelKey: 'nav.formBibles',
-        matches: ['/config/form-bibles'],
-        icon: BookOpen,
-        permission: 'form_bibles.view',
     },
     {
         href: '/config/countries',
@@ -378,7 +370,6 @@ export function useConfigPermissions(): Record<string, boolean> {
         'expense_types.view': useCan('expense_types.view'),
         'indirect_cost_types.view': useCan('indirect_cost_types.view'),
         'compliment_types.view': useCan('compliment_types.view'),
-        'form_bibles.view': useCan('form_bibles.view'),
         'vehicles.view': useCan('vehicles.view'),
         'tasks_to_perform.view': useCan('tasks_to_perform.view'),
         'checklists.view': useCan('checklists.view'),

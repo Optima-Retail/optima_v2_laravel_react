@@ -1,13 +1,15 @@
-import type { PropsWithChildren } from 'react';
+import type { HTMLAttributes, PropsWithChildren } from 'react';
 import { Spinner } from '@/components/ui/Spinner';
 import { cn } from '@/support/cn';
 
-type LoadingOverlayProps = PropsWithChildren<{
-    show: boolean;
-    className?: string;
-    overlayClassName?: string;
-    label?: string;
-}>;
+type LoadingOverlayProps = PropsWithChildren<
+    {
+        show: boolean;
+        className?: string;
+        overlayClassName?: string;
+        label?: string;
+    } & Pick<HTMLAttributes<HTMLDivElement>, 'onClickCapture'>
+>;
 
 /**
  * Light transparent loading overlay with a spinner.
@@ -19,9 +21,10 @@ export function LoadingOverlay({
     className,
     overlayClassName,
     label = 'Loading',
+    onClickCapture,
 }: LoadingOverlayProps) {
     return (
-        <div className={cn('relative', className)}>
+        <div className={cn('relative', className)} onClickCapture={onClickCapture}>
             {children}
             {show ? (
                 <div

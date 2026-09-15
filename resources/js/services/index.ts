@@ -66,7 +66,6 @@ export { complimentsService } from '@/services/compliments';
 export { complimentTypesService } from '@/services/complimentTypes';
 export { formTemplatesService } from '@/services/formTemplates';
 export { formsService } from '@/services/forms';
-export { formBiblesService } from '@/services/formBibles';
 export { incidentsService } from '@/services/incidents';
 export { workOrdersService } from '@/services/workOrders';
 export { localeService } from '@/services/locale';

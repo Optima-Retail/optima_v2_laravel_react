@@ -66,7 +66,6 @@ final class FormTemplateService
      *     brand_id?: int|null,
      *     company_relationship_id?: int|null,
      *     establishment_id?: int|null,
-     *     form_bible_id?: int|null,
      *     establishment_ids?: list<int>,
      *     sections?: list<array<string, mixed>>
      * }  $data
@@ -81,7 +80,7 @@ final class FormTemplateService
             $this->syncEstablishments($template, $data['establishment_ids'] ?? []);
             $this->syncSections($template, $data['sections'] ?? []);
 
-            return $template->fresh(['sections.fields', 'type', 'language', 'workOrderType', 'brand', 'companyRelationship.relatedCompany', 'establishment', 'bible', 'establishments'])
+            return $template->fresh(['sections.fields', 'type', 'language', 'workOrderType', 'brand', 'companyRelationship.relatedCompany', 'establishment', 'establishments'])
                 ?? $template;
         });
     }
@@ -97,7 +96,6 @@ final class FormTemplateService
      *     brand_id?: int|null,
      *     company_relationship_id?: int|null,
      *     establishment_id?: int|null,
-     *     form_bible_id?: int|null,
      *     establishment_ids?: list<int>,
      *     sections?: list<array<string, mixed>>
      * }  $data
@@ -109,7 +107,7 @@ final class FormTemplateService
             $this->syncEstablishments($template, $data['establishment_ids'] ?? []);
             $this->syncSections($template, $data['sections'] ?? []);
 
-            return $template->fresh(['sections.fields', 'type', 'language', 'workOrderType', 'brand', 'companyRelationship.relatedCompany', 'establishment', 'bible', 'establishments'])
+            return $template->fresh(['sections.fields', 'type', 'language', 'workOrderType', 'brand', 'companyRelationship.relatedCompany', 'establishment', 'establishments'])
                 ?? $template;
         });
     }
@@ -137,7 +135,6 @@ final class FormTemplateService
             'brand',
             'companyRelationship.relatedCompany',
             'establishment',
-            'bible',
         ]);
 
         return [
@@ -152,7 +149,6 @@ final class FormTemplateService
             'brand_id' => $template->brand_id,
             'company_relationship_id' => $template->company_relationship_id,
             'establishment_id' => $template->establishment_id,
-            'form_bible_id' => $template->form_bible_id,
             'owner_label' => $template->ownerLabel(),
             'type_name' => $template->type?->name,
             'establishment_ids' => $template->establishments->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
@@ -183,7 +179,7 @@ final class FormTemplateService
      */
     public function toListItem(FormTemplate $template): array
     {
-        $template->loadMissing(['type', 'brand', 'companyRelationship.relatedCompany', 'establishment', 'bible']);
+        $template->loadMissing(['type', 'brand', 'companyRelationship.relatedCompany', 'establishment']);
 
         return [
             'id' => $template->id,
@@ -331,7 +327,6 @@ final class FormTemplateService
                 'brand:id,name',
                 'companyRelationship.relatedCompany:id,name,tradename,logo',
                 'establishment:id,name',
-                'bible:id,name',
             ]);
     }
 
@@ -357,7 +352,6 @@ final class FormTemplateService
             'establishment_id' => $ownerType === FormTemplateOwnerType::Establishment
                 ? ($data['establishment_id'] ?? null)
                 : null,
-            'form_bible_id' => $ownerType === FormTemplateOwnerType::Bible ? ($data['form_bible_id'] ?? null) : null,
         ];
     }
 

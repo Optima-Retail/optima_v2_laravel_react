@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\FormTemplates;
 
-use App\Domain\Config\FormBibles\Services\FormBibleService;
 use App\Domain\Forms\Services\FormTemplateService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
@@ -26,7 +25,6 @@ final class FormTemplateController extends Controller
 
     public function __construct(
         private readonly FormTemplateService $templates,
-        private readonly FormBibleService $bibles,
     ) {}
 
     public function index(Request $request): Response
@@ -154,7 +152,6 @@ final class FormTemplateController extends Controller
                     : null,
             ),
             'establishmentOptions' => $this->templates->establishmentOptions($owner, $establishmentIds),
-            'bibleOptions' => $this->bibles->options(),
         ];
     }
 }
