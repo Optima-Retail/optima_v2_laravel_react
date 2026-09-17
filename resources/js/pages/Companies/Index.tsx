@@ -12,6 +12,7 @@ import {
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { companiesService } from '@/services';
+import { formatRelativeTime } from '@/support/datetime';
 import {
     isDeleteActionClick,
     tabulatorActionsCell,
@@ -35,7 +36,6 @@ type CompaniesIndexProps = {
     can: {
         create: boolean;
         update: boolean;
-        delete: boolean;
     };
 };
 
@@ -123,6 +123,19 @@ export default function CompaniesIndex({ filters, can }: CompaniesIndexProps) {
                     tabulatorStatusBadge(Boolean(cell.getValue()), t('common.active'), t('common.inactive')),
             },
             {
+                title: t('companies.memberSince'),
+                field: 'member_since',
+                minWidth: 140,
+                headerSort: true,
+                cssClass: 'cell-muted',
+                titleFormatter,
+                formatter: (cell: CellComponent) => {
+                    const value = cell.getValue() as string | null;
+
+                    return value ? formatRelativeTime(value, i18n.language) : t('common.emDash');
+                },
+            },
+            {
                 title: t('common.actions'),
                 field: 'actions',
                 width: 104,
@@ -142,11 +155,9 @@ export default function CompaniesIndex({ filters, can }: CompaniesIndexProps) {
                         );
                     }
 
-                    if (canRef.current.delete) {
-                        parts.push(
-                            tabulatorDeleteButton(t('common.deleteItem', { name: company.name })),
-                        );
-                    }
+                    parts.push(
+                        tabulatorDeleteButton(t('companies.leaveItem', { name: company.name })),
+                    );
 
                     return tabulatorActionsCell(parts);
                 },
@@ -158,9 +169,9 @@ export default function CompaniesIndex({ filters, can }: CompaniesIndexProps) {
                     event.preventDefault();
                     const company = cell.getRow().getData() as CompanyListItem;
                     const confirmed = await confirmAction({
-                        title: t('common.deleteTitle', { resource: t('companies.resource') }),
-                        message: t('common.deleteMessage', { name: company.name }),
-                        confirmLabel: t('common.delete'),
+                        title: t('companies.leaveTitle'),
+                        message: t('companies.leaveMessage', { name: company.name }),
+                        confirmLabel: t('companies.leave'),
                         tone: 'danger',
                     });
 
@@ -168,8 +179,7 @@ export default function CompaniesIndex({ filters, can }: CompaniesIndexProps) {
                         return;
                     }
 
-                    companiesService.destroy(company.id, {
-                        preserveScroll: true,
+                    companiesService.leave(company.id, {
                         onSuccess: () => {
                             getTable()?.replaceData();
                         },

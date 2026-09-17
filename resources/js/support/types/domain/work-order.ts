@@ -3,6 +3,10 @@ export type WorkOrderStage = 'estimate' | 'work_order';
 export type WorkOrderListItem = {
     id: number;
     code: string | null;
+    is_estimate: boolean;
+    is_work_order: boolean;
+    estimate_num: string | null;
+    work_order_num: string | null;
     subject: string | null;
     stage: WorkOrderStage;
     establishment_name: string | null;
@@ -51,8 +55,17 @@ export type WorkOrderTaskForm = {
 
 export type WorkOrderFormData = {
     id: number;
-    public_id: string;
     code: string | null;
+    is_estimate: boolean;
+    is_work_order: boolean;
+    estimate_num: string | null;
+    estimate_num_cardinal: number | null;
+    estimate_numbering_pattern_id: number | null;
+    estimate_old_num: string | null;
+    work_order_num: string | null;
+    work_order_num_cardinal: number | null;
+    work_order_numbering_pattern_id: number | null;
+    work_order_old_num: string | null;
     subject: string | null;
     reference: string | null;
     purchase_order: string | null;

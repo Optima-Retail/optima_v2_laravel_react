@@ -49,8 +49,16 @@ export const companiesService = {
         router.post(`${base}/${companyId}/users`, { user_id: userId }, { preserveScroll: true });
     },
 
-    unlinkUser(companyId: number, userId: number) {
-        router.delete(`${base}/${companyId}/users/${userId}`, { preserveScroll: true });
+    unlinkUser(companyId: number, userId: number, options: Record<string, unknown> = {}) {
+        router.delete(`${base}/${companyId}/users/${userId}`, { preserveScroll: true, ...options });
+    },
+
+    leave(companyId: number, options: Record<string, unknown> = {}) {
+        router.delete(`${base}/${companyId}/membership`, {
+            preserveScroll: true,
+            preserveState: false,
+            ...options,
+        });
     },
 
     visitPage,

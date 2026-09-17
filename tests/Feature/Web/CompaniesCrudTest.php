@@ -105,7 +105,7 @@ final class CompaniesCrudTest extends TestCase
                 ->has('filters')
                 ->has('can.create')
                 ->has('can.update')
-                ->has('can.delete'));
+                ->missing('can.delete'));
 
         $this->actingAs($admin)
             ->getJson('/companies/data')
@@ -232,11 +232,33 @@ final class CompaniesCrudTest extends TestCase
         $this->assertTrue($member->fresh()?->belongsToCompany($company->id));
 
         $this->actingAs($admin)
+            ->from(route('companies.edit', $company))
             ->delete("/companies/{$company->id}/users/{$member->id}")
-            ->assertRedirect(route('companies.index'))
+            ->assertRedirect(route('companies.edit', $company))
             ->assertSessionHas('success', 'company_user_unlinked_successfully');
 
         $this->assertFalse($member->fresh()?->belongsToCompany($company->id));
+    }
+
+    public function test_member_can_leave_company_without_deleting_it(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleEnum::Admin->value);
+
+        $company = Company::factory()->create(['name' => 'Leave Me Co']);
+        $this->attachToCompany($admin, $company);
+
+        $this->actingAs($admin)
+            ->delete("/companies/{$company->id}/membership")
+            ->assertRedirect(route('companies.index'))
+            ->assertSessionHas('success', 'company_user_unlinked_successfully');
+
+        $this->assertFalse($admin->fresh()?->belongsToCompany($company->id));
+        $this->assertDatabaseHas('companies', [
+            'id' => $company->id,
+            'name' => 'Leave Me Co',
+            'deleted_at' => null,
+        ]);
     }
 
     public function test_admin_can_upload_and_remove_company_logo(): void

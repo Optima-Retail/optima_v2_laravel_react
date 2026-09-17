@@ -132,17 +132,6 @@ export function BrandForm({
                         uncheckedLabel={t('brands.notContactable')}
                     />
                 </Field>
-
-                <Field label={t('brands.debtReminders')} htmlFor="send_debt_reminders">
-                    <Toggle
-                        id="send_debt_reminders"
-                        helpField={false}
-                        checked={values.send_debt_reminders}
-                        onCheckedChange={(checked) => onChange('send_debt_reminders', checked)}
-                        checkedLabel={t('brands.sendReminders')}
-                        uncheckedLabel={t('brands.doNotSendReminders')}
-                    />
-                </Field>
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">

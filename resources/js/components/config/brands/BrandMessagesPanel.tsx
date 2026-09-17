@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Paperclip, Send } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { AttachmentImagePreviewModal } from '@/components/attachments/AttachmentImagePreviewModal';
 import { Button } from '@/components/ui/Button';
 import { RichTextEditor, RichTextHtml } from '@/components/ui/RichTextEditor';
 import { brandsService } from '@/services';
@@ -25,6 +26,7 @@ export function BrandMessagesPanel({ brandId, messages, can }: BrandMessagesPane
     const { t } = useTranslation();
     const [body, setBody] = useState('');
     const [sending, setSending] = useState(false);
+    const [preview, setPreview] = useState<BrandMessageItem | null>(null);
     const listRef = useRef<HTMLDivElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
@@ -105,14 +107,14 @@ export function BrandMessagesPanel({ brandId, messages, can }: BrandMessagesPane
 
         if (message.type === 'image' && message.preview_url && can.download_message_files) {
             return (
-                <a href={message.preview_url} target="_blank" rel="noreferrer" className="block">
+                <button type="button" className="block cursor-pointer" onClick={() => setPreview(message)}>
                     <img
                         src={message.preview_url}
                         alt={label}
                         className="max-h-48 rounded-lg object-contain"
                         onLoad={() => scrollToBottom('auto')}
                     />
-                </a>
+                </button>
             );
         }
 
@@ -232,6 +234,13 @@ export function BrandMessagesPanel({ brandId, messages, can }: BrandMessagesPane
                     </div>
                 </form>
             ) : null}
+
+            <AttachmentImagePreviewModal
+                open={preview !== null}
+                title={preview?.download_name ?? t('brands.messagesDownload')}
+                src={preview?.preview_url ?? null}
+                onClose={() => setPreview(null)}
+            />
         </section>
     );
 }

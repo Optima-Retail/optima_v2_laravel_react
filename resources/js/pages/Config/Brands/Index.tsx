@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
 import { Plus, Tags } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -27,12 +27,15 @@ import type { BrandListItem } from '@/support/types/domain/brand';
 type BrandsIndexProps = {
     filters: {
         search: string;
-        created_from: string;
-        created_to: string;
+        created_at: string;
+        account_manager_ids: string;
+        commercial_manager_ids: string;
+        collaborator_ids: string;
         sort: string;
         direction: string;
         per_page: string;
     };
+    userOptions: Array<{ id: number; label: string }>;
     can: {
         create: boolean;
     };
@@ -43,13 +46,22 @@ type ClientsModalState = {
     brandName: string;
 } | null;
 
-export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
+export default function BrandsIndex({ filters, userOptions, can }: BrandsIndexProps) {
     const { t, i18n } = useTranslation();
     const tableRef = useRef<RemoteDataTableHandle>(null);
     const canUpdate = useCan('brands.update');
     const canDelete = useCan('brands.delete');
     const canEditClients = useCan('company_relationships.update');
     const [clientsModal, setClientsModal] = useState<ClientsModalState>(null);
+
+    const userFilterOptions = useMemo(
+        () =>
+            userOptions.map((user) => ({
+                value: String(user.id),
+                label: user.label,
+            })),
+        [userOptions],
+    );
 
     function buildColumns({ titleFormatter, getTable }: RemoteDataColumnHelpers): ColumnDefinition[] {
         return [
@@ -81,15 +93,7 @@ export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
             {
                 title: t('brands.accountManager'),
                 field: 'account_manager_name',
-                minWidth: 160,
-                headerSort: false,
-                cssClass: 'cell-muted',
-                formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
-            },
-            {
-                title: t('brands.commercialManager'),
-                field: 'commercial_manager_name',
-                minWidth: 160,
+                minWidth: 180,
                 headerSort: false,
                 cssClass: 'cell-muted',
                 formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
@@ -97,41 +101,21 @@ export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
             {
                 title: t('brands.meetingFrequency'),
                 field: 'loyalty_meeting_frequency',
-                minWidth: 140,
-                headerSort: false,
-                cssClass: 'cell-muted',
-                formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
-            },
-            {
-                title: t('brands.qcContact'),
-                field: 'is_quality_control_contactable',
-                minWidth: 120,
-                headerSort: false,
-                formatter: (cell: CellComponent) => {
-                    const value = cell.getValue() as boolean;
-
-                    if (!value) {
-                        return `<span class="text-ink-muted">${t('common.no')}</span>`;
-                    }
-
-                    const badgeIcon =
-                        '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="size-4 shrink-0" aria-hidden="true"><path d="M3.85 8.62a4 4 0 0 1 4.78-4.77 4 4 0 0 1 6.74 0 4 4 0 0 1 4.78 4.78 4 4 0 0 1 0 6.74 4 4 0 0 1-4.77 4.78 4 4 0 0 1-6.75 0 4 4 0 0 1-4.78-4.77 4 4 0 0 1 0-6.76Z"/><path d="m9 12 2 2 4-4"/></svg>';
-
-                    return `<span class="inline-flex items-center gap-1 text-success">${badgeIcon}${t('common.yes')}</span>`;
-                },
-            },
-            {
-                title: t('common.createdAt'),
-                field: 'created_at',
-                minWidth: 160,
+                minWidth: 180,
                 headerSort: true,
                 cssClass: 'cell-muted',
                 titleFormatter,
-                formatter: (cell: CellComponent) => {
-                    const value = cell.getValue() as string | null;
-
-                    return value ? new Date(value).toLocaleString() : t('common.emDash');
-                },
+                formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
+            },
+            {
+                title: t('brands.clientsCount'),
+                field: 'clients_count',
+                width: 110,
+                headerSort: true,
+                hozAlign: 'right',
+                headerHozAlign: 'right',
+                titleFormatter,
+                formatter: (cell: CellComponent) => String(cell.getValue() ?? 0),
             },
             {
                 title: t('common.actions'),
@@ -228,8 +212,10 @@ export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
                     pageSize={Number(filters.per_page) || 25}
                     initialFilters={{
                         search: filters.search,
-                        created_from: filters.created_from,
-                        created_to: filters.created_to,
+                        created_at: filters.created_at,
+                        account_manager_ids: filters.account_manager_ids,
+                        commercial_manager_ids: filters.commercial_manager_ids,
+                        collaborator_ids: filters.collaborator_ids,
                     }}
                     filterFields={[
                         {
@@ -240,20 +226,36 @@ export default function BrandsIndex({ filters, can }: BrandsIndexProps) {
                         },
                         {
                             type: 'date',
-                            name: 'created_from',
-                            label: t('filters.createdFrom'),
+                            name: 'created_at',
+                            label: t('filters.createdAt'),
                         },
                         {
-                            type: 'date',
-                            name: 'created_to',
-                            label: t('filters.createdTo'),
+                            type: 'multiselect',
+                            name: 'account_manager_ids',
+                            label: t('brands.accountManager'),
+                            options: userFilterOptions,
+                            placeholder: t('brands.filterAccountManagers'),
+                        },
+                        {
+                            type: 'multiselect',
+                            name: 'commercial_manager_ids',
+                            label: t('brands.commercialManager'),
+                            options: userFilterOptions,
+                            placeholder: t('brands.filterCommercialManagers'),
+                        },
+                        {
+                            type: 'multiselect',
+                            name: 'collaborator_ids',
+                            label: t('brands.collaborators'),
+                            options: userFilterOptions,
+                            placeholder: t('brands.collaboratorsPlaceholder'),
                         },
                     ]}
                     savedFiltersPageKey="brands"
                     syncUrlBase={brandsService.indexPath}
                     emptyIcon={<Tags className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('brands.resourcePlural') })}
-                    deps={[i18n.language, canUpdate, canDelete]}
+                    deps={[i18n.language, canUpdate, canDelete, userFilterOptions]}
                 />
             </div>
 

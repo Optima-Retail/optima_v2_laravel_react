@@ -47,6 +47,8 @@ export default function CreateUser({ roleOptions, formOptions }: CreateUserProps
         password_confirmation: '',
         roles: ['user'] as string[],
         company_ids: [] as string[],
+        avatar: null as File | null,
+        remove_avatar: false,
     });
 
     function submit(event: FormEvent) {

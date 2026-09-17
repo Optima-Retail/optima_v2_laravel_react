@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { Save, Trash2 } from 'lucide-react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { ArrowRightLeft, Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
 import { PageHeader } from '@/components/page/PageHeader';
@@ -31,6 +31,7 @@ type EditWorkOrderProps = {
     technicianOptions: UserOption[];
     articleOptions: WorkOrderArticleOption[];
     fields_locked?: boolean;
+    related_estimate_url?: string | null;
     chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
@@ -70,6 +71,7 @@ export default function EditWorkOrder({
     chat,
     can,
     fields_locked = false,
+    related_estimate_url = null,
 }: EditWorkOrderProps) {
     const { t } = useTranslation();
     const { url } = usePage();
@@ -204,6 +206,17 @@ export default function EditWorkOrder({
                     })}
                     backHref={workOrdersService.indexPath}
                     backLabel={t('common.backTo', { resource: t('workOrders.resourcePlural') })}
+                    actions={
+                        related_estimate_url ? (
+                            <Link
+                                href={related_estimate_url}
+                                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-surface px-3 text-sm text-ink transition-colors hover:border-brand/40 hover:text-brand"
+                            >
+                                <ArrowRightLeft className="size-4" aria-hidden />
+                                {t('workOrders.openEstimate')}
+                            </Link>
+                        ) : null
+                    }
                 />
 
                 <Tabs items={tabItems} value={activeTab} onValueChange={setActiveTab}>
@@ -224,6 +237,8 @@ export default function EditWorkOrder({
                             technicianOptions={technicianOptions}
                             articleOptions={articleOptions}
                             sourceLabel={workOrder.source_work_order_label}
+                            estimateNum={workOrder.estimate_num}
+                            workOrderNum={workOrder.work_order_num}
                             onChange={(key, value) => form.setData(key, value)}
                             onSubmit={submit}
                             submitLabel={t('common.save')}

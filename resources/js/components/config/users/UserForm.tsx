@@ -1,6 +1,9 @@
 import type { FormEvent, ReactNode } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { usePage } from '@inertiajs/react';
+import { ImagePlus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
@@ -11,7 +14,6 @@ import { Toggle } from '@/components/ui/Toggle';
 import { toCompanySelectOptions } from '@/support/companySelect';
 import type { UserFormOptions } from '@/support/types/domain/user';
 import type { SharedPageProps } from '@/types';
-import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
 export type UserFormValues = {
     name: string;
@@ -43,6 +45,8 @@ export type UserFormValues = {
     password_confirmation: string;
     roles: string[];
     company_ids: string[];
+    avatar: File | null;
+    remove_avatar: boolean;
 };
 
 type UserFormProps = {
@@ -52,6 +56,7 @@ type UserFormProps = {
     processing: boolean;
     roleOptions: string[];
     formOptions: UserFormOptions;
+    currentAvatarUrl?: string | null;
     onChange: (key: keyof UserFormValues, value: UserFormValues[keyof UserFormValues]) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
@@ -66,6 +71,7 @@ export function UserForm({
     processing,
     roleOptions,
     formOptions,
+    currentAvatarUrl = null,
     onChange,
     onSubmit,
     submitLabel,
@@ -74,10 +80,77 @@ export function UserForm({
 }: UserFormProps) {
     const { t } = useTranslation();
     const { supportedLocales } = usePage<SharedPageProps>().props;
+    const avatarInputRef = useRef<HTMLInputElement>(null);
+    const objectUrl = useMemo(
+        () => (values.avatar ? URL.createObjectURL(values.avatar) : null),
+        [values.avatar],
+    );
+
+    useEffect(() => {
+        return () => {
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+    }, [objectUrl]);
+
+    const previewUrl = objectUrl ?? (values.remove_avatar ? null : currentAvatarUrl);
 
     return (
         <FieldHelpScope table="users">
-        <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
+        <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8" encType="multipart/form-data">
+            <Field label={t('users.avatar')} htmlFor="avatar" error={errors.avatar}>
+                <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex size-16 items-center justify-center overflow-hidden rounded-full border border-line bg-canvas">
+                        {previewUrl ? (
+                            <img src={previewUrl} alt="" className="size-full object-cover" />
+                        ) : (
+                            <ImagePlus className="size-5 text-ink-muted" aria-hidden />
+                        )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <input
+                            ref={avatarInputRef}
+                            id="avatar"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="hidden"
+                            onChange={(event) => {
+                                const file = event.target.files?.[0] ?? null;
+                                onChange('avatar', file);
+                                if (file) {
+                                    onChange('remove_avatar', false);
+                                }
+                            }}
+                        />
+                        <Button type="button" variant="secondary" onClick={() => avatarInputRef.current?.click()}>
+                            <ImagePlus className="size-4" aria-hidden />
+                            {t('users.chooseAvatar')}
+                        </Button>
+                        {(previewUrl || values.avatar) && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => {
+                                    onChange('avatar', null);
+                                    onChange('remove_avatar', true);
+                                    if (avatarInputRef.current) {
+                                        avatarInputRef.current.value = '';
+                                    }
+                                }}
+                            >
+                                <Trash2 className="size-4" aria-hidden />
+                                {t('users.removeAvatar')}
+                            </Button>
+                        )}
+                        <span className="text-sm text-ink-muted">
+                            {values.avatar?.name
+                                ?? (previewUrl ? t('users.avatarSelected') : t('users.noAvatarSelected'))}
+                        </span>
+                    </div>
+                </div>
+            </Field>
+
             <Field label={t('common.name')} htmlFor="name" error={errors.name} required>
                 <Input
                     id="name"

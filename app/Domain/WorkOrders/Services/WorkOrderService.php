@@ -32,9 +32,9 @@ use App\Models\WorkOrderType;
 use App\Policies\EstimatePolicy;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class WorkOrderService
@@ -592,7 +592,7 @@ final class WorkOrderService
     }
 
     /**
-     * @param  array{search?: string|null, stage?: string|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
+     * @param  array{search?: string|null, stage?: string|null, is_estimate?: bool|null, is_work_order?: bool|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return LengthAwarePaginator<int, WorkOrder>
      */
     public function paginateForOwner(Company $owner, array $filters = [], ?int $perPage = null): LengthAwarePaginator
@@ -624,7 +624,7 @@ final class WorkOrderService
      * Aggregate totals for the active list filters (legacy presupuestos indexTotales).
      * Amounts come from billing lines + selected technicians (not only denormalized header cols).
      *
-     * @param  array{search?: string|null, stage?: string|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
+     * @param  array{search?: string|null, stage?: string|null, is_estimate?: bool|null, is_work_order?: bool|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
      * @return array{count: int, total_amount: float, cost_amount: float, margin_percentage: float}
      */
     public function totalsForOwner(Company $owner, array $filters = []): array
@@ -652,8 +652,8 @@ final class WorkOrderService
     }
 
     /**
-     * @param  array{search?: string|null, stage?: string|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
-     * @return \Illuminate\Database\Eloquent\Builder<WorkOrder>
+     * @param  array{search?: string|null, stage?: string|null, is_estimate?: bool|null, is_work_order?: bool|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
+     * @return Builder<WorkOrder>
      */
     private function filteredQueryForOwner(Company $owner, array $filters = [])
     {
@@ -665,6 +665,8 @@ final class WorkOrderService
         $createdFrom = trim((string) ($filters['created_from'] ?? ''));
         $createdTo = trim((string) ($filters['created_to'] ?? ''));
         $companyIds = $this->accessibleCompanyIds($owner);
+        $isEstimate = array_key_exists('is_estimate', $filters) ? $filters['is_estimate'] : null;
+        $isWorkOrder = array_key_exists('is_work_order', $filters) ? $filters['is_work_order'] : null;
 
         return WorkOrder::query()
             ->where(function ($query) use ($owner, $companyIds): void {
@@ -682,6 +684,12 @@ final class WorkOrderService
             ->when($contractId > 0, function ($query) use ($contractId): void {
                 $query->where('contract_id', $contractId);
             })
+            ->when($isEstimate !== null, function ($query) use ($isEstimate): void {
+                $query->where('is_estimate', (bool) $isEstimate);
+            })
+            ->when($isWorkOrder !== null, function ($query) use ($isWorkOrder): void {
+                $query->where('is_work_order', (bool) $isWorkOrder);
+            })
             ->when($stage !== '' && in_array($stage, WorkOrderStage::values(), true), function ($query) use ($stage): void {
                 $query->where('stage', $stage);
             })
@@ -695,6 +703,10 @@ final class WorkOrderService
                     $inner
                         ->where('subject', 'like', "%{$search}%")
                         ->orWhere('code', 'like', "%{$search}%")
+                        ->orWhere('estimate_num', 'like', "%{$search}%")
+                        ->orWhere('work_order_num', 'like', "%{$search}%")
+                        ->orWhere('estimate_old_num', 'like', "%{$search}%")
+                        ->orWhere('work_order_old_num', 'like', "%{$search}%")
                         ->orWhere('reference', 'like', "%{$search}%")
                         ->orWhereHas('establishment', function ($establishmentQuery) use ($search): void {
                             $establishmentQuery
@@ -728,7 +740,11 @@ final class WorkOrderService
 
         $row = WorkOrder::query()
             ->where('establishment_id', $establishmentId)
-            ->where('stage', $stage->value)
+            ->when(
+                $stage === WorkOrderStage::Estimate,
+                fn ($query) => $query->where('is_estimate', true),
+                fn ($query) => $query->where('is_work_order', true),
+            )
             ->where(function ($query) use ($owner, $companyIds): void {
                 $query->where('owner_company_id', $owner->id)
                     ->orWhere(function ($legacy) use ($companyIds): void {
@@ -757,7 +773,11 @@ final class WorkOrderService
 
         $row = WorkOrder::query()
             ->where('contract_id', $contractId)
-            ->where('stage', $stage->value)
+            ->when(
+                $stage === WorkOrderStage::Estimate,
+                fn ($query) => $query->where('is_estimate', true),
+                fn ($query) => $query->where('is_work_order', true),
+            )
             ->where(function ($query) use ($owner, $companyIds): void {
                 $query->where('owner_company_id', $owner->id)
                     ->orWhere(function ($legacy) use ($companyIds): void {
@@ -828,12 +848,22 @@ final class WorkOrderService
 
             $attributes = $this->attributes($data, $stage);
             $attributes['owner_company_id'] = $owner->id;
+            $attributes['is_estimate'] = $stage === WorkOrderStage::Estimate;
+            $attributes['is_work_order'] = $stage === WorkOrderStage::WorkOrder;
 
             // Always allocate when the pattern is missing/active (ignore client peek of suggestedCode).
-            $allocatedCode = $this->allocateCode($owner, $stage);
+            $allocation = $this->allocateNumbering($owner, $stage);
 
-            if ($allocatedCode !== null) {
-                $attributes['code'] = $allocatedCode;
+            if ($allocation !== null) {
+                $attributes = [
+                    ...$attributes,
+                    ...$this->numberingAttributesForStage($stage, $allocation),
+                ];
+            } elseif (filled($data['code'] ?? null)) {
+                $attributes = [
+                    ...$attributes,
+                    ...$this->manualNumberingAttributesForStage($stage, (string) $data['code']),
+                ];
             }
 
             if (($attributes['billing_company_id'] ?? null) === null) {
@@ -927,6 +957,13 @@ final class WorkOrderService
             }
 
             $attributes = $this->attributes($data, $workOrder->stage);
+
+            if (! $fieldsLocked) {
+                $attributes = [
+                    ...$attributes,
+                    ...$this->syncNumberingFromCodeAttributes($workOrder, $data),
+                ];
+            }
 
             if ($approving || $rejecting) {
                 unset($attributes['status_id']);
@@ -1092,7 +1129,9 @@ final class WorkOrderService
         $updated = 0;
         $failed = [];
 
-        $documents = $this->filteredQueryForOwner($owner, ['stage' => $stage->value])
+        $documents = $this->filteredQueryForOwner($owner, $stage === WorkOrderStage::Estimate
+            ? ['is_estimate' => true, 'stage' => WorkOrderStage::Estimate->value]
+            : ['is_work_order' => true, 'stage' => WorkOrderStage::WorkOrder->value])
             ->whereIn('work_orders.id', $ids)
             ->get()
             ->keyBy('id');
@@ -1162,7 +1201,6 @@ final class WorkOrderService
         ])->save();
 
         $clone = $workOrder->replicate([
-            'public_id',
             'code',
             'stage',
             'confirmed_at',
@@ -1171,15 +1209,39 @@ final class WorkOrderService
             'closed_at',
             'billed_at',
             'legacy_erp_id',
+            'is_estimate',
+            'is_work_order',
+            'estimate_num',
+            'estimate_num_cardinal',
+            'estimate_numbering_pattern_id',
+            'estimate_old_num',
+            'work_order_num',
+            'work_order_num_cardinal',
+            'work_order_numbering_pattern_id',
+            'work_order_old_num',
         ]);
-        $clone->public_id = (string) Str::uuid();
         $clone->stage = WorkOrderStage::Estimate;
         $clone->confirmed_at = null;
         $clone->status_id = $estimateStatusId;
         $clone->source_work_order_id = $workOrder->id;
-        $code = $workOrder->code ?: (string) $workOrder->id;
-        $clone->subject = trim((string) $workOrder->subject).' (viene de '.$code.')';
-        $clone->code = $this->allocateCode($owner, WorkOrderStage::Estimate);
+        $clone->is_estimate = true;
+        $clone->is_work_order = false;
+        $clone->work_order_num = null;
+        $clone->work_order_num_cardinal = null;
+        $clone->work_order_numbering_pattern_id = null;
+        $clone->work_order_old_num = null;
+
+        $allocation = $this->allocateNumbering($owner, WorkOrderStage::Estimate);
+
+        if ($allocation !== null) {
+            $clone->forceFill($this->numberingAttributesForStage(WorkOrderStage::Estimate, $allocation));
+        } else {
+            $clone->estimate_num = null;
+            $clone->estimate_num_cardinal = null;
+            $clone->estimate_numbering_pattern_id = null;
+            $clone->estimate_old_num = null;
+            $clone->code = null;
+        }
 
         $clone->save();
         $clone->collaborators()->sync($workOrder->collaborators()->pluck('users.id')->all());
@@ -1215,8 +1277,17 @@ final class WorkOrderService
 
         return [
             'id' => $workOrder->id,
-            'public_id' => $workOrder->public_id,
             'code' => $workOrder->code,
+            'is_estimate' => (bool) $workOrder->is_estimate,
+            'is_work_order' => (bool) $workOrder->is_work_order,
+            'estimate_num' => $workOrder->estimate_num,
+            'estimate_num_cardinal' => $workOrder->estimate_num_cardinal,
+            'estimate_numbering_pattern_id' => $workOrder->estimate_numbering_pattern_id,
+            'estimate_old_num' => $workOrder->estimate_old_num,
+            'work_order_num' => $workOrder->work_order_num,
+            'work_order_num_cardinal' => $workOrder->work_order_num_cardinal,
+            'work_order_numbering_pattern_id' => $workOrder->work_order_numbering_pattern_id,
+            'work_order_old_num' => $workOrder->work_order_old_num,
             'subject' => $workOrder->subject,
             'reference' => $workOrder->reference,
             'purchase_order' => $workOrder->purchase_order,
@@ -1302,6 +1373,10 @@ final class WorkOrderService
         return [
             'id' => $workOrder->id,
             'code' => $workOrder->code,
+            'is_estimate' => (bool) $workOrder->is_estimate,
+            'is_work_order' => (bool) $workOrder->is_work_order,
+            'estimate_num' => $workOrder->estimate_num,
+            'work_order_num' => $workOrder->work_order_num,
             'subject' => $workOrder->subject,
             'stage' => $workOrder->stage instanceof WorkOrderStage
                 ? $workOrder->stage->value
@@ -1773,6 +1848,16 @@ final class WorkOrderService
 
     public function allocateCode(Company $owner, WorkOrderStage $stage): ?string
     {
+        $allocation = $this->allocateNumbering($owner, $stage);
+
+        return $allocation['code'] ?? null;
+    }
+
+    /**
+     * @return array{code: string, cardinal: int, numbering_pattern_id: int}|null
+     */
+    public function allocateNumbering(Company $owner, WorkOrderStage $stage): ?array
+    {
         $resource = $this->numberingResourceFor($stage);
         $existing = $this->numbering->findForResource($owner, $resource);
 
@@ -1781,7 +1866,92 @@ final class WorkOrderService
             return null;
         }
 
-        return $this->numbering->allocateNext($owner, $resource);
+        return $this->numbering->allocateNextDetails($owner, $resource);
+    }
+
+    /**
+     * @param  array{code: string, cardinal: int, numbering_pattern_id: int}  $allocation
+     * @return array<string, mixed>
+     */
+    private function numberingAttributesForStage(WorkOrderStage $stage, array $allocation): array
+    {
+        if ($stage === WorkOrderStage::Estimate) {
+            return [
+                'estimate_num' => $allocation['code'],
+                'estimate_num_cardinal' => $allocation['cardinal'],
+                'estimate_numbering_pattern_id' => $allocation['numbering_pattern_id'],
+                'code' => $allocation['code'],
+            ];
+        }
+
+        return [
+            'work_order_num' => $allocation['code'],
+            'work_order_num_cardinal' => $allocation['cardinal'],
+            'work_order_numbering_pattern_id' => $allocation['numbering_pattern_id'],
+            'code' => $allocation['code'],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function manualNumberingAttributesForStage(WorkOrderStage $stage, string $code): array
+    {
+        $trimmed = trim($code);
+
+        if ($stage === WorkOrderStage::Estimate) {
+            return [
+                'estimate_num' => $trimmed !== '' ? $trimmed : null,
+                'estimate_num_cardinal' => null,
+                'estimate_numbering_pattern_id' => null,
+                'code' => $trimmed !== '' ? $trimmed : null,
+            ];
+        }
+
+        return [
+            'work_order_num' => $trimmed !== '' ? $trimmed : null,
+            'work_order_num_cardinal' => null,
+            'work_order_numbering_pattern_id' => null,
+            'code' => $trimmed !== '' ? $trimmed : null,
+        ];
+    }
+
+    /**
+     * Keep stage-specific numbering columns aligned when the display code changes.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function syncNumberingFromCodeAttributes(WorkOrder $workOrder, array $data): array
+    {
+        if (! array_key_exists('code', $data)) {
+            return [];
+        }
+
+        $stage = $workOrder->stage instanceof WorkOrderStage
+            ? $workOrder->stage
+            : WorkOrderStage::from((string) $workOrder->stage);
+
+        $requested = trim((string) ($data['code'] ?? ''));
+        $current = $stage === WorkOrderStage::Estimate
+            ? trim((string) ($workOrder->estimate_num ?? ''))
+            : trim((string) ($workOrder->work_order_num ?? ''));
+
+        if ($requested === '' || $requested === $current) {
+            return [];
+        }
+
+        $attributes = $this->manualNumberingAttributesForStage($stage, $requested);
+
+        if ($stage === WorkOrderStage::Estimate && $current !== '') {
+            $attributes['estimate_old_num'] = $current;
+        }
+
+        if ($stage === WorkOrderStage::WorkOrder && $current !== '') {
+            $attributes['work_order_old_num'] = $current;
+        }
+
+        return $attributes;
     }
 
     /**

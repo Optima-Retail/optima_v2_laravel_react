@@ -58,6 +58,28 @@ export default function UsersIndex({ filters, roleOptions, can }: UsersIndexProp
                 titleFormatter,
             },
             {
+                title: t('users.avatar'),
+                field: 'avatar_url',
+                width: 72,
+                headerSort: false,
+                hozAlign: 'center',
+                formatter: (cell: CellComponent) => {
+                    const user = cell.getRow().getData() as UserListItem;
+                    const url = user.avatar_url;
+
+                    if (!url) {
+                        return t('common.emDash');
+                    }
+
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = user.name;
+                    img.className = 'mx-auto size-8 rounded-full object-cover';
+
+                    return img;
+                },
+            },
+            {
                 title: t('common.name'),
                 field: 'name',
                 minWidth: 160,

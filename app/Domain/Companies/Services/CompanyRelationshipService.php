@@ -12,18 +12,25 @@ use App\Domain\Companies\Support\CompanyValidation;
 use App\Domain\Config\TechnicianAlternativeDelegations\Services\TechnicianAlternativeDelegationService;
 use App\Domain\Config\TechnicianGlobalServiceTypes\Services\TechnicianGlobalServiceTypeService;
 use App\Domain\Config\TechnicianServiceTypes\Services\TechnicianServiceTypeService;
+use App\Models\ArticleClient;
 use App\Models\Brand;
 use App\Models\ClientPriority;
 use App\Models\ClientRate;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
+use App\Models\Compliment;
 use App\Models\Delegation;
+use App\Models\Form;
+use App\Models\FormTemplate;
 use App\Models\GlobalServiceType;
 use App\Models\Integration;
 use App\Models\Language;
 use App\Models\Series;
 use App\Models\ServiceType;
+use App\Models\TechnicianIncident;
+use App\Models\TechnicianRating;
 use App\Models\User;
+use App\Models\WorkOrderTechnician;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -254,10 +261,75 @@ final class CompanyRelationshipService
             return;
         }
 
+        if (! $this->canBeDeleted($relationship)) {
+            throw new \InvalidArgumentException('company_relationship_cannot_be_deleted');
+        }
+
         DB::transaction(function () use ($relationship): void {
             $relationship->collaborators()->detach();
             $relationship->softDeleteSafely();
         });
+    }
+
+    /**
+     * Operational usages that still reference this relationship and block deletion.
+     *
+     * Owned configuration (collaborators, client/technician rates, vehicles, chat,
+     * blacklist/favorites) does not block.
+     *
+     * @return list<string>
+     */
+    public function deletionBlockers(CompanyRelationship $relationship): array
+    {
+        $id = $relationship->id;
+        $blockers = [];
+
+        if (WorkOrderTechnician::query()->where('company_relationship_id', $id)->exists()) {
+            $blockers[] = 'work_order_technicians';
+        }
+
+        if (ArticleClient::query()->where('company_relationship_id', $id)->exists()) {
+            $blockers[] = 'article_clients';
+        }
+
+        if (TechnicianIncident::query()->where('technician_id', $id)->exists()) {
+            $blockers[] = 'technician_incidents';
+        }
+
+        if (TechnicianRating::query()->where('company_relationship_id', $id)->exists()) {
+            $blockers[] = 'technician_ratings';
+        }
+
+        if (DB::table('technician_request_technician')->where('company_relationship_id', $id)->exists()) {
+            $blockers[] = 'technician_requests';
+        }
+
+        if (Compliment::query()->where('company_relationship_id', $id)->exists()) {
+            $blockers[] = 'compliments';
+        }
+
+        if (Form::query()->where('company_relationship_id', $id)->exists()) {
+            $blockers[] = 'forms';
+        }
+
+        if (FormTemplate::query()->where('company_relationship_id', $id)->exists()) {
+            $blockers[] = 'form_templates';
+        }
+
+        if (DB::table('work_order_type_form_templates')->where('company_relationship_id', $id)->exists()) {
+            $blockers[] = 'work_order_type_form_templates';
+        }
+
+        if (CompanyRelationship::query()->where('reported_customer_relationship_id', $id)->exists()) {
+            $blockers[] = 'reported_customer_relationships';
+        }
+
+        return $blockers;
+    }
+
+    public function canBeDeleted(CompanyRelationship $relationship): bool
+    {
+        return $this->deletionBlockers($relationship) === [];
     }
 
     /**

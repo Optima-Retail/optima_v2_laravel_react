@@ -93,9 +93,19 @@ final class NumberingPatternService
 
     public function allocateNext(Company $company, string $resource, ?int $year = null): string
     {
+        $allocation = $this->allocateNextDetails($company, $resource, $year);
+
+        return $allocation['code'];
+    }
+
+    /**
+     * @return array{code: string, cardinal: int, numbering_pattern_id: int}
+     */
+    public function allocateNextDetails(Company $company, string $resource, ?int $year = null): array
+    {
         $year ??= (int) now()->format('Y');
 
-        return DB::transaction(function () use ($company, $resource, $year): string {
+        return DB::transaction(function () use ($company, $resource, $year): array {
             $pattern = NumberingPattern::query()
                 ->where('company_id', $company->id)
                 ->where('resource', $resource)
@@ -130,7 +140,11 @@ final class NumberingPatternService
                 'last_year' => $sequenceYear,
             ]);
 
-            return $this->format($pattern, $sequence, $year);
+            return [
+                'code' => $this->format($pattern, $sequence, $year),
+                'cardinal' => $sequence,
+                'numbering_pattern_id' => (int) $pattern->id,
+            ];
         });
     }
 

@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Head, useForm, usePage } from '@inertiajs/react';
-import { Save, Trash2 } from 'lucide-react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { ArrowRightLeft, Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
 import {
@@ -36,9 +36,12 @@ type EditEstimateProps = {
     technicianOptions: CompanyOption[];
     articleOptions: WorkOrderArticleOption[];
     fields_locked?: boolean;
+    confirmed_as_work_order?: boolean;
+    related_work_order_url?: string | null;
     chat: DocumentChatPayload | null;
     can: {
         delete: boolean;
+        update?: boolean;
         update_closed: boolean;
         view_attachments: boolean;
         view_private_attachments: boolean;
@@ -79,13 +82,15 @@ export default function EditEstimate({
     chat,
     can,
     fields_locked = false,
+    confirmed_as_work_order = false,
+    related_work_order_url = null,
 }: EditEstimateProps) {
     const { t } = useTranslation();
     const { url } = usePage();
     const [activeTab, setActiveTab] = useState(() => tabFromUrl(url, can.view_attachments));
     const form = useForm(
         defaultWorkOrderFormValues({
-            code: estimate.code ?? '',
+            code: estimate.estimate_num ?? estimate.code ?? '',
             subject: estimate.subject ?? '',
             reference: estimate.reference ?? '',
             purchase_order: estimate.purchase_order ?? '',
@@ -137,7 +142,8 @@ export default function EditEstimate({
         }),
     );
 
-    const fieldsLocked = fields_locked || (estimate.status_is_open === false && !can.update_closed);
+    const fieldsLocked = confirmed_as_work_order || fields_locked || (estimate.status_is_open === false && !can.update_closed);
+    const hideSubmit = confirmed_as_work_order;
 
     const tabItems = useMemo<TabItem[]>(() => {
         const items: TabItem[] = [
@@ -161,6 +167,10 @@ export default function EditEstimate({
 
     async function submit(event: FormEvent) {
         event.preventDefault();
+
+        if (confirmed_as_work_order) {
+            return;
+        }
 
         const result = await confirmWorkOrderStatusChange({
             t,
@@ -211,6 +221,8 @@ export default function EditEstimate({
         technicianOptions,
         articleOptions,
         sourceLabel: estimate.source_work_order_label,
+        estimateNum: estimate.estimate_num,
+        workOrderNum: estimate.work_order_num,
         currencyLabel: estimate.currency_label,
         createdAt: estimate.created_at,
         sentAt: estimate.sent_at,
@@ -220,6 +232,10 @@ export default function EditEstimate({
         onSubmit: submit,
         submitLabel: t('common.save'),
         submitIcon: <Save className="size-4" aria-hidden />,
+        hideSubmit,
+        lockedHint: confirmed_as_work_order
+            ? t('estimates.confirmedReadOnlyHint')
+            : t('workOrders.fieldsLockedHint'),
         actions:
             can.delete && activeTab === 'details' ? (
                 <Button type="button" variant="danger" onClick={destroyEstimate}>
@@ -229,7 +245,20 @@ export default function EditEstimate({
             ) : null,
     };
 
-    const title = [estimate.code, estimate.subject].filter(Boolean).join(' - ') || String(estimate.id);
+    const title = [
+        estimate.estimate_num || estimate.code,
+        estimate.subject,
+    ].filter(Boolean).join(' - ') || String(estimate.id);
+
+    const relatedWorkOrderLink = related_work_order_url ? (
+        <Link
+            href={related_work_order_url}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-surface px-3 text-sm text-ink transition-colors hover:border-brand/40 hover:text-brand"
+        >
+            <ArrowRightLeft className="size-4" aria-hidden />
+            {t('estimates.openWorkOrder')}
+        </Link>
+    ) : null;
 
     return (
         <AppLayout
@@ -250,13 +279,20 @@ export default function EditEstimate({
                 <PageHeader
                     eyebrow={t('estimates.title')}
                     title={title}
-                    description={t('common.updateDetails', {
-                        name: estimate.subject || estimate.code || estimate.id,
-                    })}
+                    description={
+                        confirmed_as_work_order
+                            ? t('estimates.confirmedReadOnlyHint')
+                            : t('common.updateDetails', {
+                                  name: estimate.subject || estimate.estimate_num || estimate.code || estimate.id,
+                              })
+                    }
                     backHref={estimatesService.indexPath}
                     backLabel={t('common.backTo', { resource: t('estimates.resourcePlural') })}
                     actions={
-                        <EstimateWorkSummary lines={form.data.lines} technicians={form.data.technicians} />
+                        <div className="flex flex-wrap items-center gap-2">
+                            {relatedWorkOrderLink}
+                            <EstimateWorkSummary lines={form.data.lines} technicians={form.data.technicians} />
+                        </div>
                     }
                 />
 

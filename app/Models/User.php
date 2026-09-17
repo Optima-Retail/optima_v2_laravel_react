@@ -16,12 +16,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable([
     'name',
     'email',
+    'avatar',
     'username',
     'password',
     'locale',
@@ -193,6 +195,15 @@ class User extends Authenticatable
             ->where('companies.id', $companyId)
             ->wherePivot('is_active', true)
             ->exists();
+    }
+
+    public function avatarUrl(): ?string
+    {
+        if ($this->avatar === null || $this->avatar === '') {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->avatar);
     }
 
     /**

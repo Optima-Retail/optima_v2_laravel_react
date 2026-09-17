@@ -9,14 +9,18 @@ use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Companies\Support\Coordinates;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
+use App\Models\Compliment;
 use App\Models\Delegation;
 use App\Models\Establishment;
 use App\Models\EstablishmentFormTemplate;
 use App\Models\EstablishmentType;
+use App\Models\Evaluation;
 use App\Models\FormTemplate;
+use App\Models\Incident;
 use App\Models\Language;
 use App\Models\Series;
 use App\Models\Timezone;
+use App\Models\WorkOrder;
 use App\Models\WorkOrderType;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -170,6 +174,10 @@ final class EstablishmentService
             return;
         }
 
+        if (! $this->canBeDeleted($establishment)) {
+            throw new \InvalidArgumentException('establishment_cannot_be_deleted');
+        }
+
         DB::transaction(function () use ($establishment): void {
             $establishment->collaborators()->detach();
             $establishment->blacklistedTechnicians()->detach();
@@ -177,6 +185,55 @@ final class EstablishmentService
             $establishment->formTemplateLinks()->delete();
             $establishment->softDeleteSafely();
         });
+    }
+
+    /**
+     * Operational usages that still reference this establishment and block deletion.
+     *
+     * Owned configuration (collaborators, attachments, blacklist/favorites, template links)
+     * does not block.
+     *
+     * @return list<string>
+     */
+    public function deletionBlockers(Establishment $establishment): array
+    {
+        $id = $establishment->id;
+        $blockers = [];
+
+        if (WorkOrder::query()->where('establishment_id', $id)->exists()) {
+            $blockers[] = 'work_orders';
+        }
+
+        if (Evaluation::query()->where('establishment_id', $id)->exists()) {
+            $blockers[] = 'evaluations';
+        }
+
+        if (DB::table('contract_establishment')->where('establishment_id', $id)->exists()) {
+            $blockers[] = 'contracts';
+        }
+
+        if (Compliment::query()->where('establishment_id', $id)->exists()) {
+            $blockers[] = 'compliments';
+        }
+
+        if (Incident::query()->where('establishment_id', $id)->exists()) {
+            $blockers[] = 'incidents';
+        }
+
+        if (FormTemplate::query()->where('establishment_id', $id)->exists()) {
+            $blockers[] = 'form_templates';
+        }
+
+        if (DB::table('work_order_type_form_templates')->where('establishment_id', $id)->exists()) {
+            $blockers[] = 'work_order_type_form_templates';
+        }
+
+        return $blockers;
+    }
+
+    public function canBeDeleted(Establishment $establishment): bool
+    {
+        return $this->deletionBlockers($establishment) === [];
     }
 
     /**

@@ -37,8 +37,10 @@ final class BrandController extends Controller
 
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
-            'created_from' => $request->string('created_from')->trim()->toString(),
-            'created_to' => $request->string('created_to')->trim()->toString(),
+            'created_at' => $request->string('created_at')->trim()->toString(),
+            'account_manager_ids' => $request->string('account_manager_ids')->trim()->toString(),
+            'commercial_manager_ids' => $request->string('commercial_manager_ids')->trim()->toString(),
+            'collaborator_ids' => $request->string('collaborator_ids')->trim()->toString(),
             'sort' => $request->string('sort')->trim()->toString() ?: 'name',
             'direction' => $request->string('direction')->trim()->toString() ?: 'asc',
             'per_page' => (string) ListQuery::perPage([
@@ -46,8 +48,11 @@ final class BrandController extends Controller
             ]),
         ];
 
+        $owner = app(ActiveCompany::class)->forUser($request->user());
+
         return Inertia::render('Config/Brands/Index', [
             'filters' => $filters,
+            'userOptions' => $this->brands->userOptions($owner),
             'can' => [
                 'create' => $request->user()?->can('create', Brand::class) ?? false,
             ],
@@ -60,10 +65,16 @@ final class BrandController extends Controller
 
         $filters = TabulatorQuery::fromRequest(
             $request,
-            allowedSorts: ['id', 'name', 'account_manager_id', 'commercial_manager_id', 'loyalty_meeting_frequency', 'created_at'],
+            allowedSorts: ['id', 'name', 'account_manager_id', 'loyalty_meeting_frequency', 'clients_count', 'created_at'],
             defaultSort: 'name',
             defaultDirection: 'asc',
-            filterKeys: ['search', 'created_from', 'created_to'],
+            filterKeys: [
+                'search',
+                'created_at',
+                'account_manager_ids',
+                'commercial_manager_ids',
+                'collaborator_ids',
+            ],
         );
 
         return TabulatorResponse::fromPaginator(
@@ -121,7 +132,8 @@ final class BrandController extends Controller
                 : [],
             'clients' => $this->brands->clientsForBrand($brand),
             'can' => [
-                'delete' => $user?->can('delete', $brand) ?? false,
+                'delete' => ($user?->can('delete', $brand) ?? false)
+                    && $this->brands->canBeDeleted($brand),
                 'update_clients' => $user?->can('company_relationships.update') ?? false,
                 'view_messages' => $canViewMessages,
                 'send_messages' => $user?->can('sendMessages', $brand) ?? false,
@@ -144,6 +156,12 @@ final class BrandController extends Controller
     public function destroy(Brand $brand): RedirectResponse
     {
         $this->authorize('delete', $brand);
+
+        if (! $this->brands->canBeDeleted($brand)) {
+            return redirect()
+                ->back()
+                ->with('error', 'brand_cannot_be_deleted');
+        }
 
         $this->brands->delete($brand);
 

@@ -3,13 +3,8 @@ export type BrandListItem = {
     name: string;
     account_manager_id: number | null;
     account_manager_name: string | null;
-    commercial_manager_id: number | null;
-    commercial_manager_name: string | null;
-    collaborator_ids: number[];
     loyalty_meeting_frequency: string | null;
-    is_quality_control_contactable: boolean;
-    send_debt_reminders: boolean;
-    created_at: string | null;
+    clients_count: number;
 };
 
 export type BrandFormData = {

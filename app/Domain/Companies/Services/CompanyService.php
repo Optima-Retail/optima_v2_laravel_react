@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -32,30 +33,48 @@ final class CompanyService
         $createdFrom = trim((string) ($filters['created_from'] ?? ''));
         $createdTo = trim((string) ($filters['created_to'] ?? ''));
         $perPage ??= ListQuery::perPage($filters);
-        [$sort, $direction] = ListQuery::sort($filters, ['id', 'name', 'tax_id', 'kind', 'is_active', 'created_at'], 'name');
+        [$sort, $direction] = ListQuery::sort(
+            $filters,
+            ['id', 'name', 'tax_id', 'kind', 'is_active', 'created_at', 'member_since'],
+            'name',
+        );
         $page = max(1, (int) ($filters['page'] ?? request()->integer('page', 1)));
+        $orderColumn = $sort === 'member_since' ? 'company_user.created_at' : "companies.{$sort}";
 
         return Company::query()
+            ->select('companies.*')
             ->with(['country', 'brand'])
             ->when($member !== null, function ($query) use ($member): void {
-                $query->whereIn('id', $member->companies()
-                    ->wherePivot('is_active', true)
-                    ->select('companies.id'));
+                $query
+                    ->join('company_user', function ($join) use ($member): void {
+                        $join->on('companies.id', '=', 'company_user.company_id')
+                            ->where('company_user.user_id', '=', $member->id)
+                            ->where('company_user.is_active', '=', true)
+                            ->whereNull('company_user.deleted_at');
+                    })
+                    ->addSelect('company_user.created_at as member_since');
             })
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner
-                        ->where('name', 'like', "%{$search}%")
-                        ->orWhere('tradename', 'like', "%{$search}%")
-                        ->orWhere('tax_id', 'like', "%{$search}%")
-                        ->orWhere('slug', 'like', "%{$search}%");
+                        ->where('companies.name', 'like', "%{$search}%")
+                        ->orWhere('companies.tradename', 'like', "%{$search}%")
+                        ->orWhere('companies.tax_id', 'like', "%{$search}%")
+                        ->orWhere('companies.slug', 'like', "%{$search}%");
                 });
             })
-            ->when($kind !== '', fn ($query) => $query->where('kind', $kind))
-            ->when($isActive === '1' || $isActive === '0', fn ($query) => $query->where('is_active', $isActive === '1'))
-            ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
-            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
-            ->orderBy($sort, $direction)
+            ->when($kind !== '', fn ($query) => $query->where('companies.kind', $kind))
+            ->when(
+                $isActive === '1' || $isActive === '0',
+                fn ($query) => $query->where('companies.is_active', $isActive === '1'),
+            )
+            ->when($createdFrom !== '', fn ($query) => $query->whereDate('companies.created_at', '>=', $createdFrom))
+            ->when($createdTo !== '', fn ($query) => $query->whereDate('companies.created_at', '<=', $createdTo))
+            ->when(
+                $sort === 'member_since' && $member === null,
+                fn ($query) => $query->orderBy('companies.created_at', $direction),
+                fn ($query) => $query->orderBy($orderColumn, $direction),
+            )
             ->paginate($perPage, ['*'], 'page', $page)
             ->withQueryString();
     }
@@ -344,6 +363,8 @@ final class CompanyService
      */
     public function toListItem(Company $company): array
     {
+        $memberSince = $company->getAttribute('member_since');
+
         return [
             'id' => $company->id,
             'name' => $company->name,
@@ -354,6 +375,9 @@ final class CompanyService
             'logo_url' => $company->logoUrl(),
             'is_active' => $company->is_active,
             'created_at' => $company->created_at?->toIso8601String(),
+            'member_since' => $memberSince
+                ? Carbon::parse($memberSince)->toIso8601String()
+                : null,
         ];
     }
 

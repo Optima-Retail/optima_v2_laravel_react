@@ -49,7 +49,6 @@ final class CompanyController extends Controller
             'can' => [
                 'create' => $request->user()?->can('create', Company::class) ?? false,
                 'update' => $request->user()?->can('companies.update') ?? false,
-                'delete' => $request->user()?->can('companies.delete') ?? false,
             ],
         ]);
     }
@@ -60,7 +59,7 @@ final class CompanyController extends Controller
 
         $filters = TabulatorQuery::fromRequest(
             $request,
-            allowedSorts: ['id', 'name', 'tax_id', 'kind', 'is_active', 'created_at'],
+            allowedSorts: ['id', 'name', 'tax_id', 'kind', 'is_active', 'created_at', 'member_since'],
             defaultSort: 'name',
             defaultDirection: 'asc',
             filterKeys: ['search', 'kind', 'is_active', 'created_from', 'created_to'],

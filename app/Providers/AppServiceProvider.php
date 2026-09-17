@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Domain\WorkOrders\Enums\WorkOrderStage;
 use App\Models\Role;
 use App\Models\WorkOrder;
 use App\Policies\RolePolicy;
@@ -26,14 +25,14 @@ class AppServiceProvider extends ServiceProvider
         Route::bind('estimate', function (string $value): WorkOrder {
             return WorkOrder::query()
                 ->whereKey($value)
-                ->where('stage', WorkOrderStage::Estimate->value)
+                ->where('is_estimate', true)
                 ->firstOrFail();
         });
 
         Route::bind('work_order', function (string $value): WorkOrder {
             return WorkOrder::query()
                 ->whereKey($value)
-                ->where('stage', WorkOrderStage::WorkOrder->value)
+                ->where('is_work_order', true)
                 ->firstOrFail();
         });
     }

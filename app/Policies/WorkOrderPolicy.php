@@ -20,7 +20,7 @@ final class WorkOrderPolicy
 
     public function view(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isConfirmedWorkOrder()
+        return (bool) $workOrder->is_work_order
             && $this->allows($user, 'view')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
@@ -32,56 +32,56 @@ final class WorkOrderPolicy
 
     public function update(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isConfirmedWorkOrder()
+        return (bool) $workOrder->is_work_order
             && $this->allows($user, 'update')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
 
     public function updateClosed(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isConfirmedWorkOrder()
+        return (bool) $workOrder->is_work_order
             && $this->allows($user, 'update-closed')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
 
     public function delete(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isConfirmedWorkOrder()
+        return (bool) $workOrder->is_work_order
             && $this->allows($user, 'delete')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
 
     public function viewAttachments(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isConfirmedWorkOrder()
+        return (bool) $workOrder->is_work_order
             && $this->allows($user, 'view-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
 
     public function uploadAttachments(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isConfirmedWorkOrder()
+        return (bool) $workOrder->is_work_order
             && $this->allows($user, 'upload-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
 
     public function downloadAttachments(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isConfirmedWorkOrder()
+        return (bool) $workOrder->is_work_order
             && $this->allows($user, 'download-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
 
     public function deleteAttachments(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isConfirmedWorkOrder()
+        return (bool) $workOrder->is_work_order
             && $this->allows($user, 'delete-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
 
     public function viewPrivateAttachments(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isConfirmedWorkOrder()
+        return (bool) $workOrder->is_work_order
             && $this->allows($user, 'view-private-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }

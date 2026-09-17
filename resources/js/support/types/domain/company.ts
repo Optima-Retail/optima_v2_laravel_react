@@ -8,6 +8,7 @@ export type CompanyListItem = {
     logo_url: string | null;
     is_active: boolean;
     created_at: string | null;
+    member_since: string | null;
 };
 
 export type CompanyFormData = {

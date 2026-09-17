@@ -52,6 +52,7 @@ export const estimatesService = {
 
     createPath: `${base}/create`,
     editPath: (id: number) => `${base}/${id}/edit`,
+    pdfPath: (id: number) => `${base}/${id}/pdf`,
     indexPath: base,
     dataPath: `${base}/data`,
     totalsPath: `${base}/totals`,

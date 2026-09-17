@@ -201,7 +201,8 @@ final class CompanyRelationshipController extends Controller
             ),
             'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
             'can' => [
-                'delete' => $request->user()?->can('delete', $relationship) ?? false,
+                'delete' => ($request->user()?->can('delete', $relationship) ?? false)
+                    && $this->relationships->canBeDeleted($relationship),
             ],
         ]);
     }
@@ -236,7 +237,8 @@ final class CompanyRelationshipController extends Controller
             ),
             'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
             'can' => [
-                'delete' => $request->user()?->can('delete', $relationship) ?? false,
+                'delete' => ($request->user()?->can('delete', $relationship) ?? false)
+                    && $this->relationships->canBeDeleted($relationship),
             ],
         ]);
     }
@@ -264,7 +266,8 @@ final class CompanyRelationshipController extends Controller
                 ? $this->chats->payload(ChatDocumentType::Technician, (int) $relationship->id, $user)
                 : null,
             'can' => [
-                'delete' => $user?->can('delete', $relationship) ?? false,
+                'delete' => ($user?->can('delete', $relationship) ?? false)
+                    && $this->relationships->canBeDeleted($relationship),
                 'viewIncidents' => $user?->can('technician_incidents.view') ?? false,
                 'post_chat' => $user?->can('update', $relationship) ?? false,
             ],
@@ -318,6 +321,12 @@ final class CompanyRelationshipController extends Controller
         $this->assertKind($relationship, self::CLIENT_KINDS);
         $this->authorize('delete', $relationship);
 
+        if (! $this->relationships->canBeDeleted($relationship)) {
+            return redirect()
+                ->back()
+                ->with('error', 'client_cannot_be_deleted');
+        }
+
         $this->relationships->delete($relationship);
 
         return redirect()
@@ -330,6 +339,12 @@ final class CompanyRelationshipController extends Controller
         $this->assertKind($relationship, self::SUPPLIER_KINDS);
         $this->authorize('delete', $relationship);
 
+        if (! $this->relationships->canBeDeleted($relationship)) {
+            return redirect()
+                ->back()
+                ->with('error', 'supplier_cannot_be_deleted');
+        }
+
         $this->relationships->delete($relationship);
 
         return redirect()
@@ -341,6 +356,12 @@ final class CompanyRelationshipController extends Controller
     {
         $this->assertKind($relationship, self::TECHNICIAN_KINDS);
         $this->authorize('delete', $relationship);
+
+        if (! $this->relationships->canBeDeleted($relationship)) {
+            return redirect()
+                ->back()
+                ->with('error', 'technician_cannot_be_deleted');
+        }
 
         $this->relationships->delete($relationship);
 

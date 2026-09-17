@@ -142,7 +142,7 @@ final class WorkOrdersCrudTest extends TestCase
 
         $this->assertTrue($clone->isEstimate());
         $this->assertSame($pending->id, $clone->status_id);
-        $this->assertStringContainsString('viene de WO-200', (string) $clone->subject);
+        $this->assertSame('Job to reject', (string) $clone->subject);
         $this->assertNotSame($workOrder->id, $clone->id);
 
         $response->assertRedirect(route('estimates.edit', $clone));

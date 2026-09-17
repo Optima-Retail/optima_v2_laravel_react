@@ -64,6 +64,7 @@ use App\Http\Controllers\Web\Forms\FormController;
 use App\Http\Controllers\Web\FormTemplates\FormTemplateController;
 use App\Http\Controllers\Web\Incidents\IncidentController;
 use App\Http\Controllers\Web\LocaleController;
+use App\Http\Controllers\Web\Profile\ProfileController;
 use App\Http\Controllers\Web\SavedFilters\SavedFilterController;
 use App\Http\Controllers\Web\SwitchCompany\SwitchCompanyController;
 use App\Http\Controllers\Web\TechnicianRequests\TechnicianRequestController;
@@ -85,6 +86,8 @@ Route::get('/forms/public/{public_id}', [FormController::class, 'showPublic'])
 Route::middleware('auth')->group(function (): void {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
+    Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
     Route::post('/me/company/switch', SwitchCompanyController::class)->name('me.company.switch');
 
     Route::get('/field-help', [FieldHelpController::class, 'resolve'])->name('field-help.resolve');
@@ -116,6 +119,8 @@ Route::middleware('auth')->group(function (): void {
     Route::middleware('permission:companies.view')->group(function (): void {
         Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
         Route::get('/companies/data', [CompanyController::class, 'data'])->name('companies.data');
+        Route::delete('/companies/{company}/membership', [CompanyMemberController::class, 'leave'])
+            ->name('companies.membership.leave');
     });
 
     Route::middleware('permission:companies.create')->group(function (): void {
@@ -352,6 +357,9 @@ Route::middleware('auth')->group(function (): void {
                 ->name('estimates.technician-search');
             Route::get('/estimates/client-rates', [EstimateController::class, 'clientRates'])
                 ->name('estimates.client-rates');
+            Route::get('/estimates/{estimate}/pdf', [EstimateController::class, 'downloadPdf'])
+                ->whereNumber('estimate')
+                ->name('estimates.pdf');
         });
 
         Route::middleware('permission:estimates.create')->group(function (): void {

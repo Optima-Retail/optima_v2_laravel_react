@@ -4,6 +4,7 @@ export type UserListItem = {
     id: number;
     name: string;
     email: string;
+    avatar_url: string | null;
     roles: string[];
     is_active: boolean;
     created_at: string | null;
@@ -13,6 +14,7 @@ export type UserFormData = {
     id: number;
     name: string;
     email: string;
+    avatar_url: string | null;
     username: string | null;
     locale: string | null;
     manager_id: number | null;

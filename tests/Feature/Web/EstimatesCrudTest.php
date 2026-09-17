@@ -352,6 +352,49 @@ final class EstimatesCrudTest extends TestCase
         $this->assertDatabaseHas('articles', ['id' => $other->id]);
     }
 
+    public function test_admin_can_download_estimate_pdf(): void
+    {
+        [$admin, $establishment, $pending, , , , , $type] = $this->seedContext();
+
+        $estimate = WorkOrder::factory()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $pending->id,
+            'stage' => WorkOrderStage::Estimate,
+            'is_estimate' => true,
+            'is_work_order' => false,
+            'work_order_type_id' => $type->id,
+            'subject' => 'PDF estimate',
+            'code' => 'EST-PDF-1',
+            'estimate_num' => 'EST-PDF-1',
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->get(route('estimates.pdf', $estimate));
+
+        $response->assertOk();
+        $this->assertStringContainsString('application/pdf', (string) $response->headers->get('content-type'));
+        $this->assertStringContainsString('inline', (string) $response->headers->get('content-disposition'));
+        $this->assertNotEmpty($response->getContent());
+        $this->assertStringStartsWith('%PDF', (string) $response->getContent());
+    }
+
+    public function test_pure_work_order_cannot_download_estimate_pdf(): void
+    {
+        [$admin, $establishment, , , $received, , , $type] = $this->seedContext();
+
+        $workOrder = WorkOrder::factory()->workOrder()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $received->id,
+            'work_order_type_id' => $type->id,
+            'subject' => 'Not an estimate',
+            'code' => 'OT-NO-PDF',
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/estimates/'.$workOrder->id.'/pdf')
+            ->assertNotFound();
+    }
+
     public function test_approving_an_estimate_confirms_it_and_redirects_to_work_orders(): void
     {
         [$admin, $establishment, $pending, $approved, $received] = $this->seedContext();
@@ -372,7 +415,7 @@ final class EstimatesCrudTest extends TestCase
                 'is_urgent' => false,
                 'code' => $estimate->code,
             ])
-            ->assertRedirect(route('work-orders.edit', $estimate))
+            ->assertRedirect(route('estimates.edit', $estimate))
             ->assertSessionHas('success', 'work_order_confirmed_successfully');
 
         $estimate->refresh();
@@ -380,7 +423,12 @@ final class EstimatesCrudTest extends TestCase
         $this->assertTrue($estimate->isConfirmedWorkOrder());
         $this->assertSame($received->id, $estimate->status_id);
         $this->assertNotNull($estimate->confirmed_at);
-        $this->assertStringContainsString('viene de PR26/00001', (string) $estimate->subject);
+        $this->assertTrue($estimate->is_estimate);
+        $this->assertTrue($estimate->is_work_order);
+        $this->assertSame('PR26/00001', $estimate->estimate_num);
+        $this->assertNotNull($estimate->work_order_num);
+        $this->assertSame($estimate->work_order_num, $estimate->code);
+        $this->assertSame('Quote to confirm', (string) $estimate->subject);
         $this->assertNotSame(7, $approved->id);
         $this->assertNotSame(14, $received->id);
     }
@@ -624,6 +672,58 @@ final class EstimatesCrudTest extends TestCase
         $this->actingAs($admin)
             ->get("/estimates/{$workOrder->id}/edit")
             ->assertNotFound();
+    }
+
+    public function test_confirmed_estimate_remains_visible_in_estimates_list(): void
+    {
+        [$admin, $establishment, $pending, $approved, $received] = $this->seedContext();
+
+        $estimate = WorkOrder::factory()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $pending->id,
+            'stage' => WorkOrderStage::Estimate,
+            'subject' => 'Quote stays listed',
+            'code' => 'PR-LIST-1',
+            'owner_company_id' => $admin->fresh()?->active_company_id,
+        ]);
+
+        $this->actingAs($admin)
+            ->put("/estimates/{$estimate->id}", [
+                'subject' => 'Quote stays listed',
+                'status_id' => $approved->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => $estimate->code,
+            ])
+            ->assertRedirect(route('estimates.edit', $estimate));
+
+        $estimate->refresh();
+
+        $this->assertTrue($estimate->is_estimate);
+        $this->assertTrue($estimate->is_work_order);
+        $this->assertTrue($estimate->isConfirmedWorkOrder());
+
+        $this->actingAs($admin)
+            ->getJson('/estimates/data?pending=')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $estimate->id, 'is_estimate' => true]);
+
+        $this->actingAs($admin)
+            ->get("/estimates/{$estimate->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Estimates/Edit')
+                ->where('confirmed_as_work_order', true)
+                ->where('fields_locked', true)
+                ->where('related_work_order_url', route('work-orders.edit', $estimate))
+                ->where('can.update', false));
+
+        $this->actingAs($admin)
+            ->get("/work-orders/{$estimate->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('WorkOrders/Edit')
+                ->where('related_estimate_url', route('estimates.edit', $estimate)));
     }
 
     public function test_user_without_permission_cannot_view_estimates(): void

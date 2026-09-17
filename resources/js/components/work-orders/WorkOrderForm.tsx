@@ -65,10 +65,13 @@ type WorkOrderFormProps = {
     technicianOptions: CompanyOption[];
     articleOptions: WorkOrderArticleOption[];
     sourceLabel?: string | null;
+    estimateNum?: string | null;
+    workOrderNum?: string | null;
     onChange: (key: keyof WorkOrderFormValues, value: WorkOrderFormValues[keyof WorkOrderFormValues]) => void;
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
     submitIcon?: ReactNode;
+    hideSubmit?: boolean;
     actions?: ReactNode;
 };
 
@@ -171,10 +174,13 @@ export function WorkOrderForm({
     technicianOptions,
     articleOptions,
     sourceLabel,
+    estimateNum = null,
+    workOrderNum = null,
     onChange,
     onSubmit,
     submitLabel,
     submitIcon,
+    hideSubmit = false,
     actions,
 }: WorkOrderFormProps) {
     const { t } = useTranslation();
@@ -238,6 +244,18 @@ export function WorkOrderForm({
                             <p className="text-xs text-ink-muted">{t('workOrders.codeAutomaticHint')}</p>
                         ) : null}
                     </Field>
+
+                    {estimateNum && values.stage === 'work_order' ? (
+                        <Field label={t('workOrders.estimateNum')} htmlFor="estimate_num_readonly">
+                            <Input id="estimate_num_readonly" value={estimateNum} readOnly disabled />
+                        </Field>
+                    ) : null}
+
+                    {workOrderNum && values.stage === 'estimate' ? (
+                        <Field label={t('workOrders.workOrderNum')} htmlFor="work_order_num_readonly">
+                            <Input id="work_order_num_readonly" value={workOrderNum} readOnly disabled />
+                        </Field>
+                    ) : null}
 
                     <Field label={t('workOrders.stage')} htmlFor="stage" error={errors.stage} required className={stageLocked ? 'hidden' : undefined}>
                         <Select
@@ -634,10 +652,12 @@ export function WorkOrderForm({
 
                 <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
                     {actions}
-                    <Button type="submit" loading={processing}>
-                        {submitIcon}
-                        {submitLabel}
-                    </Button>
+                    {!hideSubmit ? (
+                        <Button type="submit" loading={processing}>
+                            {submitIcon}
+                            {submitLabel}
+                        </Button>
+                    ) : null}
                 </div>
             </form>
         </FieldHelpScope>

@@ -50,6 +50,9 @@ final class WorkOrderSchemaTest extends TestCase
 
         $this->assertTrue($workOrder->isEstimate());
         $this->assertNull($workOrder->confirmed_at);
+        $this->assertTrue($workOrder->is_estimate);
+        $this->assertFalse($workOrder->is_work_order);
+        $this->assertSame($workOrder->code, $workOrder->estimate_num);
 
         $confirmed = app(WorkOrderConfirmationService::class)->confirm($workOrder, $received->id);
 
@@ -57,6 +60,9 @@ final class WorkOrderSchemaTest extends TestCase
         $this->assertNotNull($confirmed->confirmed_at);
         $this->assertSame($received->id, $confirmed->status_id);
         $this->assertSame($workOrder->id, $confirmed->id);
+        $this->assertTrue($confirmed->is_estimate);
+        $this->assertTrue($confirmed->is_work_order);
+        $this->assertNotNull($confirmed->estimate_num);
 
         $this->expectException(InvalidArgumentException::class);
         app(WorkOrderConfirmationService::class)->confirm($confirmed);

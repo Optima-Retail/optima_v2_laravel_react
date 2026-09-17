@@ -164,7 +164,8 @@ final class EstablishmentController extends Controller
             'workOrderTypeOptions' => $this->establishments->workOrderTypeOptions(),
             'formTemplateOptions' => $this->establishments->formTemplateOptions($owner),
             'can' => [
-                'delete' => $user?->can('delete', $establishment) ?? false,
+                'delete' => ($user?->can('delete', $establishment) ?? false)
+                    && $this->establishments->canBeDeleted($establishment),
                 'view_attachments' => $canViewAttachments,
                 'upload_attachments' => $user?->can('uploadAttachments', $establishment) ?? false,
                 'download_attachments' => $user?->can('downloadAttachments', $establishment) ?? false,
@@ -194,6 +195,12 @@ final class EstablishmentController extends Controller
     public function destroy(Establishment $establishment): RedirectResponse
     {
         $this->authorize('delete', $establishment);
+
+        if (! $this->establishments->canBeDeleted($establishment)) {
+            return redirect()
+                ->back()
+                ->with('error', 'establishment_cannot_be_deleted');
+        }
 
         $this->establishments->delete($establishment);
 

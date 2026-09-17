@@ -1,4 +1,5 @@
 export { authService } from '@/services/auth';
+export { profileService } from '@/services/profile';
 export { usersService } from '@/services/users';
 export { rolesService } from '@/services/roles';
 export { workOrderTypesService } from '@/services/workOrderTypes';

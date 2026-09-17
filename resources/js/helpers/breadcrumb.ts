@@ -7,6 +7,7 @@ export type BreadcrumbItem = {
 
 const labelKeys: Record<string, string> = {
     dashboard: 'nav.overview',
+    profile: 'profile.title',
     config: 'nav.configuration',
     users: 'nav.users',
     roles: 'nav.roles',

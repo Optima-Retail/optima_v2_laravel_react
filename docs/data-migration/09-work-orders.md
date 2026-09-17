@@ -34,6 +34,15 @@ These must exist **before** inserting `work_orders` rows (they already do):
 
 **v2 going forward:** one row. Starts as `stage = estimate`. Confirming sets `stage = work_order` and `confirmed_at`. Same id, same children.
 
+**Identity + numbering (traceability):**
+
+| Column group | Purpose |
+| --- | --- |
+| `is_estimate` / `is_work_order` | Identity flags (at least one must be true; both true after in-place confirm) |
+| `estimate_num`, `estimate_num_cardinal`, `estimate_numbering_pattern_id`, `estimate_old_num` | Presupuesto numbering slot (kept after confirm) |
+| `work_order_num`, `work_order_num_cardinal`, `work_order_numbering_pattern_id`, `work_order_old_num` | OT numbering slot (allocated on confirm / WO create) |
+| `code` | Display code for the **current** stage (synced from the active slot) |
+
 **v2 data import of historical pairs:** still **two rows** in `work_orders` (each keeps its code and status), linked by `source_work_order_id`. Do not silently collapse a presupuesto+OT pair into one row — they can diverge after conversion. In-place confirm is the **new** product behaviour.
 
 ---

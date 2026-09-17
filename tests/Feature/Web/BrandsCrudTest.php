@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature\Web;
 
 use App\Domain\Auth\Enums\RoleEnum;
+use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Models\Brand;
+use App\Models\Company;
+use App\Models\CompanyRelationship;
 use App\Models\User;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,6 +39,7 @@ final class BrandsCrudTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Config/Brands/Index')
                 ->has('filters')
+                ->has('userOptions')
                 ->has('can.create')
                 ->missing('brands'));
 
@@ -139,5 +143,42 @@ final class BrandsCrudTest extends TestCase
                 ->component('Config/Brands/Index')
                 ->where('auth.company', null)
                 ->has('auth.companies', 0));
+    }
+
+    public function test_brand_linked_to_client_cannot_be_deleted(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleEnum::Admin->value);
+
+        $brand = Brand::query()->create([
+            'name' => 'LINKED BRAND',
+            'is_quality_control_contactable' => false,
+            'send_debt_reminders' => false,
+        ]);
+
+        $owner = Company::factory()->create();
+        $client = Company::factory()->create();
+
+        CompanyRelationship::factory()->create([
+            'owner_company_id' => $owner->id,
+            'related_company_id' => $client->id,
+            'kind' => CompanyRelationshipKind::Customer,
+            'brand_id' => $brand->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('brands.edit', $brand))
+            ->delete("/brands/{$brand->id}")
+            ->assertRedirect(route('brands.edit', $brand))
+            ->assertSessionHas('error', 'brand_cannot_be_deleted');
+
+        $this->assertNotSoftDeleted($brand);
+
+        $this->actingAs($admin)
+            ->get("/brands/{$brand->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Config/Brands/Edit')
+                ->where('can.delete', false));
     }
 }

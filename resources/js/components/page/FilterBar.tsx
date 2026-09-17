@@ -3,6 +3,7 @@ import { ChevronDown, RotateCcw, Search } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { MultiSelect } from '@/components/ui/MultiSelect';
 import { Select } from '@/components/ui/Select';
 import { cn } from '@/support/cn';
 
@@ -26,6 +27,11 @@ export type FilterField =
           type: 'select';
           options: FilterOption[];
           emptyLabel?: string;
+      })
+    | (FilterFieldBase & {
+          type: 'multiselect';
+          options: FilterOption[];
+          placeholder?: string;
       });
 
 type FilterBarProps = {
@@ -41,6 +47,17 @@ type FilterBarProps = {
     /** When true, filters start collapsed behind a toggle (main index tables). */
     collapsible?: boolean;
 };
+
+function splitCsv(value: string | undefined): string[] {
+    if (!value?.trim()) {
+        return [];
+    }
+
+    return value
+        .split(',')
+        .map((part) => part.trim())
+        .filter(Boolean);
+}
 
 export function FilterBar({
     fields,
@@ -104,6 +121,28 @@ export function FilterBar({
                                     className={field.type === 'search' ? 'pl-10' : undefined}
                                 />
                             </div>
+                        </div>
+                    );
+                }
+
+                if (field.type === 'multiselect') {
+                    return (
+                        <div key={field.name} className={cn('min-w-0', field.className)}>
+                            {field.label ? (
+                                <label
+                                    htmlFor={`filter-${field.name}`}
+                                    className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-ink-muted"
+                                >
+                                    {field.label}
+                                </label>
+                            ) : null}
+                            <MultiSelect
+                                id={`filter-${field.name}`}
+                                options={field.options}
+                                value={splitCsv(values[field.name])}
+                                placeholder={field.placeholder}
+                                onChange={(next) => onChange(field.name, next.join(','))}
+                            />
                         </div>
                     );
                 }

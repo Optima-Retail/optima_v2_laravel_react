@@ -9,9 +9,12 @@ use Illuminate\Support\Facades\Schema;
 /**
  * Merged legacy `presupuestos` + `ots` → `work_orders`.
  *
- * Stage:
- * - estimate: status_id points to work_order_statuses.kind = estimate, confirmed_at null
- * - work_order: status_id points to work_order_statuses.kind = work_order, confirmed_at set
+ * Stage (`estimate` | `work_order`) is the current lifecycle for filters/status.
+ * Flags `is_estimate` / `is_work_order` track identity (at least one must be true;
+ * both true after in-place confirm). Numbering is stored per role so confirming
+ * a presupuesto keeps estimate_num* and adds work_order_num*.
+ *
+ * `code` is the display code for the current stage (synced from estimate_num or work_order_num).
  *
  * Confirm in place (same row). Historical presupuesto+OT pairs stay two rows linked by source_work_order_id.
  *
@@ -25,8 +28,19 @@ return new class extends Migration
     {
         Schema::create('work_orders', function (Blueprint $table): void {
             $table->id();
-            $table->uuid('public_id')->unique();
             $table->string('code', 64)->nullable();
+            $table->boolean('is_estimate')->default(false);
+            $table->boolean('is_work_order')->default(false);
+            $table->string('estimate_num', 64)->nullable();
+            $table->unsignedInteger('estimate_num_cardinal')->nullable();
+            $table->foreignId('estimate_numbering_pattern_id')->nullable()
+                ->constrained('numbering_patterns')->nullOnDelete();
+            $table->string('estimate_old_num', 64)->nullable();
+            $table->string('work_order_num', 64)->nullable();
+            $table->unsignedInteger('work_order_num_cardinal')->nullable();
+            $table->foreignId('work_order_numbering_pattern_id')->nullable()
+                ->constrained('numbering_patterns')->nullOnDelete();
+            $table->string('work_order_old_num', 64)->nullable();
             $table->string('subject');
             $table->string('reference')->nullable();
             $table->string('purchase_order')->nullable();
@@ -91,6 +105,9 @@ return new class extends Migration
             $table->index(['establishment_id', 'stage']);
             $table->index(['owner_company_id', 'stage']);
             $table->index('code');
+            $table->index('estimate_num');
+            $table->index('work_order_num');
+            $table->index(['is_estimate', 'is_work_order']);
             $table->index('legacy_erp_id');
         });
     }

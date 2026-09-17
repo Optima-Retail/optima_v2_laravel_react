@@ -35,6 +35,7 @@ final class UpdateUserRequest extends FormRequest
                 static fn ($id) => is_numeric($id) ? (int) $id : null,
                 $companyIds,
             ))),
+            'remove_avatar' => $this->boolean('remove_avatar'),
         ]);
     }
 
@@ -65,6 +66,8 @@ final class UpdateUserRequest extends FormRequest
                 Rule::unique('users', 'username')->whereNull('deleted_at')->ignore($user->id),
             ],
             'password' => ['nullable', 'confirmed', Password::defaults()],
+            'avatar' => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp,gif'],
+            'remove_avatar' => ['sometimes', 'boolean'],
             'locale' => ['nullable', 'string', Rule::in(Locale::supported())],
             'manager_id' => [
                 'nullable',

@@ -51,6 +51,8 @@ export default function EditUser({ user, roleOptions, formOptions, can }: EditUs
         password_confirmation: '',
         roles: user.roles,
         company_ids: (user.company_ids ?? []).map(String),
+        avatar: null as File | null,
+        remove_avatar: false,
     });
 
     function submit(event: FormEvent) {
@@ -92,6 +94,7 @@ export default function EditUser({ user, roleOptions, formOptions, can }: EditUs
                     processing={form.processing}
                     roleOptions={roleOptions}
                     formOptions={formOptions}
+                    currentAvatarUrl={user.avatar_url}
                     onChange={(key, value) => form.setData((data) => ({ ...data, [key]: value }))}
                     onSubmit={submit}
                     submitLabel={t('common.save')}

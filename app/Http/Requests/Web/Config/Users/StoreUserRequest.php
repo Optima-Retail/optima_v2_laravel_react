@@ -32,6 +32,7 @@ final class StoreUserRequest extends FormRequest
                 static fn ($id) => is_numeric($id) ? (int) $id : null,
                 $companyIds,
             ))),
+            'remove_avatar' => $this->boolean('remove_avatar'),
         ]);
     }
 
@@ -55,6 +56,8 @@ final class StoreUserRequest extends FormRequest
             ],
             'username' => ['nullable', 'string', 'max:255', Rule::unique('users', 'username')->whereNull('deleted_at')],
             'password' => ['required', 'confirmed', Password::defaults()],
+            'avatar' => ['nullable', 'image', 'max:2048', 'mimes:jpg,jpeg,png,webp,gif'],
+            'remove_avatar' => ['sometimes', 'boolean'],
             'locale' => ['nullable', 'string', Rule::in(Locale::supported())],
             'manager_id' => ['nullable', 'integer', $memberUser],
             'team_leader_id' => ['nullable', 'integer', $memberUser],

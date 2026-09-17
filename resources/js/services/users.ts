@@ -19,11 +19,11 @@ export const usersService = {
     },
 
     store(form: InertiaFormPoster) {
-        form.post(base);
+        form.post(base, { forceFormData: true });
     },
 
     update(id: number, form: InertiaFormPoster) {
-        form.put(`${base}/${id}`);
+        form.put(`${base}/${id}`, { forceFormData: true });
     },
 
     destroy(id: number, options: Record<string, unknown> = {}) {

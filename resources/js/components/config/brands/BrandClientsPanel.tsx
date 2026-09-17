@@ -3,6 +3,8 @@ import { Building2, Pencil } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CompanyOptionLabel } from '@/components/companies/CompanyOptionLabel';
 import { badgeVariantForRelationshipStatus } from '@/components/ui/Badge';
+import { Field } from '@/components/ui/Field';
+import { Toggle } from '@/components/ui/Toggle';
 import type { BrandClientRow } from '@/services/brands';
 import { clientsService } from '@/services/clients';
 import { cn } from '@/support/cn';
@@ -10,6 +12,8 @@ import { cn } from '@/support/cn';
 type BrandClientsPanelProps = {
     clients: BrandClientRow[];
     canEdit: boolean;
+    sendDebtReminders: boolean;
+    onToggleDebtReminders: (checked: boolean) => void;
 };
 
 const badgeVariantClassName: Record<string, string> = {
@@ -20,7 +24,12 @@ const badgeVariantClassName: Record<string, string> = {
     brand: 'bg-brand-soft text-brand',
 };
 
-export function BrandClientsPanel({ clients, canEdit }: BrandClientsPanelProps) {
+export function BrandClientsPanel({
+    clients,
+    canEdit,
+    sendDebtReminders,
+    onToggleDebtReminders,
+}: BrandClientsPanelProps) {
     const { t } = useTranslation();
 
     return (
@@ -29,6 +38,17 @@ export function BrandClientsPanel({ clients, canEdit }: BrandClientsPanelProps) 
                 <h2 className="text-base font-semibold text-ink">{t('brands.clientsTabTitle')}</h2>
                 <p className="mt-1 text-sm text-ink-muted">{t('brands.clientsTabDescription')}</p>
             </div>
+
+            <Field label={t('brands.debtReminders')} htmlFor="send_debt_reminders" className="max-w-xs">
+                <Toggle
+                    id="send_debt_reminders"
+                    helpField={false}
+                    checked={sendDebtReminders}
+                    onCheckedChange={onToggleDebtReminders}
+                    checkedLabel={t('brands.sendReminders')}
+                    uncheckedLabel={t('brands.doNotSendReminders')}
+                />
+            </Field>
 
             {clients.length === 0 ? (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-line px-6 py-12 text-center">

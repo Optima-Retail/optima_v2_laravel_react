@@ -9,6 +9,7 @@ use App\Domain\Chats\Services\DocumentChatService;
 use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\Config\NumberingPatterns\Services\NumberingPatternService;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
+use App\Domain\WorkOrders\Services\EstimatePdfService;
 use App\Domain\WorkOrders\Services\TechnicianSearchService;
 use App\Domain\WorkOrders\Services\WorkOrderAttachmentService;
 use App\Domain\WorkOrders\Services\WorkOrderService;
@@ -32,6 +33,7 @@ use App\Support\TabulatorResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Http\UploadedFile;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -48,6 +50,7 @@ final class EstimateController extends Controller
         private readonly NumberingPatternService $numberingPatterns,
         private readonly DocumentChatService $chats,
         private readonly TechnicianSearchService $technicianSearch,
+        private readonly EstimatePdfService $estimatePdf,
     ) {}
 
     public function index(Request $request): Response
@@ -95,7 +98,7 @@ final class EstimateController extends Controller
             defaultDirection: 'desc',
             filterKeys: ['search', 'pending', 'created_from', 'created_to', 'establishment_id'],
         );
-        $filters['stage'] = WorkOrderStage::Estimate->value;
+        $filters['is_estimate'] = true;
 
         $scopedToEstablishment = (int) ($filters['establishment_id'] ?? 0) > 0;
 
@@ -121,7 +124,7 @@ final class EstimateController extends Controller
             'created_from' => $request->string('created_from')->trim()->toString(),
             'created_to' => $request->string('created_to')->trim()->toString(),
             'establishment_id' => $request->integer('establishment_id') ?: null,
-            'stage' => WorkOrderStage::Estimate->value,
+            'is_estimate' => true,
         ];
 
         if (! $request->has('pending') && ($filters['pending'] ?? '') === '') {
@@ -129,6 +132,13 @@ final class EstimateController extends Controller
         }
 
         return response()->json($this->workOrders->totalsForOwner($owner, $filters));
+    }
+
+    public function downloadPdf(WorkOrder $estimate): HttpResponse
+    {
+        $this->authorizeEstimate('view', $estimate);
+
+        return $this->estimatePdf->stream($estimate);
     }
 
     public function bulkStatus(BulkUpdateEstimateStatusRequest $request): JsonResponse
@@ -214,7 +224,13 @@ final class EstimateController extends Controller
 
     public function edit(Request $request, WorkOrder $estimate): Response
     {
-        $this->authorizeEstimate('update', $estimate);
+        $confirmedAsWorkOrder = $estimate->isConfirmedWorkOrder();
+
+        if ($confirmedAsWorkOrder) {
+            $this->authorizeEstimate('view', $estimate);
+        } else {
+            $this->authorizeEstimate('update', $estimate);
+        }
 
         $owner = $this->activeCompany($request);
         $user = $request->user();
@@ -223,41 +239,50 @@ final class EstimateController extends Controller
         $canViewAttachments = $user !== null && $policy->viewAttachments($user, $estimate);
         $canViewPrivateAttachments = $user !== null && $policy->viewPrivateAttachments($user, $estimate);
         $canUpdateClosed = $user !== null && $policy->updateClosed($user, $estimate);
+        $canUpdate = $user !== null && $policy->update($user, $estimate);
         $isOpen = (bool) ($estimate->status?->is_open ?? true);
-        $stage = WorkOrderStage::Estimate;
+        // Confirmed documents keep the live WO status visible on the read-only estimate screen.
+        $statusStage = $confirmedAsWorkOrder ? WorkOrderStage::WorkOrder : WorkOrderStage::Estimate;
 
         return Inertia::render('Estimates/Edit', [
             'estimate' => $this->workOrders->toFormData($estimate),
             'attachments' => $canViewAttachments
                 ? $this->attachments->listForWorkOrder($estimate, $canViewPrivateAttachments)
                 : [],
-            ...$this->formOptions($owner, $stage, $estimate),
-            'fields_locked' => ! $isOpen && ! $canUpdateClosed,
+            ...$this->formOptions($owner, $statusStage, $estimate),
+            'fields_locked' => $confirmedAsWorkOrder || (! $isOpen && ! $canUpdateClosed),
+            'confirmed_as_work_order' => $confirmedAsWorkOrder,
+            'related_work_order_url' => $estimate->is_work_order
+                ? route('work-orders.edit', $estimate)
+                : null,
             'chat' => $user !== null
                 ? $this->chats->payload(ChatDocumentType::WorkOrder, (int) $estimate->id, $user)
                 : null,
             'can' => [
                 'delete' => $user !== null && $policy->delete($user, $estimate),
+                'update' => $canUpdate,
                 'update_closed' => $canUpdateClosed,
                 'view_attachments' => $canViewAttachments,
                 'view_private_attachments' => $canViewPrivateAttachments,
                 'upload_attachments' => $user !== null && $policy->uploadAttachments($user, $estimate),
                 'download_attachments' => $user !== null && $policy->downloadAttachments($user, $estimate),
                 'delete_attachments' => $user !== null && $policy->deleteAttachments($user, $estimate),
-                'post_chat' => $user !== null && $policy->update($user, $estimate),
+                'post_chat' => $canUpdate,
             ],
         ]);
     }
 
     public function update(UpdateEstimateRequest $request, WorkOrder $estimate): RedirectResponse
     {
+        abort_if($estimate->isConfirmedWorkOrder(), 403);
+
         $owner = $this->activeCompany($request);
         $result = $this->workOrders->update($owner, $estimate, $request->validated(), $request->user());
         $fresh = $result['work_order'];
 
         if ($fresh->isConfirmedWorkOrder()) {
             return redirect()
-                ->route('work-orders.edit', $fresh)
+                ->route('estimates.edit', $fresh)
                 ->with('success', 'work_order_confirmed_successfully');
         }
 

@@ -9,6 +9,8 @@ use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Models\Brand;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
+use App\Models\Compliment;
+use App\Models\FormTemplate;
 use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -18,41 +20,69 @@ use Illuminate\Support\Facades\DB;
 final class BrandService
 {
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
+     * @param  array{
+     *     search?: string|null,
+     *     sort?: string|null,
+     *     direction?: string|null,
+     *     per_page?: int|string|null,
+     *     created_at?: string|null,
+     *     account_manager_ids?: string|list<int|string>|null,
+     *     commercial_manager_ids?: string|list<int|string>|null,
+     *     collaborator_ids?: string|list<int|string>|null,
+     * }  $filters
      * @return LengthAwarePaginator<int, Brand>
      */
     public function paginate(array $filters = [], ?int $perPage = null): LengthAwarePaginator
     {
         $search = trim((string) ($filters['search'] ?? ''));
-        $createdFrom = trim((string) ($filters['created_from'] ?? ''));
-        $createdTo = trim((string) ($filters['created_to'] ?? ''));
+        $createdAt = trim((string) ($filters['created_at'] ?? ''));
+        $accountManagerIds = $this->intList($filters['account_manager_ids'] ?? null);
+        $commercialManagerIds = $this->intList($filters['commercial_manager_ids'] ?? null);
+        $collaboratorIds = $this->intList($filters['collaborator_ids'] ?? null);
         $perPage ??= ListQuery::perPage($filters);
         [$sort, $direction] = ListQuery::sort(
             $filters,
-            ['id', 'name', 'account_manager_id', 'commercial_manager_id', 'loyalty_meeting_frequency', 'created_at'],
+            ['id', 'name', 'account_manager_id', 'loyalty_meeting_frequency', 'clients_count', 'created_at'],
             'name',
         );
 
         return Brand::query()
-            ->with(['accountManager', 'commercialManager', 'collaborators'])
+            ->with(['accountManager'])
+            ->withCount('customers as clients_count')
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
-                    $inner
-                        ->where('name', 'like', "%{$search}%")
-                        ->orWhere('loyalty_meeting_frequency', 'like', "%{$search}%")
-                        ->orWhereHas('accountManager', fn ($users) => $users->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('commercialManager', fn ($users) => $users->where('name', 'like', "%{$search}%"));
+                    $inner->where('name', 'like', "%{$search}%");
+
+                    if (ctype_digit($search)) {
+                        $inner->orWhere('id', (int) $search);
+                    }
                 });
             })
-            ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
-            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
+            ->when($createdAt !== '', fn ($query) => $query->whereDate('created_at', $createdAt))
+            ->when($accountManagerIds !== [], fn ($query) => $query->whereIn('account_manager_id', $accountManagerIds))
+            ->when($commercialManagerIds !== [], fn ($query) => $query->whereIn('commercial_manager_id', $commercialManagerIds))
+            ->when($collaboratorIds !== [], function ($query) use ($collaboratorIds): void {
+                $query->whereHas(
+                    'collaborators',
+                    fn ($users) => $users->whereIn('users.id', $collaboratorIds),
+                );
+            })
             ->orderBy($sort, $direction)
             ->paginate($perPage)
             ->withQueryString();
     }
 
     /**
-     * @param  array{search?: string|null, sort?: string|null, direction?: string|null, per_page?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
+     * @param  array{
+     *     search?: string|null,
+     *     sort?: string|null,
+     *     direction?: string|null,
+     *     per_page?: int|string|null,
+     *     created_at?: string|null,
+     *     account_manager_ids?: string|list<int|string>|null,
+     *     commercial_manager_ids?: string|list<int|string>|null,
+     *     collaborator_ids?: string|list<int|string>|null,
+     * }  $filters
      * @return LengthAwarePaginator<int, array<string, mixed>>
      */
     public function paginateForWeb(array $filters = [], ?int $perPage = null): LengthAwarePaginator
@@ -109,12 +139,56 @@ final class BrandService
             return;
         }
 
+        if (! $this->canBeDeleted($brand)) {
+            throw new \InvalidArgumentException('brand_cannot_be_deleted');
+        }
+
         DB::transaction(function () use ($brand): void {
             User::query()->where('brand_id', $brand->id)->update(['brand_id' => null]);
             $brand->collaborators()->detach();
             $brand->messages()->delete();
             $brand->softDeleteSafely();
         });
+    }
+
+    /**
+     * Operational usages that still reference this brand and block deletion.
+     *
+     * Owned configuration (collaborators, messages) and nullable user.brand_id do not block.
+     *
+     * @return list<string>
+     */
+    public function deletionBlockers(Brand $brand): array
+    {
+        $id = $brand->id;
+        $blockers = [];
+
+        if (CompanyRelationship::query()->where('brand_id', $id)->exists()) {
+            $blockers[] = 'company_relationships';
+        }
+
+        if (Company::query()->where('brand_id', $id)->exists()) {
+            $blockers[] = 'companies';
+        }
+
+        if (Compliment::query()->where('brand_id', $id)->exists()) {
+            $blockers[] = 'compliments';
+        }
+
+        if (FormTemplate::query()->where('brand_id', $id)->exists()) {
+            $blockers[] = 'form_templates';
+        }
+
+        if (DB::table('work_order_type_form_templates')->where('brand_id', $id)->exists()) {
+            $blockers[] = 'work_order_type_form_templates';
+        }
+
+        return $blockers;
+    }
+
+    public function canBeDeleted(Brand $brand): bool
+    {
+        return $this->deletionBlockers($brand) === [];
     }
 
     /**
@@ -175,10 +249,35 @@ final class BrandService
     public function toListItem(Brand $brand): array
     {
         return [
-            ...$this->toFormData($brand),
+            'id' => $brand->id,
+            'name' => $brand->name,
+            'account_manager_id' => $brand->account_manager_id,
             'account_manager_name' => $brand->accountManager?->name,
-            'commercial_manager_name' => $brand->commercialManager?->name,
-            'created_at' => $brand->created_at?->toIso8601String(),
+            'loyalty_meeting_frequency' => $brand->loyalty_meeting_frequency,
+            'clients_count' => (int) ($brand->clients_count ?? 0),
         ];
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function intList(mixed $value): array
+    {
+        if (is_array($value)) {
+            $parts = $value;
+        } else {
+            $raw = trim((string) $value);
+
+            if ($raw === '') {
+                return [];
+            }
+
+            $parts = preg_split('/\s*,\s*/', $raw) ?: [];
+        }
+
+        return array_values(array_unique(array_filter(
+            array_map(static fn ($item): int => (int) $item, $parts),
+            static fn (int $id): bool => $id > 0,
+        )));
     }
 }

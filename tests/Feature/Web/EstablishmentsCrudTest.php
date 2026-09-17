@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\Establishment;
 use App\Models\User;
+use App\Models\WorkOrder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -158,5 +159,49 @@ final class EstablishmentsCrudTest extends TestCase
         $this->actingAs($viewer)
             ->getJson('/establishments/data')
             ->assertForbidden();
+    }
+
+    public function test_establishment_used_in_work_order_cannot_be_deleted(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleEnum::Admin->value);
+
+        $company = Company::factory()->create();
+        $client = Company::factory()->create();
+        $this->attachToCompany($admin, $company);
+
+        CompanyRelationship::factory()->create([
+            'owner_company_id' => $company->id,
+            'related_company_id' => $client->id,
+            'kind' => CompanyRelationshipKind::Customer,
+        ]);
+
+        $establishment = Establishment::query()->create([
+            'company_id' => $client->id,
+            'name' => 'Protected Store',
+            'code' => 'EST-WO',
+        ]);
+
+        WorkOrder::factory()->workOrder()->create([
+            'establishment_id' => $establishment->id,
+            'owner_company_id' => $company->id,
+            'subject' => 'Open job',
+            'code' => 'WO-EST-1',
+        ]);
+
+        $this->actingAs($admin)
+            ->from(route('establishments.edit', $establishment))
+            ->delete("/establishments/{$establishment->id}")
+            ->assertRedirect(route('establishments.edit', $establishment))
+            ->assertSessionHas('error', 'establishment_cannot_be_deleted');
+
+        $this->assertNotSoftDeleted($establishment);
+
+        $this->actingAs($admin)
+            ->get("/establishments/{$establishment->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Establishments/Edit')
+                ->where('can.delete', false));
     }
 }

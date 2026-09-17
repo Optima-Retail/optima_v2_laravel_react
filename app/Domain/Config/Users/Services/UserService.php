@@ -15,8 +15,10 @@ use App\Models\Timezone;
 use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 final class UserService
 {
@@ -65,7 +67,9 @@ final class UserService
     {
         return DB::transaction(function () use ($data): User {
             $companyIds = array_values(array_unique(array_map('intval', $data['company_ids'] ?? [])));
-            $user = User::query()->create(Arr::except($data, ['roles', 'company_ids']));
+            $payload = Arr::except($data, ['roles', 'company_ids']);
+            $payload = $this->applyAvatar($payload, null);
+            $user = User::query()->create($payload);
 
             $user->syncRoles($data['roles']);
 
@@ -107,6 +111,7 @@ final class UserService
     {
         return DB::transaction(function () use ($user, $data): User {
             $payload = Arr::except($data, ['roles', 'company_ids', '_actor']);
+            $payload = $this->applyAvatar($payload, $user);
 
             if (empty($payload['password'])) {
                 unset($payload['password']);
@@ -185,6 +190,8 @@ final class UserService
         }
 
         DB::transaction(function () use ($user): void {
+            $this->deleteAvatarFile($user->avatar);
+            $user->forceFill(['avatar' => null])->save();
             $user->softDeleteSafely();
         });
     }
@@ -274,6 +281,7 @@ final class UserService
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'avatar_url' => $user->avatarUrl(),
             'username' => $user->username,
             'locale' => $user->locale,
             'manager_id' => $user->manager_id,
@@ -303,7 +311,7 @@ final class UserService
     }
 
     /**
-     * @return array{id: int, name: string, email: string, roles: list<string>, is_active: bool, created_at: string|null}
+     * @return array{id: int, name: string, email: string, avatar_url: string|null, roles: list<string>, is_active: bool, created_at: string|null}
      */
     public function toListItem(User $user): array
     {
@@ -311,9 +319,48 @@ final class UserService
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'avatar_url' => $user->avatarUrl(),
             'roles' => $user->getRoleNames()->values()->all(),
             'is_active' => (bool) $user->is_active,
             'created_at' => $user->created_at?->toIso8601String(),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function applyAvatar(array $payload, ?User $user): array
+    {
+        $removeAvatar = (bool) ($payload['remove_avatar'] ?? false);
+        unset($payload['remove_avatar']);
+
+        $file = $payload['avatar'] ?? null;
+        unset($payload['avatar']);
+
+        if ($file instanceof UploadedFile) {
+            $this->deleteAvatarFile($user?->avatar);
+            $payload['avatar'] = $file->store('user-avatars', 'public');
+
+            return $payload;
+        }
+
+        if ($removeAvatar) {
+            $this->deleteAvatarFile($user?->avatar);
+            $payload['avatar'] = null;
+        }
+
+        return $payload;
+    }
+
+    private function deleteAvatarFile(?string $path): void
+    {
+        if ($path === null || $path === '') {
+            return;
+        }
+
+        if (Storage::disk('public')->exists($path)) {
+            Storage::disk('public')->delete($path);
+        }
     }
 }

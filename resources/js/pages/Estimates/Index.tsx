@@ -17,7 +17,7 @@ import {
 } from '@/components/table/RemoteDataTable';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
-import { estimatesService, numberingPatternsService } from '@/services';
+import { estimatesService, numberingPatternsService, workOrdersService } from '@/services';
 import { useToastStore } from '@/stores/toastStore';
 import {
     isDeleteActionClick,
@@ -25,6 +25,7 @@ import {
     tabulatorColorBadge,
     tabulatorDeleteButton,
     tabulatorEditLink,
+    tabulatorPdfLink,
     tabulatorTextLink,
 } from '@/support/tabulator';
 import { formatDateTime } from '@/support/datetime';
@@ -57,8 +58,13 @@ const EMPTY_TOTALS: EstablishmentDocumentTotalsData = {
     margin_percentage: 0,
 };
 
+function documentEditPath(row: WorkOrderListItem): string {
+    return estimatesService.editPath(row.id);
+}
+
 function subjectLabel(row: WorkOrderListItem, empty: string): string {
-    const code = row.code?.trim();
+    // Estimates index always shows the estimate number, even after confirm.
+    const code = row.estimate_num?.trim() || row.code?.trim();
     const subject = row.subject?.trim();
 
     if (code && subject) {
@@ -296,7 +302,7 @@ export default function EstimatesIndex({ filters, statusOptions, can }: Estimate
                         return label;
                     }
 
-                    return tabulatorTextLink(estimatesService.editPath(row.id), label);
+                    return tabulatorTextLink(documentEditPath(row), label);
                 },
             },
             {
@@ -307,6 +313,29 @@ export default function EstimatesIndex({ filters, statusOptions, can }: Estimate
                 headerSort: false,
                 cssClass: 'cell-muted',
                 formatter: (cell: CellComponent) => cell.getValue() || empty,
+            },
+            {
+                title: t('estimates.convertedToWorkOrder'),
+                field: 'is_work_order',
+                minWidth: 120,
+                headerSort: false,
+                hozAlign: 'center',
+                headerHozAlign: 'center',
+                formatter: (cell: CellComponent) => {
+                    const row = cell.getRow().getData() as WorkOrderListItem;
+
+                    if (!row.is_work_order) {
+                        return `<span class="text-ink-muted">${t('common.no')}</span>`;
+                    }
+
+                    const woCode = row.work_order_num?.trim();
+
+                    if (woCode && canRef.current.update) {
+                        return tabulatorTextLink(workOrdersService.editPath(row.id), woCode);
+                    }
+
+                    return woCode || t('common.yes');
+                },
             },
             {
                 title: t('establishments.documentColumns.type'),
@@ -411,8 +440,8 @@ export default function EstimatesIndex({ filters, statusOptions, can }: Estimate
             {
                 title: t('common.actions'),
                 field: 'actions',
-                minWidth: 104,
-                width: 104,
+                minWidth: 148,
+                width: 148,
                 widthGrow: 0,
                 widthShrink: 0,
                 hozAlign: 'right',
@@ -423,16 +452,23 @@ export default function EstimatesIndex({ filters, statusOptions, can }: Estimate
                     const parts: string[] = [];
                     const name = subjectLabel(estimate, String(estimate.id));
 
+                    parts.push(
+                        tabulatorPdfLink(
+                            estimatesService.pdfPath(estimate.id),
+                            t('estimates.downloadPdf', { name }),
+                        ),
+                    );
+
                     if (canRef.current.update) {
                         parts.push(
                             tabulatorEditLink(
-                                estimatesService.editPath(estimate.id),
+                                documentEditPath(estimate),
                                 t('common.editItem', { name }),
                             ),
                         );
                     }
 
-                    if (canRef.current.delete) {
+                    if (canRef.current.delete && estimate.stage === 'estimate' && !estimate.is_work_order) {
                         parts.push(tabulatorDeleteButton(t('common.deleteItem', { name })));
                     }
 

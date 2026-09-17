@@ -35,7 +35,20 @@ final class CompanyMemberController extends Controller
         $this->companies->detachUser($company, $user);
 
         return redirect()
-            ->route('companies.edit', $company)
+            ->back()
+            ->with('success', 'company_user_unlinked_successfully');
+    }
+
+    public function leave(Company $company): RedirectResponse
+    {
+        $user = request()->user();
+        abort_unless($user !== null, 403);
+        abort_unless($user->belongsToCompany($company->id), 403);
+
+        $this->companies->detachUser($company, $user);
+
+        return redirect()
+            ->route('companies.index')
             ->with('success', 'company_user_unlinked_successfully');
     }
 }

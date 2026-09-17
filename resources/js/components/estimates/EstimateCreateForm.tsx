@@ -47,6 +47,8 @@ type EstimateFormProps = {
     technicianOptions: CompanyOption[];
     articleOptions: WorkOrderArticleOption[];
     sourceLabel?: string | null;
+    estimateNum?: string | null;
+    workOrderNum?: string | null;
     currencyLabel?: string | null;
     createdAt?: string | null;
     sentAt?: string | null;
@@ -55,6 +57,8 @@ type EstimateFormProps = {
     onSubmit: (event: FormEvent) => void;
     submitLabel: string;
     submitIcon?: ReactNode;
+    hideSubmit?: boolean;
+    lockedHint?: string | null;
     actions?: ReactNode;
 };
 
@@ -120,6 +124,8 @@ export function EstimateForm({
     technicianOptions,
     articleOptions,
     sourceLabel = null,
+    estimateNum = null,
+    workOrderNum = null,
     currencyLabel = null,
     createdAt = null,
     sentAt = null,
@@ -128,6 +134,8 @@ export function EstimateForm({
     onSubmit,
     submitLabel,
     submitIcon,
+    hideSubmit = false,
+    lockedHint = null,
     actions,
 }: EstimateFormProps) {
     const { t, i18n } = useTranslation();
@@ -221,7 +229,7 @@ export function EstimateForm({
 
                 {fieldsLocked && showDetails ? (
                     <p className="rounded-lg border border-line bg-canvas px-3 py-2 text-sm text-ink-muted">
-                        {t('workOrders.fieldsLockedHint')}
+                        {lockedHint || t('workOrders.fieldsLockedHint')}
                     </p>
                 ) : null}
 
@@ -241,6 +249,23 @@ export function EstimateForm({
                                     onChange={(event) => onChange('subject', event.target.value)}
                                 />
                             </Field>
+
+                            {!isCreate ? (
+                                <Field label={t('workOrders.estimateNum')} htmlFor="estimate_num_readonly">
+                                    <Input
+                                        id="estimate_num_readonly"
+                                        value={estimateNum ?? values.code}
+                                        readOnly
+                                        disabled
+                                    />
+                                </Field>
+                            ) : null}
+
+                            {!isCreate && workOrderNum ? (
+                                <Field label={t('workOrders.workOrderNum')} htmlFor="work_order_num_readonly">
+                                    <Input id="work_order_num_readonly" value={workOrderNum} readOnly disabled />
+                                </Field>
+                            ) : null}
 
                             <Field label={t('workOrders.reference')} htmlFor="reference" error={errors.reference}>
                                 <Input
@@ -935,10 +960,12 @@ export function EstimateForm({
 
                 <div className="flex flex-wrap items-center justify-end gap-2">
                     {actions}
-                    <Button type="submit" loading={processing} disabled={gated && !processing}>
-                        {submitIcon}
-                        {submitLabel}
-                    </Button>
+                    {!hideSubmit ? (
+                        <Button type="submit" loading={processing} disabled={gated && !processing}>
+                            {submitIcon}
+                            {submitLabel}
+                        </Button>
+                    ) : null}
                 </div>
             </form>
         </FieldHelpScope>

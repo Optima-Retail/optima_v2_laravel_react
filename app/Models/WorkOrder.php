@@ -15,7 +15,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 class WorkOrder extends Model
@@ -31,8 +30,17 @@ class WorkOrder extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'public_id',
         'code',
+        'is_estimate',
+        'is_work_order',
+        'estimate_num',
+        'estimate_num_cardinal',
+        'estimate_numbering_pattern_id',
+        'estimate_old_num',
+        'work_order_num',
+        'work_order_num_cardinal',
+        'work_order_numbering_pattern_id',
+        'work_order_old_num',
         'subject',
         'reference',
         'purchase_order',
@@ -100,6 +108,10 @@ class WorkOrder extends Model
         return [
             'stage' => WorkOrderStage::class,
             'confirmed_at' => 'datetime',
+            'is_estimate' => 'boolean',
+            'is_work_order' => 'boolean',
+            'estimate_num_cardinal' => 'integer',
+            'work_order_num_cardinal' => 'integer',
             'is_urgent' => 'boolean',
             'sync_grouping' => 'boolean',
             'is_intercompany' => 'boolean',
@@ -136,13 +148,8 @@ class WorkOrder extends Model
 
     protected static function booted(): void
     {
-        static::creating(function (self $workOrder): void {
-            if ($workOrder->public_id === null || $workOrder->public_id === '') {
-                $workOrder->public_id = (string) Str::uuid();
-            }
-        });
-
         static::saving(function (self $workOrder): void {
+            $workOrder->syncDisplayCode();
             $workOrder->assertStageInvariant();
         });
     }
@@ -159,6 +166,12 @@ class WorkOrder extends Model
 
     private function assertStageInvariant(): void
     {
+        if (! $this->is_estimate && ! $this->is_work_order) {
+            throw new InvalidArgumentException(
+                'A work order requires is_estimate and/or is_work_order (both cannot be false).',
+            );
+        }
+
         if ($this->status_id === null) {
             throw new InvalidArgumentException('A work order requires status_id.');
         }
@@ -182,6 +195,36 @@ class WorkOrder extends Model
                 );
             }
         }
+    }
+
+    /**
+     * Display / search code for the current stage.
+     */
+    public function syncDisplayCode(): void
+    {
+        if ($this->stage === WorkOrderStage::WorkOrder) {
+            $this->code = $this->work_order_num ?: $this->estimate_num ?: $this->code;
+
+            return;
+        }
+
+        $this->code = $this->estimate_num ?: $this->work_order_num ?: $this->code;
+    }
+
+    /**
+     * @return BelongsTo<NumberingPattern, $this>
+     */
+    public function estimateNumberingPattern(): BelongsTo
+    {
+        return $this->belongsTo(NumberingPattern::class, 'estimate_numbering_pattern_id');
+    }
+
+    /**
+     * @return BelongsTo<NumberingPattern, $this>
+     */
+    public function workOrderNumberingPattern(): BelongsTo
+    {
+        return $this->belongsTo(NumberingPattern::class, 'work_order_numbering_pattern_id');
     }
 
     private function statusKindValue(): ?string

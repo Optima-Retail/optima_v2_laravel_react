@@ -84,7 +84,7 @@ final class WorkOrderController extends Controller
             defaultDirection: 'desc',
             filterKeys: ['search', 'pending', 'created_from', 'created_to', 'establishment_id', 'contract_id'],
         );
-        $filters['stage'] = WorkOrderStage::WorkOrder->value;
+        $filters['is_work_order'] = true;
 
         $scopedToEstablishment = (int) ($filters['establishment_id'] ?? 0) > 0;
         $scopedToContract = (int) ($filters['contract_id'] ?? 0) > 0;
@@ -153,6 +153,9 @@ final class WorkOrderController extends Controller
                 : [],
             ...$this->formOptions($owner, $stage, $workOrder),
             'fields_locked' => ! $isOpen && ! $canUpdateClosed,
+            'related_estimate_url' => $workOrder->is_estimate
+                ? route('estimates.edit', $workOrder)
+                : null,
             'chat' => $user !== null
                 ? $this->chats->payload(ChatDocumentType::WorkOrder, (int) $workOrder->id, $user)
                 : null,

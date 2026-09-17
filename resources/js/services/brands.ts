@@ -1,4 +1,5 @@
 import { router } from '@inertiajs/react';
+import type { FormDataConvertible } from '@inertiajs/core';
 import { cleanQuery, type InertiaFormPoster, type ListQuery, type SearchOptions, visitPage } from '@/services/shared';
 
 const base = '/brands';
@@ -31,6 +32,10 @@ export const brandsService = {
 
     update(id: number, form: InertiaFormPoster) {
         form.put(`${base}/${id}`);
+    },
+
+    updateData(id: number, data: Record<string, FormDataConvertible>) {
+        router.put(`${base}/${id}`, data, { preserveScroll: true });
     },
 
     destroy(id: number) {

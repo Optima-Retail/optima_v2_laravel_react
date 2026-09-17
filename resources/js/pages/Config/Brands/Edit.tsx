@@ -53,6 +53,11 @@ export default function EditBrand({ brand, userOptions, messages, clients, can }
         brandsService.update(brand.id, form);
     }
 
+    function toggleDebtReminders(checked: boolean) {
+        form.setData('send_debt_reminders', checked);
+        brandsService.updateData(brand.id, { ...form.data, send_debt_reminders: checked });
+    }
+
     async function destroyBrand() {
         const confirmed = await confirmAction({
             title: t('common.deleteTitle', { resource: t('brands.resource') }),
@@ -124,7 +129,12 @@ export default function EditBrand({ brand, userOptions, messages, clients, can }
                     </TabPanel>
 
                     <TabPanel id="clients">
-                        <BrandClientsPanel clients={clients} canEdit={can.update_clients} />
+                        <BrandClientsPanel
+                            clients={clients}
+                            canEdit={can.update_clients}
+                            sendDebtReminders={form.data.send_debt_reminders}
+                            onToggleDebtReminders={toggleDebtReminders}
+                        />
                     </TabPanel>
                 </Tabs>
             </div>

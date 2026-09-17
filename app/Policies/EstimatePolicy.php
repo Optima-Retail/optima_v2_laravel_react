@@ -10,8 +10,9 @@ use App\Models\WorkOrder;
 use App\Policies\Concerns\ChecksDiscoveredPermissions;
 
 /**
- * Permissions for estimate-stage work_orders rows (legacy presupuestos).
- * Controllers enforce stage + these abilities; Gate model binding still uses WorkOrderPolicy for OT routes.
+ * Permissions for estimate-identity work_orders rows (`is_estimate`).
+ * Confirmed rows (also `is_work_order`) stay viewable as a read-only estimate screen;
+ * mutations require current stage = estimate.
  */
 final class EstimatePolicy
 {
@@ -24,7 +25,7 @@ final class EstimatePolicy
 
     public function view(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isEstimate()
+        return (bool) $workOrder->is_estimate
             && $this->allows($user, 'view')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
@@ -57,7 +58,7 @@ final class EstimatePolicy
 
     public function viewAttachments(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isEstimate()
+        return (bool) $workOrder->is_estimate
             && $this->allows($user, 'view-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
@@ -71,7 +72,7 @@ final class EstimatePolicy
 
     public function downloadAttachments(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isEstimate()
+        return (bool) $workOrder->is_estimate
             && $this->allows($user, 'download-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
@@ -85,7 +86,7 @@ final class EstimatePolicy
 
     public function viewPrivateAttachments(User $user, WorkOrder $workOrder): bool
     {
-        return $workOrder->isEstimate()
+        return (bool) $workOrder->is_estimate
             && $this->allows($user, 'view-private-attachments')
             && app(WorkOrderCompanyAccess::class)->canAccess($user, $workOrder);
     }
