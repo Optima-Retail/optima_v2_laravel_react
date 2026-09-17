@@ -4,13 +4,24 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Web\FormTemplates;
 
+use App\Domain\Companies\Support\ActiveCompany;
 use App\Domain\Forms\Enums\FormTemplateOwnerType;
 use App\Models\FormTemplate;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreFormTemplateRequest extends FormRequest
 {
+    /**
+     * Field types that describe a structural/collection block rather than a single
+     * answer, so a visible label isn't required for them (mirrors legacy's
+     * required_unless on materiales/tecnicos/trabajo/cabecera).
+     *
+     * @var list<string>
+     */
+    private const LABEL_OPTIONAL_TYPES = ['materiales', 'tecnicos', 'trabajo', 'cabecera'];
+
     public function authorize(): bool
     {
         return $this->user()?->can('create', FormTemplate::class) ?? false;
@@ -42,9 +53,20 @@ class StoreFormTemplateRequest extends FormRequest
     public function rules(): array
     {
         $ownerType = $this->string('owner_type')->toString();
+        $ownerId = app(ActiveCompany::class)->forUser($this->user())?->id;
+        $template = $this->route('form_template');
+        $templateId = $template instanceof FormTemplate ? $template->id : null;
 
         return [
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('form_templates', 'name')
+                    ->where(fn ($query) => $query->where('company_id', $ownerId))
+                    ->whereNull('deleted_at')
+                    ->ignore($templateId),
+            ],
             'form_type_id' => ['required', 'integer', 'exists:form_types,id'],
             'language_id' => ['nullable', 'integer', 'exists:languages,id'],
             'is_default' => ['boolean'],
@@ -87,6 +109,56 @@ class StoreFormTemplateRequest extends FormRequest
             'sections.*.fields.*.is_repeatable' => ['boolean'],
             'sections.*.fields.*.is_visible' => ['boolean'],
             'sections.*.fields.*.is_locked' => ['boolean'],
+            'sections.*.fields.*.payload' => ['nullable', 'array'],
+            'sections.*.fields.*.payload.value' => ['nullable', 'string', 'max:255'],
+            'sections.*.fields.*.conditional_field_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('form_template_fields', 'id')->where(function ($query) use ($templateId): void {
+                    $query->whereNull('deleted_at');
+
+                    if ($templateId !== null) {
+                        $query->whereIn('form_template_section_id', function ($sub) use ($templateId): void {
+                            $sub->select('id')->from('form_template_sections')->where('form_template_id', $templateId);
+                        });
+
+                        return;
+                    }
+
+                    // A brand-new template has no fields of its own yet, so a field
+                    // can only ever depend on a sibling saved in an earlier update.
+                    $query->whereRaw('1 = 0');
+                }),
+            ],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            foreach ((array) $this->input('sections', []) as $sectionIndex => $section) {
+                foreach ((array) ($section['fields'] ?? []) as $fieldIndex => $field) {
+                    $type = (string) ($field['type'] ?? '');
+                    $label = $field['label'] ?? null;
+
+                    if ($type !== '' && ! in_array($type, self::LABEL_OPTIONAL_TYPES, true) && ($label === null || $label === '')) {
+                        $validator->errors()->add(
+                            "sections.{$sectionIndex}.fields.{$fieldIndex}.label",
+                            __('validation.required', ['attribute' => 'label']),
+                        );
+                    }
+
+                    $fieldId = $field['id'] ?? null;
+                    $conditionalFieldId = $field['conditional_field_id'] ?? null;
+
+                    if ($fieldId !== null && $conditionalFieldId !== null && (int) $fieldId === (int) $conditionalFieldId) {
+                        $validator->errors()->add(
+                            "sections.{$sectionIndex}.fields.{$fieldIndex}.conditional_field_id",
+                            'A field cannot be conditional on itself.',
+                        );
+                    }
+                }
+            }
+        });
     }
 }

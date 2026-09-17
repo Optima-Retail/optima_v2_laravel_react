@@ -1,6 +1,7 @@
 import type { UserOption } from './common';
 
 export type WorkOrderStatusOption = UserOption & {
+    lifecycle?: number | null;
     is_open?: boolean;
     confirms_estimate?: boolean;
     rejects_to_estimate?: boolean;

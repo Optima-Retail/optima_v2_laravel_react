@@ -44,6 +44,8 @@ export type WorkOrderTechnicianForm = {
     quote_net_amount: string;
     quoted_at: string;
     quote_total_euros: string;
+    status_id?: string;
+    attendance_confirmation_type_id?: string;
 };
 
 export type WorkOrderTaskForm = {
@@ -111,6 +113,8 @@ export type WorkOrderFormData = {
         quote_net_amount: string | number | null;
         quoted_at: string | null;
         quote_total_euros: string | number | null;
+        status_id?: number | null;
+        attendance_confirmation_type_id?: number | null;
     }>;
     tasks?: Array<{
         id: number;
@@ -118,6 +122,8 @@ export type WorkOrderFormData = {
         description: string | null;
         is_completed: boolean;
     }>;
+    sla_at?: string | null;
+    sla_justification?: string | null;
 };
 
 export type WorkOrderAttachmentItem = {

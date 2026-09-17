@@ -74,6 +74,8 @@ export default function EditFormTemplate({
                     ...field,
                     label: field.label ?? '',
                     default_value: field.default_value ?? '',
+                    conditional_field_id: field.conditional_field_id ?? null,
+                    payload: field.payload ?? null,
                 })),
             })),
         }),

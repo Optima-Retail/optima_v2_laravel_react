@@ -4,21 +4,26 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web\Forms;
 
+use App\Domain\Forms\Services\FormPdfService;
 use App\Domain\Forms\Services\FormService;
 use App\Domain\Forms\Services\FormTemplateService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Web\Forms\StoreFormFieldFileRequest;
 use App\Http\Requests\Web\Forms\StoreFormRequest;
 use App\Http\Requests\Web\Forms\UpdateFormRequest;
 use App\Models\Form;
+use App\Models\FormField;
 use App\Support\ListQuery;
 use App\Support\TabulatorQuery;
 use App\Support\TabulatorResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class FormController extends Controller
 {
@@ -27,6 +32,7 @@ final class FormController extends Controller
     public function __construct(
         private readonly FormService $forms,
         private readonly FormTemplateService $templates,
+        private readonly FormPdfService $formPdf,
     ) {}
 
     public function index(Request $request): Response
@@ -88,6 +94,22 @@ final class FormController extends Controller
         ]);
     }
 
+    public function templateSuggestions(Request $request): JsonResponse
+    {
+        $this->authorize('create', Form::class);
+        $owner = $this->activeCompany($request);
+
+        $workOrder = $this->forms->findAccessibleWorkOrder($owner, $request->integer('work_order_id'));
+
+        abort_if($workOrder === null, 404);
+
+        $formTypeId = $request->filled('form_type_id') ? $request->integer('form_type_id') : null;
+
+        return response()->json([
+            'data' => $this->templates->resolveForWorkOrder($owner, $workOrder, $formTypeId),
+        ]);
+    }
+
     public function store(StoreFormRequest $request): RedirectResponse
     {
         $user = $request->user();
@@ -138,6 +160,31 @@ final class FormController extends Controller
         return redirect()
             ->route('forms.edit', $form)
             ->with('success', 'form_status_advanced_successfully');
+    }
+
+    public function uploadFieldFile(StoreFormFieldFileRequest $request, Form $form, FormField $field): JsonResponse
+    {
+        $field = $this->forms->storeFieldFile($form, $field, (string) $request->validated('target'), $request->file('file'));
+
+        return response()->json([
+            'value' => $field->value,
+            'payload' => $field->payload,
+            'url' => route('forms.fields.file', ['form' => $form, 'field' => $field, 'target' => $request->validated('target')]),
+        ]);
+    }
+
+    public function showFieldFile(Request $request, Form $form, FormField $field): StreamedResponse
+    {
+        $this->authorize('update', $form);
+
+        return $this->forms->streamFieldFile($form, $field, $request->string('target', 'value')->toString());
+    }
+
+    public function downloadPdf(Form $form): HttpResponse
+    {
+        $this->authorize('view', $form);
+
+        return $this->formPdf->stream($form);
     }
 
     public function showPublic(string $public_id): Response

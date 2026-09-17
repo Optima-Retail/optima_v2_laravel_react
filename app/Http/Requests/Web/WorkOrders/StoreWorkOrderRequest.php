@@ -9,6 +9,7 @@ use App\Domain\WorkOrders\Enums\WorkOrderStage;
 use App\Domain\WorkOrders\Services\WorkOrderService;
 use App\Models\WorkOrder;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 final class StoreWorkOrderRequest extends FormRequest
 {
@@ -45,6 +46,8 @@ final class StoreWorkOrderRequest extends FormRequest
         ), [
             'stage' => ['required', 'string', 'in:'.WorkOrderStage::WorkOrder->value],
             'code' => ['nullable', 'string', 'max:64'],
+            'work_order_type_id' => ['required', 'integer', Rule::exists('work_order_types', 'id')->whereNull('deleted_at')],
+            'client_priority_id' => ['required', 'integer', Rule::exists('client_priorities', 'id')->whereNull('deleted_at')],
         ]);
     }
 }

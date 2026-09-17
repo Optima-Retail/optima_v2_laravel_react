@@ -8,7 +8,6 @@ export type CompanyRelationshipListItem = {
     status: string;
     classification: string;
     brand_name: string | null;
-    owner_reference: string | null;
     created_at: string | null;
 };
 
@@ -25,10 +24,7 @@ export type CompanyRelationshipFormData = {
     kind: string;
     status: string;
     classification: string;
-    owner_reference: string | null;
-    related_reference: string | null;
     brand_id: number | null;
-    external_code: string | null;
     notes: string | null;
     starts_at: string | null;
     ends_at: string | null;

@@ -1,4 +1,4 @@
-import { FormEvent } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -47,6 +47,57 @@ export default function CreateForm({
         app_platform_id: '1',
         technician_code: '',
     });
+    const [suggestedTemplateIds, setSuggestedTemplateIds] = useState<number[]>([]);
+
+    // Re-rank the template list around the chosen work order (establishment,
+    // work order type, language) instead of leaving it a flat, unscoped
+    // alphabetical dropdown — see formTemplatesService.resolveForWorkOrder.
+    useEffect(() => {
+        if (form.data.subject_type !== 'work_order' || !form.data.work_order_id) {
+            setSuggestedTemplateIds([]);
+
+            return;
+        }
+
+        let cancelled = false;
+
+        formsService
+            .templateSuggestions({
+                workOrderId: Number(form.data.work_order_id),
+                formTypeId: form.data.form_type_id ? Number(form.data.form_type_id) : null,
+            })
+            .then((suggestions) => {
+                if (cancelled) {
+                    return;
+                }
+
+                setSuggestedTemplateIds(suggestions.map((suggestion) => suggestion.id));
+
+                if (!form.data.form_template_id && suggestions.length > 0) {
+                    form.setData('form_template_id', String(suggestions[0].id));
+                }
+            })
+            .catch(() => {
+                if (!cancelled) {
+                    setSuggestedTemplateIds([]);
+                }
+            });
+
+        return () => {
+            cancelled = true;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.data.subject_type, form.data.work_order_id, form.data.form_type_id]);
+
+    const orderedTemplateOptions =
+        suggestedTemplateIds.length === 0
+            ? templateOptions
+            : [
+                  ...suggestedTemplateIds
+                      .map((id) => templateOptions.find((option) => option.id === id))
+                      .filter((option): option is Option => option !== undefined),
+                  ...templateOptions.filter((option) => !suggestedTemplateIds.includes(option.id)),
+              ];
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -85,12 +136,17 @@ export default function CreateForm({
                                 onChange={(event) => form.setData('form_template_id', event.target.value)}
                             >
                                 <option value="">{t('common.select')}</option>
-                                {templateOptions.map((option) => (
+                                {orderedTemplateOptions.map((option) => (
                                     <option key={option.id} value={option.id}>
-                                        {option.label}
+                                        {suggestedTemplateIds.includes(option.id)
+                                            ? t('forms.suggestedTemplateOption', { name: option.label })
+                                            : option.label}
                                     </option>
                                 ))}
                             </Select>
+                            {suggestedTemplateIds.length > 0 ? (
+                                <p className="text-xs text-ink-muted">{t('forms.suggestedTemplatesHint')}</p>
+                            ) : null}
                         </Field>
 
                         <Field label={t('forms.type')} htmlFor="form_type_id" error={form.errors.form_type_id}>

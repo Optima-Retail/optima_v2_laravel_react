@@ -47,6 +47,10 @@ final class WorkOrderFormInput
                 'quote_net_amount' => filled($item['quote_net_amount'] ?? null) ? $item['quote_net_amount'] : null,
                 'quoted_at' => filled($item['quoted_at'] ?? null) ? (string) $item['quoted_at'] : null,
                 'quote_total_euros' => filled($item['quote_total_euros'] ?? null) ? $item['quote_total_euros'] : null,
+                'status_id' => filled($item['status_id'] ?? null) ? (int) $item['status_id'] : null,
+                'attendance_confirmation_type_id' => filled($item['attendance_confirmation_type_id'] ?? null)
+                    ? (int) $item['attendance_confirmation_type_id']
+                    : null,
             ];
         }
 
@@ -89,6 +93,8 @@ final class WorkOrderFormInput
             'received_at' => filled($request->input('received_at')) ? $request->input('received_at') : null,
             'intervention_at' => filled($request->input('intervention_at')) ? $request->input('intervention_at') : null,
             'due_at' => filled($request->input('due_at')) ? $request->input('due_at') : null,
+            'sla_at' => filled($request->input('sla_at')) ? $request->input('sla_at') : null,
+            'sla_justification' => filled($request->input('sla_justification')) ? $request->input('sla_justification') : null,
             'collaborator_ids' => array_values(array_filter(
                 array_map('intval', (array) $request->input('collaborator_ids', [])),
                 fn (int $id): bool => $id > 0,
@@ -96,6 +102,10 @@ final class WorkOrderFormInput
             'lines' => $lines,
             'technicians' => $technicians,
             'tasks' => $tasks,
+            'checklist_completions' => array_values(array_filter(
+                array_map('intval', (array) $request->input('checklist_completions', [])),
+                fn (int $id): bool => $id > 0,
+            )),
             'status_justification' => filled($request->input('status_justification'))
                 ? trim((string) $request->input('status_justification'))
                 : null,
@@ -145,6 +155,8 @@ final class WorkOrderFormInput
             'received_at' => ['nullable', 'date'],
             'intervention_at' => ['nullable', 'date'],
             'due_at' => ['nullable', 'date'],
+            'sla_at' => ['nullable', 'date'],
+            'sla_justification' => ['nullable', 'string'],
             'collaborator_ids' => ['nullable', 'array'],
             'collaborator_ids.*' => ['integer', CompanyMemberUsers::existsRule($ownerCompanyId)],
             'lines' => ['nullable', 'array'],
@@ -164,11 +176,19 @@ final class WorkOrderFormInput
             'technicians.*.quote_net_amount' => ['nullable', 'numeric'],
             'technicians.*.quoted_at' => ['nullable', 'date'],
             'technicians.*.quote_total_euros' => ['nullable', 'numeric'],
+            'technicians.*.status_id' => ['nullable', 'integer', Rule::exists('work_order_technician_statuses', 'id')],
+            'technicians.*.attendance_confirmation_type_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('technician_attendance_confirmation_types', 'id')->whereNull('deleted_at'),
+            ],
             'tasks' => ['nullable', 'array'],
             'tasks.*.id' => ['nullable', 'integer'],
             'tasks.*.title' => ['required', 'string', 'max:255'],
             'tasks.*.description' => ['nullable', 'string'],
             'tasks.*.is_completed' => ['nullable', 'boolean'],
+            'checklist_completions' => ['nullable', 'array'],
+            'checklist_completions.*' => ['integer', Rule::exists('checklists', 'id')->whereNull('deleted_at')],
             'status_justification' => ['nullable', 'string', 'max:2000'],
         ];
     }

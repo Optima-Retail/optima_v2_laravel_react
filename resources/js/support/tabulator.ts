@@ -123,7 +123,7 @@ const filePdfIcon =
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>';
 
 export function tabulatorPdfLink(href: string, ariaLabel: string): string {
-    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-danger/40 hover:text-danger" aria-label="${escapeHtml(ariaLabel)}" data-action="pdf">${filePdfIcon}</a>`;
+    return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${escapeHtml(ariaLabel)}" data-action="pdf">${filePdfIcon}</a>`;
 }
 
 export function tabulatorEditLink(href: string, ariaLabel: string): string {
@@ -176,6 +176,14 @@ export function tabulatorCopyButton(ariaLabel: string): string {
 
 export function isCopyActionClick(event: UIEvent): boolean {
     return isActionClick(event, 'copy');
+}
+
+export function tabulatorDuplicateButton(ariaLabel: string): string {
+    return `<button type="button" class="inline-flex size-8 items-center justify-center rounded-lg border border-line text-ink-muted transition-colors hover:border-brand/40 hover:text-brand" aria-label="${ariaLabel}" data-action="duplicate">${copyIcon}</button>`;
+}
+
+export function isDuplicateActionClick(event: UIEvent): boolean {
+    return isActionClick(event, 'duplicate');
 }
 
 export function isDeleteActionClick(event: UIEvent): boolean {

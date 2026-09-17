@@ -40,7 +40,6 @@ export default function CreateCompany({ countryOptions, provinceOptions, brandOp
         language_id: '',
         latitude: '',
         longitude: '',
-        legacy_erp_id: '',
         logo: null as File | null,
         remove_logo: false,
     });

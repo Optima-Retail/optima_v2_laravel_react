@@ -65,7 +65,6 @@ export type EstablishmentFormValues = {
     longitude: string;
     tax_rate: string;
     tax_included: boolean;
-    legacy_erp_id: string;
     integration_external_id: string;
     notes: string;
     notes_alert: boolean;
@@ -172,7 +171,6 @@ export function defaultEstablishmentFormValues(overrides: Partial<EstablishmentF
         longitude: '',
         tax_rate: '',
         tax_included: false,
-        legacy_erp_id: '',
         integration_external_id: '',
         notes: '',
         notes_alert: false,
@@ -228,7 +226,6 @@ export function establishmentFormValuesFromData(establishment: EstablishmentForm
         longitude: establishment.longitude ?? '',
         tax_rate: num(establishment.tax_rate),
         tax_included: bool(establishment.tax_included),
-        legacy_erp_id: num(establishment.legacy_erp_id),
         integration_external_id: establishment.integration_external_id ?? '',
         notes: establishment.notes ?? '',
         notes_alert: bool(establishment.notes_alert),
@@ -294,7 +291,7 @@ export function EstablishmentForm({
             { id: 'address', label: t('establishments.tabs.address') },
             { id: 'catalogs', label: t('establishments.tabs.catalogs') },
             { id: 'technicians', label: t('establishments.tabs.technicians') },
-            { id: 'geo', label: t('establishments.tabs.geo') },
+            { id: 'tax', label: t('establishments.tabs.tax') },
             { id: 'notes', label: t('establishments.tabs.notes') },
             { id: 'flags', label: t('establishments.tabs.flags') },
         ];
@@ -494,6 +491,28 @@ export function EstablishmentForm({
                             onChange={(event) => onChange('postal_code', event.target.value)}
                         />
                     </Field>
+
+                    <Field label={t('establishments.latitude')} htmlFor="latitude" error={errors.latitude}>
+                        <Input
+                            id="latitude"
+                            type="number"
+                            step="any"
+                            value={values.latitude}
+                            invalid={Boolean(errors.latitude)}
+                            onChange={(event) => onChange('latitude', clampDecimalPlaces(event.target.value))}
+                        />
+                    </Field>
+
+                    <Field label={t('establishments.longitude')} htmlFor="longitude" error={errors.longitude}>
+                        <Input
+                            id="longitude"
+                            type="number"
+                            step="any"
+                            value={values.longitude}
+                            invalid={Boolean(errors.longitude)}
+                            onChange={(event) => onChange('longitude', clampDecimalPlaces(event.target.value))}
+                        />
+                    </Field>
                     </div>
                 </TabPanel>
 
@@ -630,30 +649,8 @@ export function EstablishmentForm({
                     </div>
                 </TabPanel>
 
-                <TabPanel id="geo">
+                <TabPanel id="tax">
                     <div className="grid gap-5 sm:grid-cols-2">
-                    <Field label={t('establishments.latitude')} htmlFor="latitude" error={errors.latitude}>
-                        <Input
-                            id="latitude"
-                            type="number"
-                            step="any"
-                            value={values.latitude}
-                            invalid={Boolean(errors.latitude)}
-                            onChange={(event) => onChange('latitude', clampDecimalPlaces(event.target.value))}
-                        />
-                    </Field>
-
-                    <Field label={t('establishments.longitude')} htmlFor="longitude" error={errors.longitude}>
-                        <Input
-                            id="longitude"
-                            type="number"
-                            step="any"
-                            value={values.longitude}
-                            invalid={Boolean(errors.longitude)}
-                            onChange={(event) => onChange('longitude', clampDecimalPlaces(event.target.value))}
-                        />
-                    </Field>
-
                     <Field label={t('establishments.taxRate')} htmlFor="tax_rate" error={errors.tax_rate}>
                         <Input
                             id="tax_rate"
@@ -674,17 +671,6 @@ export function EstablishmentForm({
                             uncheckedLabel={t('establishments.taxExcluded')}
                         />
                     </div>
-
-                    <Field label={t('establishments.legacyErpId')} htmlFor="legacy_erp_id" error={errors.legacy_erp_id}>
-                        <Input
-                            id="legacy_erp_id"
-                            type="number"
-                            min={0}
-                            value={values.legacy_erp_id}
-                            invalid={Boolean(errors.legacy_erp_id)}
-                            onChange={(event) => onChange('legacy_erp_id', event.target.value)}
-                        />
-                    </Field>
 
                     <Field label={t('establishments.integrationExternalId')} htmlFor="integration_external_id" error={errors.integration_external_id}>
                         <Input

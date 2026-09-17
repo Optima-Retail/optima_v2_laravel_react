@@ -70,10 +70,7 @@ final class CompanyRelationshipService
             ->when($search !== '', function ($query) use ($search): void {
                 $query->where(function ($inner) use ($search): void {
                     $inner
-                        ->where('owner_reference', 'like', "%{$search}%")
-                        ->orWhere('related_reference', 'like', "%{$search}%")
-                        ->orWhere('external_code', 'like', "%{$search}%")
-                        ->orWhereHas('relatedCompany', fn ($companies) => $companies
+                        ->whereHas('relatedCompany', fn ($companies) => $companies
                             ->where('name', 'like', "%{$search}%")
                             ->orWhere('tax_id', 'like', "%{$search}%"));
                 });
@@ -484,10 +481,7 @@ final class CompanyRelationshipService
             'kind' => $relationship->kind->value,
             'status' => $relationship->status->value,
             'classification' => $relationship->classification->value,
-            'owner_reference' => $relationship->owner_reference,
-            'related_reference' => $relationship->related_reference,
             'brand_id' => $relationship->brand_id,
-            'external_code' => $relationship->external_code,
             'notes' => $relationship->notes,
             'starts_at' => $relationship->starts_at?->toDateString(),
             'ends_at' => $relationship->ends_at?->toDateString(),
@@ -568,7 +562,6 @@ final class CompanyRelationshipService
             'status' => $relationship->status->value,
             'classification' => $relationship->classification->value,
             'brand_name' => $relationship->brand?->name,
-            'owner_reference' => $relationship->owner_reference,
             'created_at' => $relationship->created_at?->toIso8601String(),
         ];
     }

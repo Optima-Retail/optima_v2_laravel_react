@@ -7,6 +7,7 @@ namespace App\Domain\WorkOrders\Services;
 use App\Domain\Chats\Enums\ChatDocumentType;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyMemberUsers;
+use App\Domain\Config\Checklists\Enums\ChecklistDocumentType;
 use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\Config\NumberingPatterns\Services\NumberingPatternService;
 use App\Domain\Config\TasksToPerform\Enums\TaskDocumentType;
@@ -15,6 +16,7 @@ use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
 use App\Models\Article;
 use App\Models\ArticleClient;
+use App\Models\Checklist;
 use App\Models\ClientPriority;
 use App\Models\ClientRate;
 use App\Models\Company;
@@ -23,16 +25,20 @@ use App\Models\Contract;
 use App\Models\Establishment;
 use App\Models\Requester;
 use App\Models\TaskToPerform;
+use App\Models\TechnicianAttendanceConfirmationType;
 use App\Models\User;
 use App\Models\WorkOrder;
+use App\Models\WorkOrderChecklistCompletion;
 use App\Models\WorkOrderLine;
 use App\Models\WorkOrderStatus;
 use App\Models\WorkOrderTechnician;
+use App\Models\WorkOrderTechnicianStatus;
 use App\Models\WorkOrderType;
 use App\Policies\EstimatePolicy;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -275,17 +281,50 @@ final class WorkOrderService
     }
 
     /**
-     * @return list<array{id: int, label: string, color: string|null}>
+     * Priorities for the WO form.
+     *
+     * Prod: options come from the establishment's client (`clientes_prioridades` /
+     * `company_priority`), not the global catalog. When `$companyId` is null, returns
+     * all priorities with `company_ids` so the UI can filter after establishment select.
+     *
+     * @param  list<int>  $includePriorityIds
+     * @return list<array{id: int, label: string, color: string|null, company_ids: list<int>}>
      */
-    public function priorityOptions(): array
+    public function priorityOptions(?int $companyId = null, array $includePriorityIds = []): array
     {
-        return ClientPriority::query()
+        $includePriorityIds = array_values(array_unique(array_filter(
+            array_map('intval', $includePriorityIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        $priorities = ClientPriority::query()
+            ->with(['companies:id'])
+            ->when(
+                $companyId !== null,
+                fn ($query) => $query->where(function ($inner) use ($companyId, $includePriorityIds): void {
+                    $inner->whereHas(
+                        'companies',
+                        fn ($companies) => $companies->where('companies.id', $companyId),
+                    );
+
+                    if ($includePriorityIds !== []) {
+                        $inner->orWhereIn('client_priorities.id', $includePriorityIds);
+                    }
+                }),
+            )
             ->orderBy('name')
-            ->get(['id', 'name', 'color'])
+            ->get(['id', 'name', 'color']);
+
+        return $priorities
             ->map(fn (ClientPriority $priority): array => [
-                'id' => $priority->id,
+                'id' => (int) $priority->id,
                 'label' => $priority->name,
                 'color' => $priority->color,
+                'company_ids' => $priority->companies
+                    ->pluck('id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->values()
+                    ->all(),
             ])
             ->values()
             ->all();
@@ -878,13 +917,23 @@ final class WorkOrderService
 
             $workOrder = WorkOrder::query()->create($attributes);
 
-            // optima_back: if no trabajos_a_realizar, seed one from asunto
-            if ($stage === WorkOrderStage::Estimate && ($data['tasks'] ?? []) === [] && filled($attributes['subject'] ?? null)) {
-                $data['tasks'] = [[
-                    'title' => (string) $attributes['subject'],
-                    'description' => (string) $attributes['subject'],
-                    'is_completed' => false,
-                ]];
+            // optima_back: if no trabajos_a_realizar, seed from asunto (split by +)
+            if (($data['tasks'] ?? []) === [] && filled($attributes['subject'] ?? null)) {
+                $subject = (string) $attributes['subject'];
+                $parts = array_values(array_filter(array_map('trim', explode('+', $subject)), fn (string $part): bool => $part !== ''));
+
+                if ($parts === []) {
+                    $parts = [$subject];
+                }
+
+                $data['tasks'] = array_map(
+                    static fn (string $part): array => [
+                        'title' => $part,
+                        'description' => $part,
+                        'is_completed' => false,
+                    ],
+                    $parts,
+                );
             }
 
             $this->syncChildren($workOrder, $data);
@@ -956,7 +1005,41 @@ final class WorkOrderService
                 $this->assertClosedFieldsUnchanged($workOrder, $data);
             }
 
+            // Prod Facturada/Abonada (ciclo_vida >= 8): almost no header updates; SLA only with update-closed.
+            $currentLifecycle = $workOrder->status?->lifecycle !== null ? (int) $workOrder->status->lifecycle : null;
+            $isInvoicedLike = $currentLifecycle !== null && $currentLifecycle >= 8;
+
+            if ($isInvoicedLike && $newStatusId === $oldStatusId) {
+                $slaPayload = [];
+
+                if (
+                    array_key_exists('sla_at', $data)
+                    && $this->actorCanUpdateClosed($actor, $workOrder)
+                ) {
+                    $slaPayload['sla_at'] = $data['sla_at'] ?: null;
+                    $slaPayload['sla_justification'] = $data['sla_justification'] ?? $workOrder->sla_justification;
+                }
+
+                if ($slaPayload !== []) {
+                    $workOrder->update($slaPayload);
+                }
+
+                return [
+                    'work_order' => $workOrder->fresh($this->defaultRelations()) ?? $workOrder,
+                    'cloned_estimate' => null,
+                ];
+            }
+
+            if ($workOrder->isConfirmedWorkOrder() || $workOrder->stage === WorkOrderStage::WorkOrder) {
+                $this->assertWorkOrderBusinessRules($workOrder, $data, $oldStatusId, $newStatusId, $actor);
+            }
+
             $attributes = $this->attributes($data, $workOrder->stage);
+
+            // Prod nonUpdatableFields: received_at is not client-writable without update-closed.
+            if (! $this->actorCanUpdateClosed($actor, $workOrder)) {
+                unset($attributes['received_at']);
+            }
 
             if (! $fieldsLocked) {
                 $attributes = [
@@ -970,7 +1053,12 @@ final class WorkOrderService
             }
 
             if ($fieldsLocked) {
-                $attributes = array_intersect_key($attributes, ['status_id' => true]);
+                // Prod (UpdateOtUseCase): closed without update-closed may still change status, referencia, po.
+                $attributes = array_intersect_key($attributes, [
+                    'status_id' => true,
+                    'reference' => true,
+                    'purchase_order' => true,
+                ]);
             }
 
             if ($attributes !== []) {
@@ -979,6 +1067,7 @@ final class WorkOrderService
 
             if (! $fieldsLocked) {
                 $this->syncChildren($workOrder, $data);
+                $this->syncChecklistCompletions($workOrder, $data, $actor);
                 $this->refreshHeaderTotals($workOrder);
             }
 
@@ -1208,7 +1297,6 @@ final class WorkOrderService
             'source_work_order_id',
             'closed_at',
             'billed_at',
-            'legacy_erp_id',
             'is_estimate',
             'is_work_order',
             'estimate_num',
@@ -1318,6 +1406,8 @@ final class WorkOrderService
             'received_at' => $workOrder->received_at?->format('Y-m-d\TH:i'),
             'intervention_at' => $workOrder->intervention_at?->format('Y-m-d\TH:i'),
             'due_at' => $workOrder->due_at?->format('Y-m-d\TH:i'),
+            'sla_at' => $workOrder->sla_at?->format('Y-m-d\TH:i'),
+            'sla_justification' => $workOrder->sla_justification,
             'sent_at' => $workOrder->sent_at?->format('Y-m-d\TH:i'),
             'closed_at' => $workOrder->closed_at?->format('Y-m-d\TH:i'),
             'created_at' => $workOrder->created_at?->format('Y-m-d\TH:i'),
@@ -1336,6 +1426,8 @@ final class WorkOrderService
                 'quote_net_amount' => $technician->quote_net_amount,
                 'quoted_at' => $technician->quoted_at?->format('Y-m-d'),
                 'quote_total_euros' => $technician->quote_total_euros,
+                'status_id' => $technician->status_id,
+                'attendance_confirmation_type_id' => $technician->attendance_confirmation_type_id,
             ])->values()->all(),
             'tasks' => $this->tasksForDocument($workOrder)->map(fn (TaskToPerform $task): array => [
                 'id' => $task->id,
@@ -1485,6 +1577,8 @@ final class WorkOrderService
             'received_at' => $data['received_at'] ?? null,
             'intervention_at' => $data['intervention_at'] ?? null,
             'due_at' => $data['due_at'] ?? null,
+            'sla_at' => $data['sla_at'] ?? null,
+            'sla_justification' => $data['sla_justification'] ?? null,
         ];
     }
 
@@ -1536,8 +1630,6 @@ final class WorkOrderService
     {
         $comparisons = [
             'subject' => $workOrder->subject,
-            'reference' => $workOrder->reference,
-            'purchase_order' => $workOrder->purchase_order,
             'notes' => $workOrder->notes,
             'internal_notes' => $workOrder->internal_notes,
             'establishment_id' => $workOrder->establishment_id !== null ? (int) $workOrder->establishment_id : null,
@@ -1769,6 +1861,10 @@ final class WorkOrderService
                 'quote_net_amount' => filled($row['quote_net_amount'] ?? null) ? $row['quote_net_amount'] : null,
                 'quoted_at' => filled($row['quoted_at'] ?? null) ? $row['quoted_at'] : null,
                 'quote_total_euros' => filled($row['quote_total_euros'] ?? null) ? $row['quote_total_euros'] : null,
+                'status_id' => filled($row['status_id'] ?? null) ? (int) $row['status_id'] : null,
+                'attendance_confirmation_type_id' => filled($row['attendance_confirmation_type_id'] ?? null)
+                    ? (int) $row['attendance_confirmation_type_id']
+                    : null,
             ];
 
             $id = isset($row['id']) ? (int) $row['id'] : 0;
@@ -1960,5 +2056,231 @@ final class WorkOrderService
     private function defaultRelations(): array
     {
         return ['establishment', 'status', 'responsibleUser', 'type', 'lines', 'technicians', 'collaborators'];
+    }
+
+    /**
+     * @return list<array{id: int, label: string, color: string|null}>
+     */
+    public function technicianStatusOptions(): array
+    {
+        return WorkOrderTechnicianStatus::query()
+            ->orderBy('id')
+            ->get(['id', 'name', 'color'])
+            ->map(fn (WorkOrderTechnicianStatus $status): array => [
+                'id' => $status->id,
+                'label' => $status->name,
+                'color' => $status->color,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, label: string}>
+     */
+    public function attendanceTypeOptions(): array
+    {
+        return TechnicianAttendanceConfirmationType::query()
+            ->orderBy('id')
+            ->get(['id', 'name'])
+            ->map(fn (TechnicianAttendanceConfirmationType $type): array => [
+                'id' => $type->id,
+                'label' => $type->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return list<array{id: int, name: string, completed: bool}>
+     */
+    public function checklistItemsForWorkOrder(WorkOrder $workOrder): array
+    {
+        $statusId = $workOrder->status_id !== null ? (int) $workOrder->status_id : null;
+
+        if ($statusId === null) {
+            return [];
+        }
+
+        $completedIds = WorkOrderChecklistCompletion::query()
+            ->where('work_order_id', $workOrder->id)
+            ->pluck('checklist_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        return Checklist::query()
+            ->where('document_type', ChecklistDocumentType::WorkOrder->value)
+            ->where('work_order_status_id', $statusId)
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'label'])
+            ->map(fn (Checklist $checklist): array => [
+                'id' => $checklist->id,
+                'name' => $checklist->label,
+                'completed' => in_array($checklist->id, $completedIds, true),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function syncChecklistCompletions(WorkOrder $workOrder, array $data, ?User $actor): void
+    {
+        if (! array_key_exists('checklist_completions', $data)) {
+            return;
+        }
+
+        $ids = array_values(array_unique(array_filter(
+            array_map('intval', (array) $data['checklist_completions']),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        WorkOrderChecklistCompletion::query()
+            ->where('work_order_id', $workOrder->id)
+            ->when($ids !== [], fn ($query) => $query->whereNotIn('checklist_id', $ids))
+            ->when($ids === [], fn ($query) => $query)
+            ->delete();
+
+        foreach ($ids as $checklistId) {
+            WorkOrderChecklistCompletion::query()->updateOrCreate(
+                [
+                    'work_order_id' => $workOrder->id,
+                    'checklist_id' => $checklistId,
+                ],
+                [
+                    'user_id' => $actor?->id,
+                    'is_validated' => true,
+                ],
+            );
+        }
+    }
+
+    /**
+     * Prod UpdateOtUseCase rules that map cleanly onto v2 statuses.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function assertWorkOrderBusinessRules(
+        WorkOrder $workOrder,
+        array $data,
+        int $oldStatusId,
+        int $newStatusId,
+        ?User $actor,
+    ): void {
+        $technicians = array_values(array_filter(
+            (array) ($data['technicians'] ?? []),
+            static fn (mixed $row): bool => is_array($row) && filled($row['company_relationship_id'] ?? null),
+        ));
+
+        $interventionAt = filled($data['intervention_at'] ?? null) ? (string) $data['intervention_at'] : null;
+        $oldIntervention = $workOrder->intervention_at?->format('Y-m-d H:i');
+        $newIntervention = $interventionAt !== null
+            ? Carbon::parse($interventionAt)->format('Y-m-d H:i')
+            : null;
+
+        // En Progreso (18) / En Espera de Material (16): cannot change intervention while staying in status.
+        if (
+            in_array($oldStatusId, [16, 18], true)
+            && $newStatusId === $oldStatusId
+            && $oldIntervention !== null
+            && $newIntervention !== null
+            && $oldIntervention !== $newIntervention
+        ) {
+            throw ValidationException::withMessages([
+                'intervention_at' => 'Intervention date cannot be changed in this status.',
+            ]);
+        }
+
+        // En Espera del Cliente (17) requires intervention date.
+        if ($newStatusId === 17 && $interventionAt === null) {
+            throw ValidationException::withMessages([
+                'intervention_at' => 'Intervention date is required for this status.',
+            ]);
+        }
+
+        $targetStatus = WorkOrderStatus::query()->find($newStatusId);
+        $isClosedNonReject = $targetStatus !== null
+            && ! $targetStatus->is_open
+            && ! (bool) $targetStatus->rejects_to_estimate
+            && ! in_array($newStatusId, [11, 12], true);
+
+        // Technicians required when entering En Progreso or a closed (non-reject) status.
+        $enteringTechnicianRequiredStatus = $newStatusId !== $oldStatusId
+            && ($newStatusId === 18 || $isClosedNonReject);
+
+        if ($enteringTechnicianRequiredStatus && $technicians === []) {
+            throw ValidationException::withMessages([
+                'technicians' => 'At least one technician is required for this status.',
+            ]);
+        }
+
+        // Near En Progreso: cannot change tasks within 1 hour of intervention.
+        if (
+            $oldStatusId === 18
+            && $newStatusId !== 18
+            && $workOrder->intervention_at !== null
+            && $workOrder->intervention_at->lte(now()->addHour())
+        ) {
+            $incomingTasks = collect((array) ($data['tasks'] ?? []))
+                ->map(fn (mixed $task): array => is_array($task) ? [
+                    'title' => trim((string) ($task['title'] ?? '')),
+                    'description' => trim((string) ($task['description'] ?? '')),
+                    'is_completed' => (bool) ($task['is_completed'] ?? false),
+                ] : [])
+                ->values()
+                ->all();
+            $currentTasks = $this->tasksForDocument($workOrder)
+                ->map(fn (TaskToPerform $task): array => [
+                    'title' => trim((string) $task->title),
+                    'description' => trim((string) ($task->description ?? '')),
+                    'is_completed' => (bool) $task->is_completed,
+                ])
+                ->values()
+                ->all();
+
+            if ($incomingTasks !== $currentTasks) {
+                throw ValidationException::withMessages([
+                    'tasks' => 'Tasks cannot be modified while the work order is in progress near the intervention time.',
+                ]);
+            }
+        }
+
+        // Establishment change only while open.
+        $newEstablishmentId = filled($data['establishment_id'] ?? null) ? (int) $data['establishment_id'] : null;
+        if (
+            $newEstablishmentId !== null
+            && $workOrder->establishment_id !== null
+            && $newEstablishmentId !== (int) $workOrder->establishment_id
+            && ! (bool) ($workOrder->status?->is_open ?? true)
+        ) {
+            throw ValidationException::withMessages([
+                'establishment_id' => 'Establishment cannot be changed on a closed work order.',
+            ]);
+        }
+
+        // Preventivo priority: block certain status transitions without permission.
+        $priorityId = filled($data['client_priority_id'] ?? null)
+            ? (int) $data['client_priority_id']
+            : ($workOrder->client_priority_id !== null ? (int) $workOrder->client_priority_id : null);
+        $preventive = ClientPriority::query()->whereKey($priorityId)->where('code', 'PREVENTIVO')->exists()
+            || ClientPriority::query()->whereKey($priorityId)->where('name', 'like', '%Preventiv%')->exists();
+
+        if ($preventive && in_array($newStatusId, [12, 13, 16, 17], true)) {
+            $canClose = $actor?->can('work_orders.update_closed') || $actor?->hasRole('Admin');
+
+            if (! $canClose && in_array($newStatusId, [11, 12], true)) {
+                throw ValidationException::withMessages([
+                    'status_id' => 'You do not have permission to close a preventive work order.',
+                ]);
+            }
+
+            if (in_array($newStatusId, [13, 16, 17], true)) {
+                throw ValidationException::withMessages([
+                    'status_id' => 'A preventive work order cannot be changed to this status.',
+                ]);
+            }
+        }
     }
 }

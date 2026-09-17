@@ -18,8 +18,6 @@ return new class extends Migration
             $table->string('kind', 32);
             $table->string('status', 32)->default('active');
             $table->string('classification', 50)->default('commercial');
-            $table->string('owner_reference', 80)->nullable();
-            $table->string('related_reference', 80)->nullable();
             $table->foreignId('brand_id')->nullable()->constrained('brands')->nullOnDelete();
             $table->foreignId('delegation_id')->nullable()->constrained('delegations')->nullOnDelete();
             $table->foreignId('billing_language_id')->nullable()->constrained('languages')->nullOnDelete();
@@ -33,7 +31,6 @@ return new class extends Migration
             $table->foreignId('account_owner_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('commercial_owner_id')->nullable()->constrained('users')->nullOnDelete();
             $table->foreignId('sourced_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('external_code', 80)->nullable();
             $table->text('notes')->nullable();
             $table->text('internal_notes')->nullable();
             $table->boolean('notes_alert')->default(false);

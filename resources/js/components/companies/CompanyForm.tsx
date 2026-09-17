@@ -46,7 +46,6 @@ export type CompanyFormValues = {
     language_id: string;
     latitude: string;
     longitude: string;
-    legacy_erp_id: string;
     logo: File | null;
     remove_logo: boolean;
 };
@@ -102,7 +101,6 @@ export function CompanyForm({
         const items: TabItem[] = [
             { id: 'identity', label: t('companies.tabs.identity') },
             { id: 'address', label: t('companies.tabs.address') },
-            { id: 'location', label: t('companies.tabs.location') },
         ];
 
         if (usersPanel) {
@@ -342,37 +340,39 @@ export function CompanyForm({
                             />
                         </Field>
 
-                        <Field label={t('companies.city')} htmlFor="city" error={errors.city}>
-                            <Input
-                                id="city"
-                                value={values.city}
-                                invalid={Boolean(errors.city)}
-                                onChange={(event) => onChange('city', event.target.value)}
-                            />
-                        </Field>
+                        <div className="grid gap-5 sm:col-span-2 sm:grid-cols-3">
+                            <Field label={t('companies.city')} htmlFor="city" error={errors.city}>
+                                <Input
+                                    id="city"
+                                    value={values.city}
+                                    invalid={Boolean(errors.city)}
+                                    onChange={(event) => onChange('city', event.target.value)}
+                                />
+                            </Field>
 
-                        <Field label={t('companies.province')} htmlFor="province_id" error={errors.province_id}>
-                            <SearchableSelect
-                                id="province_id"
-                                value={values.province_id}
-                                invalid={Boolean(errors.province_id)}
-                                onChange={(value) => onChange('province_id', value)}
-                                emptyLabel={t('common.none')}
-                                options={filteredProvinceOptions.map((option) => ({
-                                    value: String(option.id),
-                                    label: option.label,
-                                }))}
-                            />
-                        </Field>
+                            <Field label={t('companies.province')} htmlFor="province_id" error={errors.province_id}>
+                                <SearchableSelect
+                                    id="province_id"
+                                    value={values.province_id}
+                                    invalid={Boolean(errors.province_id)}
+                                    onChange={(value) => onChange('province_id', value)}
+                                    emptyLabel={t('common.none')}
+                                    options={filteredProvinceOptions.map((option) => ({
+                                        value: String(option.id),
+                                        label: option.label,
+                                    }))}
+                                />
+                            </Field>
 
-                        <Field label={t('companies.postalCode')} htmlFor="postal_code" error={errors.postal_code}>
-                            <Input
-                                id="postal_code"
-                                value={values.postal_code}
-                                invalid={Boolean(errors.postal_code)}
-                                onChange={(event) => onChange('postal_code', event.target.value)}
-                            />
-                        </Field>
+                            <Field label={t('companies.postalCode')} htmlFor="postal_code" error={errors.postal_code}>
+                                <Input
+                                    id="postal_code"
+                                    value={values.postal_code}
+                                    invalid={Boolean(errors.postal_code)}
+                                    onChange={(event) => onChange('postal_code', event.target.value)}
+                                />
+                            </Field>
+                        </div>
 
                         <Field label={t('companies.country')} htmlFor="country_id" error={errors.country_id}>
                             <SearchableSelect
@@ -411,11 +411,7 @@ export function CompanyForm({
                                 }))}
                             />
                         </Field>
-                    </div>
-                </TabPanel>
 
-                <TabPanel id="location">
-                    <div className="grid gap-5 sm:grid-cols-2">
                         <Field label={t('companies.latitude')} htmlFor="latitude" error={errors.latitude}>
                             <Input
                                 id="latitude"
@@ -451,17 +447,6 @@ export function CompanyForm({
                                 </a>
                             </div>
                         ) : null}
-
-                        <Field label={t('companies.legacyErpId')} htmlFor="legacy_erp_id" error={errors.legacy_erp_id}>
-                            <Input
-                                id="legacy_erp_id"
-                                type="number"
-                                min={0}
-                                value={values.legacy_erp_id}
-                                invalid={Boolean(errors.legacy_erp_id)}
-                                onChange={(event) => onChange('legacy_erp_id', event.target.value)}
-                            />
-                        </Field>
                     </div>
                 </TabPanel>
 

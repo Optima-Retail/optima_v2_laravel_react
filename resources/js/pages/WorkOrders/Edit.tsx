@@ -1,36 +1,54 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowRightLeft, Save, Trash2 } from 'lucide-react';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { ArrowRightLeft, FileText, Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
+import { EstimateWorkSummary } from '@/components/estimates/EstimateWorkSummary';
+import { PageActionsMenu } from '@/components/page/PageActionsMenu';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { WorkOrderAttachmentsPanel } from '@/components/work-orders/WorkOrderAttachmentsPanel';
-import { defaultWorkOrderFormValues, WorkOrderForm } from '@/components/work-orders/WorkOrderForm';
+import {
+    defaultWorkOrderFormValues,
+    WorkOrderForm,
+    type WorkOrderFormSection,
+    type WorkOrderPriorityOption,
+} from '@/components/work-orders/WorkOrderForm';
 import { confirmAction } from '@/helpers/confirm';
 import { confirmWorkOrderStatusChange } from '@/helpers/workOrderStatusChange';
 import { AppLayout } from '@/layouts/AppLayout';
 import { workOrdersService } from '@/services';
 import type { DocumentChatPayload } from '@/support/types/domain/chat';
-import type { UserOption, WorkOrderArticleOption } from '@/support/types/domain/common';
+import type { CompanyOption, UserOption, WorkOrderArticleOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
 import type { WorkOrderAttachmentItem, WorkOrderFormData } from '@/support/types/domain/work-order';
 import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
+
+type ChecklistItem = {
+    id: number;
+    name: string;
+    completed: boolean;
+};
 
 type EditWorkOrderProps = {
     workOrder: WorkOrderFormData;
     attachments: WorkOrderAttachmentItem[];
     statusOptions: WorkOrderStatusOption[];
     typeOptions: UserOption[];
-    priorityOptions: UserOption[];
+    priorityOptions: WorkOrderPriorityOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
-    contractOptions: UserOption[];
+    contractOptions?: UserOption[];
     requesterOptions: UserOption[];
-    technicianOptions: UserOption[];
+    technicianOptions: CompanyOption[];
     articleOptions: WorkOrderArticleOption[];
+    technicianStatusOptions: UserOption[];
+    attendanceTypeOptions: UserOption[];
+    checklistItems: ChecklistItem[];
     fields_locked?: boolean;
+    intervention_locked?: boolean;
+    can_change_establishment?: boolean;
     related_estimate_url?: string | null;
     chat: DocumentChatPayload | null;
     can: {
@@ -45,12 +63,18 @@ type EditWorkOrderProps = {
     };
 };
 
-function tabFromUrl(url: string): string {
+const FORM_TABS: WorkOrderFormSection[] = ['details', 'tasks', 'technicians', 'notes', 'lines', 'checklists'];
+
+function tabFromUrl(url: string, canViewAttachments: boolean): string {
     try {
         const query = url.includes('?') ? url.slice(url.indexOf('?')) : '';
-        const tab = new URLSearchParams(query).get('tab');
+        const tab = new URLSearchParams(query).get('tab') ?? 'details';
 
-        return tab === 'attachments' ? 'attachments' : 'details';
+        if (tab === 'attachments') {
+            return canViewAttachments ? 'attachments' : 'details';
+        }
+
+        return FORM_TABS.includes(tab as WorkOrderFormSection) ? tab : 'details';
     } catch {
         return 'details';
     }
@@ -64,22 +88,24 @@ export default function EditWorkOrder({
     priorityOptions,
     userOptions,
     establishmentOptions,
-    contractOptions,
+    contractOptions = [],
     requesterOptions,
     technicianOptions,
     articleOptions,
+    technicianStatusOptions,
+    attendanceTypeOptions,
+    checklistItems,
     chat,
     can,
     fields_locked = false,
+    intervention_locked = false,
+    can_change_establishment = true,
     related_estimate_url = null,
 }: EditWorkOrderProps) {
     const { t } = useTranslation();
     const { url } = usePage();
-    const [activeTab, setActiveTab] = useState(() => {
-        const tab = tabFromUrl(url);
-
-        return tab === 'attachments' && !can.view_attachments ? 'details' : tab;
-    });
+    const [activeTab, setActiveTab] = useState(() => tabFromUrl(url, can.view_attachments));
+    const [localChecklists, setLocalChecklists] = useState(checklistItems);
     const form = useForm(
         defaultWorkOrderFormValues({
             code: workOrder.code ?? '',
@@ -93,6 +119,7 @@ export default function EditWorkOrder({
             is_urgent: workOrder.is_urgent,
             establishment_id: workOrder.establishment_id ? String(workOrder.establishment_id) : '',
             contract_id: workOrder.contract_id ? String(workOrder.contract_id) : '',
+            currency_id: workOrder.currency_id ? String(workOrder.currency_id) : '',
             responsible_user_id: workOrder.responsible_user_id ? String(workOrder.responsible_user_id) : '',
             requester_id: workOrder.requester_id ? String(workOrder.requester_id) : '',
             notes: workOrder.notes ?? '',
@@ -102,6 +129,8 @@ export default function EditWorkOrder({
             received_at: workOrder.received_at ?? '',
             intervention_at: workOrder.intervention_at ?? '',
             due_at: workOrder.due_at ?? '',
+            sla_at: workOrder.sla_at ?? '',
+            sla_justification: workOrder.sla_justification ?? '',
             collaborator_ids: workOrder.collaborator_ids.map(String),
             lines: workOrder.lines.map((line) => ({
                 id: line.id,
@@ -123,12 +152,31 @@ export default function EditWorkOrder({
                     technician.quote_total_euros !== null && technician.quote_total_euros !== undefined
                         ? String(technician.quote_total_euros)
                         : '',
+                status_id: technician.status_id ? String(technician.status_id) : '',
+                attendance_confirmation_type_id: technician.attendance_confirmation_type_id
+                    ? String(technician.attendance_confirmation_type_id)
+                    : '',
+            })),
+            tasks: (workOrder.tasks ?? []).map((task) => ({
+                id: task.id,
+                title: task.title ?? '',
+                description: task.description ?? '',
+                is_completed: task.is_completed,
             })),
         }),
     );
 
+    const fieldsLocked = fields_locked || (workOrder.status_is_open === false && !can.update_closed);
+
     const tabItems = useMemo<TabItem[]>(() => {
-        const items: TabItem[] = [{ id: 'details', label: t('workOrders.tabDetails') }];
+        const items: TabItem[] = [
+            { id: 'details', label: t('workOrders.tabDetails') },
+            { id: 'tasks', label: t('workOrders.tabTasks') },
+            { id: 'technicians', label: t('workOrders.tabTechnicians') },
+            { id: 'notes', label: t('workOrders.tabNotes') },
+            { id: 'lines', label: t('workOrders.tabLines') },
+            { id: 'checklists', label: t('workOrders.tabChecklists') },
+        ];
 
         if (can.view_attachments) {
             items.push({
@@ -157,6 +205,9 @@ export default function EditWorkOrder({
         form.transform((data) => ({
             ...data,
             status_justification: result.justification || null,
+            checklist_completions: localChecklists
+                .filter((item) => item.completed)
+                .map((item) => item.id),
         }));
         workOrdersService.update(workOrder.id, form);
     }
@@ -178,6 +229,55 @@ export default function EditWorkOrder({
         workOrdersService.destroy(workOrder.id);
     }
 
+    const formProps = {
+        mode: 'edit' as const,
+        values: form.data,
+        errors: form.errors,
+        processing: form.processing,
+        fieldsLocked,
+        interventionLocked: intervention_locked,
+        canChangeEstablishment: can_change_establishment && !fieldsLocked,
+        statusOptions,
+        typeOptions,
+        priorityOptions,
+        userOptions,
+        establishmentOptions,
+        contractOptions,
+        requesterOptions,
+        technicianOptions,
+        articleOptions,
+        technicianStatusOptions,
+        attendanceTypeOptions,
+        checklistItems: localChecklists,
+        sourceLabel: workOrder.source_work_order_label,
+        estimateNum: workOrder.estimate_num,
+        workOrderNum: workOrder.work_order_num,
+        currencyLabel: workOrder.currency_label,
+        createdAt: workOrder.created_at,
+        closedAt: workOrder.closed_at,
+        onChange: (key: keyof typeof form.data, value: (typeof form.data)[keyof typeof form.data]) =>
+            form.setData(key, value),
+        onChecklistChange: (checklistId: number, completed: boolean) => {
+            setLocalChecklists((prev) =>
+                prev.map((item) => (item.id === checklistId ? { ...item, completed } : item)),
+            );
+        },
+        onSubmit: submit,
+        submitLabel: t('common.save'),
+        submitIcon: <Save className="size-4" aria-hidden />,
+        actions:
+            can.delete && activeTab === 'details' ? (
+                <Button type="button" variant="danger" onClick={destroyWorkOrder}>
+                    <Trash2 className="size-4" aria-hidden />
+                    {t('common.delete')}
+                </Button>
+            ) : null,
+    };
+
+    const title = [workOrder.work_order_num || workOrder.code, workOrder.subject]
+        .filter(Boolean)
+        .join(' - ') || String(workOrder.id);
+
     return (
         <AppLayout
             title={t('common.editResource', { resource: t('workOrders.resource') })}
@@ -192,67 +292,50 @@ export default function EditWorkOrder({
                 ) : null
             }
         >
-            <Head
-                title={t('common.editItem', {
-                    name: workOrder.subject || workOrder.code || workOrder.id,
-                })}
-            />
+            <Head title={t('common.editItem', { name: title })} />
             <div className="w-full space-y-6">
                 <PageHeader
                     eyebrow={t('workOrders.title')}
-                    title={workOrder.subject || workOrder.code || String(workOrder.id)}
+                    title={title}
                     description={t('common.updateDetails', {
                         name: workOrder.subject || workOrder.code || workOrder.id,
                     })}
                     backHref={workOrdersService.indexPath}
                     backLabel={t('common.backTo', { resource: t('workOrders.resourcePlural') })}
                     actions={
-                        related_estimate_url ? (
-                            <Link
-                                href={related_estimate_url}
-                                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-surface px-3 text-sm text-ink transition-colors hover:border-brand/40 hover:text-brand"
-                            >
-                                <ArrowRightLeft className="size-4" aria-hidden />
-                                {t('workOrders.openEstimate')}
-                            </Link>
-                        ) : null
+                        <div className="flex flex-wrap items-center gap-2">
+                            <PageActionsMenu
+                                items={[
+                                    {
+                                        key: 'pdf',
+                                        label: t('workOrders.previewPdf'),
+                                        icon: <FileText className="size-4" aria-hidden />,
+                                        href: workOrdersService.pdfPath(workOrder.id),
+                                        external: true,
+                                    },
+                                    ...(related_estimate_url
+                                        ? [
+                                              {
+                                                  key: 'estimate',
+                                                  label: t('workOrders.openEstimate'),
+                                                  icon: <ArrowRightLeft className="size-4" aria-hidden />,
+                                                  href: related_estimate_url,
+                                              },
+                                          ]
+                                        : []),
+                                ]}
+                            />
+                            <EstimateWorkSummary lines={form.data.lines} technicians={form.data.technicians} />
+                        </div>
                     }
                 />
 
                 <Tabs items={tabItems} value={activeTab} onValueChange={setActiveTab}>
-                    <TabPanel id="details">
-                        <WorkOrderForm
-                            values={form.data}
-                            errors={form.errors}
-                            processing={form.processing}
-                            stageLocked
-                            fieldsLocked={fields_locked || (workOrder.status_is_open === false && !can.update_closed)}
-                            statusOptions={statusOptions}
-                            typeOptions={typeOptions}
-                            priorityOptions={priorityOptions}
-                            userOptions={userOptions}
-                            establishmentOptions={establishmentOptions}
-                            contractOptions={contractOptions}
-                            requesterOptions={requesterOptions}
-                            technicianOptions={technicianOptions}
-                            articleOptions={articleOptions}
-                            sourceLabel={workOrder.source_work_order_label}
-                            estimateNum={workOrder.estimate_num}
-                            workOrderNum={workOrder.work_order_num}
-                            onChange={(key, value) => form.setData(key, value)}
-                            onSubmit={submit}
-                            submitLabel={t('common.save')}
-                            submitIcon={<Save className="size-4" aria-hidden />}
-                            actions={
-                                can.delete ? (
-                                    <Button type="button" variant="danger" onClick={destroyWorkOrder}>
-                                        <Trash2 className="size-4" aria-hidden />
-                                        {t('common.delete')}
-                                    </Button>
-                                ) : null
-                            }
-                        />
-                    </TabPanel>
+                    {FORM_TABS.map((section) => (
+                        <TabPanel key={section} id={section}>
+                            <WorkOrderForm {...formProps} section={section} />
+                        </TabPanel>
+                    ))}
 
                     {can.view_attachments ? (
                         <TabPanel id="attachments">

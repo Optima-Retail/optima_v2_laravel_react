@@ -1,6 +1,6 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { ArrowRightLeft, Save, Trash2 } from 'lucide-react';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { ArrowRightLeft, FileText, Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { DocumentChatPanel } from '@/components/chat/DocumentChatPanel';
 import {
@@ -10,6 +10,7 @@ import {
 } from '@/components/estimates/EstimateCreateForm';
 import { EstimateRatesPanel } from '@/components/estimates/EstimateRatesPanel';
 import { EstimateWorkSummary } from '@/components/estimates/EstimateWorkSummary';
+import { PageActionsMenu } from '@/components/page/PageActionsMenu';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
@@ -250,16 +251,6 @@ export default function EditEstimate({
         estimate.subject,
     ].filter(Boolean).join(' - ') || String(estimate.id);
 
-    const relatedWorkOrderLink = related_work_order_url ? (
-        <Link
-            href={related_work_order_url}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-line bg-surface px-3 text-sm text-ink transition-colors hover:border-brand/40 hover:text-brand"
-        >
-            <ArrowRightLeft className="size-4" aria-hidden />
-            {t('estimates.openWorkOrder')}
-        </Link>
-    ) : null;
-
     return (
         <AppLayout
             title={t('common.editResource', { resource: t('estimates.resource') })}
@@ -290,7 +281,27 @@ export default function EditEstimate({
                     backLabel={t('common.backTo', { resource: t('estimates.resourcePlural') })}
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
-                            {relatedWorkOrderLink}
+                            <PageActionsMenu
+                                items={[
+                                    {
+                                        key: 'pdf',
+                                        label: t('estimates.previewPdf'),
+                                        icon: <FileText className="size-4" aria-hidden />,
+                                        href: estimatesService.pdfPath(estimate.id),
+                                        external: true,
+                                    },
+                                    ...(related_work_order_url
+                                        ? [
+                                              {
+                                                  key: 'work-order',
+                                                  label: t('estimates.openWorkOrder'),
+                                                  icon: <ArrowRightLeft className="size-4" aria-hidden />,
+                                                  href: related_work_order_url,
+                                              },
+                                          ]
+                                        : []),
+                                ]}
+                            />
                             <EstimateWorkSummary lines={form.data.lines} technicians={form.data.technicians} />
                         </div>
                     }

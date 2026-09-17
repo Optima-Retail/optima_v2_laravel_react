@@ -107,53 +107,8 @@ final class FieldHelpSeeder extends Seeder
                     ],
                 ],
             ],
-            [
-                'key' => 'companies.legacy_erp_id',
-                'context' => 'companies',
-                'sort_order' => 50,
-                'translations' => [
-                    'en' => [
-                        'title' => 'Legacy ERP ID',
-                        'description' => 'Identifier of this company in the previous ERP or Optima v1. Keep stable for migrations, historical invoice matching, and dual-running integrations.',
-                    ],
-                    'es' => [
-                        'title' => 'ID ERP legado',
-                        'description' => 'Identificador de esta empresa en el ERP anterior u Optima v1. Manténgalo estable para migraciones, cruce de facturas históricas e integraciones en paralelo.',
-                    ],
-                ],
-            ],
 
             // ── Company relationships ──────────────────────────────────────
-            [
-                'key' => 'company_relationships.owner_reference',
-                'context' => 'company_relationships',
-                'sort_order' => 10,
-                'translations' => [
-                    'en' => [
-                        'title' => 'Owner reference',
-                        'description' => 'Internal code your organisation uses for this related party (customer or supplier account code). Appears on work orders, invoices, and exports so finance and operations share the same reference.',
-                    ],
-                    'es' => [
-                        'title' => 'Referencia del propietario',
-                        'description' => 'Código interno que su organización usa para esta parte relacionada (cuenta de cliente o proveedor). Aparece en órdenes de trabajo, facturas y exportaciones para alinear finanzas y operaciones.',
-                    ],
-                ],
-            ],
-            [
-                'key' => 'company_relationships.related_reference',
-                'context' => 'company_relationships',
-                'sort_order' => 20,
-                'translations' => [
-                    'en' => [
-                        'title' => 'Related party reference',
-                        'description' => 'Code that the related company uses for you (their vendor or customer number). Useful when the client’s portal or EDI requires their own account ID on documents.',
-                    ],
-                    'es' => [
-                        'title' => 'Referencia de la parte relacionada',
-                        'description' => 'Código que la empresa relacionada usa para usted (su número de proveedor o cliente). Útil cuando el portal o EDI del cliente exige su propio ID de cuenta en los documentos.',
-                    ],
-                ],
-            ],
             [
                 'key' => 'company_relationships.classification',
                 'context' => 'company_relationships',
@@ -768,21 +723,6 @@ final class FieldHelpSeeder extends Seeder
                     'es' => [
                         'title' => 'Precios con impuestos incluidos',
                         'description' => 'Si está activo, las tarifas acordadas y los importes de OT de este centro se tratan con IVA incluido. Afecta a cómo se desglosan base e impuestos en la factura.',
-                    ],
-                ],
-            ],
-            [
-                'key' => 'establishments.legacy_erp_id',
-                'context' => 'establishments',
-                'sort_order' => 70,
-                'translations' => [
-                    'en' => [
-                        'title' => 'Legacy ERP ID',
-                        'description' => 'Identifier of this establishment in the previous ERP. Keep unchanged to preserve historical cost centres and migrated work-order links.',
-                    ],
-                    'es' => [
-                        'title' => 'ID ERP legado',
-                        'description' => 'Identificador de este establecimiento en el ERP anterior. No lo cambie para preservar centros de coste históricos y enlaces de OT migradas.',
                     ],
                 ],
             ],

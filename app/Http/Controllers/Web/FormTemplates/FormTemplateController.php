@@ -120,6 +120,18 @@ final class FormTemplateController extends Controller
             ->with('success', 'form_template_deleted_successfully');
     }
 
+    public function duplicate(FormTemplate $formTemplate): RedirectResponse
+    {
+        $this->authorize('view', $formTemplate);
+        $this->authorize('create', FormTemplate::class);
+
+        $copy = $this->templates->duplicate($formTemplate);
+
+        return redirect()
+            ->route('form-templates.edit', $copy)
+            ->with('success', 'form_template_duplicated_successfully');
+    }
+
     /**
      * @return array<string, mixed>
      */

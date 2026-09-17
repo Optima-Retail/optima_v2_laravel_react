@@ -15,6 +15,7 @@ use App\Models\FormTemplateField;
 use App\Models\FormTemplateSection;
 use App\Models\FormType;
 use App\Models\Language;
+use App\Models\WorkOrder;
 use App\Models\WorkOrderType;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -79,6 +80,7 @@ final class FormTemplateService
             ]);
             $this->syncEstablishments($template, $data['establishment_ids'] ?? []);
             $this->syncSections($template, $data['sections'] ?? []);
+            $this->unsetSiblingDefaults($template);
 
             return $template->fresh(['sections.fields', 'type', 'language', 'workOrderType', 'brand', 'companyRelationship.relatedCompany', 'establishment', 'establishments'])
                 ?? $template;
@@ -106,9 +108,70 @@ final class FormTemplateService
             $template->update($this->headerAttributes($data));
             $this->syncEstablishments($template, $data['establishment_ids'] ?? []);
             $this->syncSections($template, $data['sections'] ?? []);
+            $this->unsetSiblingDefaults($template);
 
             return $template->fresh(['sections.fields', 'type', 'language', 'workOrderType', 'brand', 'companyRelationship.relatedCompany', 'establishment', 'establishments'])
                 ?? $template;
+        });
+    }
+
+    /**
+     * Duplicate a template together with its sections and fields. The copy always
+     * starts out as a non-default draft so it can never silently steal the
+     * "default template" slot from the one it was cloned from.
+     */
+    public function duplicate(FormTemplate $template): FormTemplate
+    {
+        return DB::transaction(function () use ($template): FormTemplate {
+            $template->loadMissing(['sections.fields', 'establishments:id']);
+
+            $copy = FormTemplate::query()->create([
+                'company_id' => $template->company_id,
+                'name' => $this->duplicateName($template),
+                'form_type_id' => $template->form_type_id,
+                'language_id' => $template->language_id,
+                'is_default' => false,
+                'work_order_type_id' => $template->work_order_type_id,
+                'owner_type' => $template->owner_type,
+                'brand_id' => $template->brand_id,
+                'company_relationship_id' => $template->company_relationship_id,
+                'establishment_id' => $template->establishment_id,
+            ]);
+
+            $this->syncEstablishments($copy, $template->establishments->pluck('id')->map(fn ($id) => (int) $id)->all());
+
+            foreach ($template->sections as $section) {
+                $newSection = FormTemplateSection::query()->create([
+                    'form_template_id' => $copy->id,
+                    'sort_order' => $section->sort_order,
+                    'label' => $section->label,
+                    'is_repeatable' => $section->is_repeatable,
+                    'is_modal' => $section->is_modal,
+                    'is_visible' => $section->is_visible,
+                ]);
+
+                // Conditional fields can only ever point at a field that already
+                // existed before this save (see StoreFormTemplateRequest), so a
+                // fresh clone intentionally drops the link rather than reattaching
+                // it to the wrong template's copy.
+                foreach ($section->fields as $field) {
+                    FormTemplateField::query()->create([
+                        'form_template_section_id' => $newSection->id,
+                        'sort_order' => $field->sort_order,
+                        'type' => $field->type,
+                        'label' => $field->label,
+                        'default_value' => $field->default_value,
+                        'is_required' => $field->is_required,
+                        'is_repeatable' => $field->is_repeatable,
+                        'is_visible' => $field->is_visible,
+                        'is_locked' => $field->is_locked,
+                        'payload' => $field->payload,
+                    ]);
+                }
+            }
+
+            return $copy->fresh(['sections.fields', 'type', 'language', 'workOrderType', 'brand', 'companyRelationship.relatedCompany', 'establishment', 'establishments'])
+                ?? $copy;
         });
     }
 
@@ -169,6 +232,8 @@ final class FormTemplateService
                     'is_repeatable' => $field->is_repeatable,
                     'is_visible' => $field->is_visible,
                     'is_locked' => $field->is_locked,
+                    'conditional_field_id' => $field->conditional_field_id,
+                    'payload' => $field->payload,
                 ])->values()->all(),
             ])->values()->all(),
         ];
@@ -316,6 +381,82 @@ final class FormTemplateService
     }
 
     /**
+     * Rank the templates eligible for a work order instead of handing back every
+     * template the company owns. A template explicitly linked (via
+     * establishment_form_template) to other establishments but not this one is
+     * dropped entirely; everything else is ordered best match first:
+     *
+     *   0. linked to this establishment for this exact work order type
+     *   1. linked to this establishment for any work order type
+     *   2. not linked to any establishment (i.e. usable everywhere)
+     *   — tie-broken by the template's own `is_default` flag, then name.
+     *
+     * @return list<array{id: int, label: string, is_default: bool}>
+     */
+    public function resolveForWorkOrder(Company $owner, WorkOrder $workOrder, ?int $formTypeId = null): array
+    {
+        $workOrder->loadMissing('establishment');
+        $establishmentId = $workOrder->establishment_id;
+        $languageId = $workOrder->establishment?->language_id;
+        $workOrderTypeId = $workOrder->work_order_type_id;
+
+        return $this->scopedQuery($owner)
+            ->when($formTypeId !== null, fn (Builder $q) => $q->where('form_type_id', $formTypeId))
+            ->where(function (Builder $q) use ($languageId): void {
+                $q->whereNull('language_id');
+
+                if ($languageId !== null) {
+                    $q->orWhere('language_id', $languageId);
+                }
+            })
+            ->with('establishments')
+            ->get()
+            ->map(function (FormTemplate $template) use ($establishmentId, $workOrderTypeId): ?array {
+                $rank = $this->establishmentMatchRank($template, $establishmentId, $workOrderTypeId);
+
+                return $rank === null ? null : ['template' => $template, 'rank' => $rank];
+            })
+            ->filter()
+            ->sort(fn (array $a, array $b): int => $a['rank'] <=> $b['rank']
+                ?: ($b['template']->is_default <=> $a['template']->is_default)
+                ?: strcasecmp($a['template']->name, $b['template']->name))
+            ->values()
+            ->map(fn (array $row): array => [
+                'id' => $row['template']->id,
+                'label' => $row['template']->name,
+                'is_default' => $row['template']->is_default,
+            ])
+            ->all();
+    }
+
+    /**
+     * Null means "not eligible for this work order at all" (the template is
+     * scoped to a set of establishments that doesn't include this one).
+     */
+    private function establishmentMatchRank(FormTemplate $template, ?int $establishmentId, ?int $workOrderTypeId): ?int
+    {
+        $links = $template->establishments;
+
+        if ($links->isEmpty()) {
+            return 2;
+        }
+
+        $match = $establishmentId !== null ? $links->firstWhere('id', $establishmentId) : null;
+
+        if ($match === null) {
+            return null;
+        }
+
+        $pivotWorkOrderTypeId = $match->pivot->work_order_type_id ?? null;
+
+        if ($pivotWorkOrderTypeId !== null && $workOrderTypeId !== null && (int) $pivotWorkOrderTypeId === (int) $workOrderTypeId) {
+            return 0;
+        }
+
+        return 1;
+    }
+
+    /**
      * @return Builder<FormTemplate>
      */
     private function scopedQuery(Company $owner): Builder
@@ -353,6 +494,47 @@ final class FormTemplateService
                 ? ($data['establishment_id'] ?? null)
                 : null,
         ];
+    }
+
+    /**
+     * When a template is flagged as the default for its form type + language,
+     * every other template sharing that (form_type_id, language_id) pair within
+     * the same company stops being the default.
+     */
+    private function unsetSiblingDefaults(FormTemplate $template): void
+    {
+        if (! $template->is_default) {
+            return;
+        }
+
+        FormTemplate::query()
+            ->where('company_id', $template->company_id)
+            ->where('form_type_id', $template->form_type_id)
+            ->where(function (Builder $query) use ($template): void {
+                if ($template->language_id === null) {
+                    $query->whereNull('language_id');
+
+                    return;
+                }
+
+                $query->where('language_id', $template->language_id);
+            })
+            ->whereKeyNot($template->id)
+            ->update(['is_default' => false]);
+    }
+
+    private function duplicateName(FormTemplate $template): string
+    {
+        $base = $template->name.' (copy)';
+        $name = $base;
+        $suffix = 2;
+
+        while (FormTemplate::query()->where('company_id', $template->company_id)->where('name', $name)->exists()) {
+            $name = $base.' '.$suffix;
+            $suffix++;
+        }
+
+        return $name;
     }
 
     /**
@@ -440,6 +622,10 @@ final class FormTemplateService
                     ? (bool) $fieldData['is_visible']
                     : true,
                 'is_locked' => (bool) ($fieldData['is_locked'] ?? false),
+                'conditional_field_id' => isset($fieldData['conditional_field_id']) && is_numeric($fieldData['conditional_field_id'])
+                    ? (int) $fieldData['conditional_field_id']
+                    : null,
+                'payload' => $fieldData['payload'] ?? null,
             ];
 
             if ($fieldId !== null) {

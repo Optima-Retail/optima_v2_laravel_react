@@ -97,7 +97,6 @@ class WorkOrder extends Model
         'notify_technician',
         'organization_seconds',
         'completion_seconds',
-        'legacy_erp_id',
     ];
 
     /**

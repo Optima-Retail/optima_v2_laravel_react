@@ -29,6 +29,10 @@ export const formTemplatesService = {
         router.delete(`${base}/${id}`, options);
     },
 
+    duplicate(id: number, options: Record<string, unknown> = {}) {
+        router.post(`${base}/${id}/duplicate`, {}, options);
+    },
+
     visitPage,
 
     createPath: `${base}/create`,

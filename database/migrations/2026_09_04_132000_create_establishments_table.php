@@ -47,7 +47,6 @@ return new class extends Migration
             $table->decimal('longitude', 20, 16)->nullable();
             $table->decimal('tax_rate', 10, 2)->nullable();
             $table->boolean('tax_included')->default(false);
-            $table->string('legacy_erp_id', 64)->nullable();
             $table->string('integration_external_id', 80)->nullable();
             $table->text('notes')->nullable();
             $table->boolean('notes_alert')->default(false);
@@ -60,7 +59,6 @@ return new class extends Migration
             $table->unique(['company_id', 'code']);
             $table->index(['company_id', 'is_active']);
             $table->index('store_code');
-            $table->index('legacy_erp_id');
             $table->index('integration_external_id');
         });
     }

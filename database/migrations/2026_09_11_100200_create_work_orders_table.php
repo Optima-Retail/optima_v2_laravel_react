@@ -97,7 +97,6 @@ return new class extends Migration
             $table->boolean('notify_technician')->default(false);
             $table->unsignedInteger('organization_seconds')->nullable();
             $table->unsignedInteger('completion_seconds')->nullable();
-            $table->string('legacy_erp_id', 64)->nullable();
             $table->timestamps();
             $table->softDeletes();
 
@@ -108,7 +107,6 @@ return new class extends Migration
             $table->index('estimate_num');
             $table->index('work_order_num');
             $table->index(['is_estimate', 'is_work_order']);
-            $table->index('legacy_erp_id');
         });
     }
 

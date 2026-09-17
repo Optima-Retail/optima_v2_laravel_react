@@ -16,7 +16,7 @@ This phase did **not** query production, so there are no concrete “cliente id 
 | `users.username`, `users.tenant_id` | Column vs v2 tenants | Schema dump |
 | `users.establecimiento_id`, `clientes_users`, `establecimientos_users` | No v2 table | Product: drop vs new portal model |
 | `marcas_usuarios` vs `brand_collaborators` vs `company_user` | Three different ideas | Decide |
-| `tecnicos.codigo` vs `codigo_tecnico` | Two codes, two v2 fields | Which maps to `owner_reference` / `external_code` |
+| `tecnicos.codigo` / `codigo_tecnico` | Dropped in v2 | Use `company_relationships.id` + `users.username` |
 | `partner` relationship kind | No legacy table | Ignore until a source exists |
 | `company.kind` corporation/holding/ute | No confirmed source | Manual |
 | Incident origin modelos other than 5/6/7 | v2 origin_type closed set | Drop origin or extend v2 |
@@ -125,7 +125,7 @@ Classify at dry-run:
 | `marcas.minutos_reunion` | No column |
 | `tecnicos.activo` | Column dropped |
 | Most `colaboradores` modelo_ids | No pivot |
-| FileMaker leftovers not on `legacy_erp_id` | No column |
+| FileMaker leftovers (`id_filemaker`, `id_partner`) | No column |
 
 ```text
 Legacy field

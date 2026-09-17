@@ -218,6 +218,31 @@ export function EstimateForm({
         }
     }
 
+    const actionsSection = showLines
+        ? 'lines'
+        : showNotes
+          ? 'notes'
+          : showTechnicians
+            ? 'technicians'
+            : showTasks
+              ? 'tasks'
+              : showDetails
+                ? 'details'
+                : null;
+
+    const formActions =
+        actions || !hideSubmit ? (
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line pt-4">
+                {actions}
+                {!hideSubmit ? (
+                    <Button type="submit" loading={processing} disabled={gated && !processing}>
+                        {submitIcon}
+                        {submitLabel}
+                    </Button>
+                ) : null}
+            </div>
+        ) : null;
+
     return (
         <FieldHelpScope table="work_orders">
             <form onSubmit={onSubmit} className="space-y-5">
@@ -474,6 +499,7 @@ export function EstimateForm({
                             </Field>
                         </div>
                     </div>
+                {actionsSection === 'details' ? formActions : null}
                 </Section>
                 ) : null}
 
@@ -565,6 +591,7 @@ export function EstimateForm({
                             ))}
                         </div>
                     )}
+                {actionsSection === 'tasks' ? formActions : null}
                 </Section>
                 ) : null}
 
@@ -775,6 +802,7 @@ export function EstimateForm({
                             }
                         }}
                     />
+                {actionsSection === 'technicians' ? formActions : null}
                 </Section>
                 ) : null}
 
@@ -821,6 +849,7 @@ export function EstimateForm({
                             uncheckedLabel={t('estimates.internalNotesAlertOff')}
                         />
                     </div>
+                {actionsSection === 'notes' ? formActions : null}
                 </Section>
                 ) : null}
 
@@ -955,18 +984,9 @@ export function EstimateForm({
                             ))}
                         </div>
                     )}
+                {actionsSection === 'lines' ? formActions : null}
                 </Section>
                 ) : null}
-
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                    {actions}
-                    {!hideSubmit ? (
-                        <Button type="submit" loading={processing} disabled={gated && !processing}>
-                            {submitIcon}
-                            {submitLabel}
-                        </Button>
-                    ) : null}
-                </div>
             </form>
         </FieldHelpScope>
     );

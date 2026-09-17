@@ -170,6 +170,7 @@ final class WorkOrderStatusCatalog
                     'id' => $id,
                     'label' => $status->name,
                     'color' => $status->color,
+                    'lifecycle' => $status->lifecycle !== null ? (int) $status->lifecycle : null,
                     'is_open' => (bool) $status->is_open,
                     'confirms_estimate' => (bool) $status->confirms_estimate,
                     'rejects_to_estimate' => (bool) $status->rejects_to_estimate,

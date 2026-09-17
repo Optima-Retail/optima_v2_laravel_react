@@ -60,14 +60,6 @@ fields:
     transform: true_to_intercompany_else_commercial
     confidence: medium
 
-  owner_reference:
-    sources:
-      - clientes.codigo
-      - proveedores.codigo
-      - tecnicos.codigo
-    mapping: rename
-    notes: tecnicos.codigo vs codigo_tecnico UNRESOLVED
-    confidence: medium
 
   brand_id:
     sources:

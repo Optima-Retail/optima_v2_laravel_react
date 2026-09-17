@@ -1,32 +1,52 @@
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Toast } from '@/components/feedback/Toast';
 import { useToastStore } from '@/stores/toastStore';
-import type { SharedPageProps } from '@/types';
+import type { FlashMessages, SharedPageProps } from '@/types';
+
+function flashMessage(flash: FlashMessages | null | undefined): { text: string; tone: 'success' | 'error' } | null {
+    if (flash?.error) {
+        return { text: flash.error, tone: 'error' };
+    }
+
+    if (flash?.success) {
+        return { text: flash.success, tone: 'success' };
+    }
+
+    return null;
+}
 
 export function ToastHost() {
     const { flash } = usePage<SharedPageProps>().props;
     const { t } = useTranslation();
     const push = useToastStore((state) => state.push);
-    const lastKey = useRef<string | null>(null);
+    const initialFlash = useRef(flash);
+    const handledInitial = useRef(false);
 
     useEffect(() => {
-        const message = flash.success || flash.error;
-        if (!message) {
-            lastKey.current = null;
-            return;
+        function showFlash(next: FlashMessages | null | undefined) {
+            const message = flashMessage(next);
+
+            if (!message) {
+                return;
+            }
+
+            push(t(`messages.${message.text}`, { defaultValue: message.text }), message.tone);
         }
 
-        const key = `${flash.success ?? ''}|${flash.error ?? ''}`;
-        if (lastKey.current === key) {
-            return;
+        // Full document load with flashed session (e.g. hard refresh after redirect).
+        if (!handledInitial.current) {
+            handledInitial.current = true;
+            showFlash(initialFlash.current);
         }
 
-        lastKey.current = key;
-        const translated = t(`messages.${message}`, { defaultValue: message });
-        push(translated, flash.error ? 'error' : 'success');
-    }, [flash.error, flash.success, push, t]);
+        // Every successful Inertia visit (store/update redirects back to edit, etc.).
+        return router.on('success', (event) => {
+            const pageFlash = (event.detail.page.props as SharedPageProps).flash;
+            showFlash(pageFlash);
+        });
+    }, [push, t]);
 
     return <Toast />;
 }

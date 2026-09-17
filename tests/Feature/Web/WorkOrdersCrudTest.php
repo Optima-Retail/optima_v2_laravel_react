@@ -7,15 +7,22 @@ namespace Tests\Feature\Web;
 use App\Domain\Auth\Enums\RoleEnum;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\WorkOrders\Enums\WorkOrderStage;
+use App\Models\ClientPriority;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\Contract;
 use App\Models\ContractStatus;
+use App\Models\Currency;
+use App\Models\Delegation;
 use App\Models\Establishment;
+use App\Models\TaskToPerform;
+use App\Models\TechnicianAttendanceConfirmationType;
 use App\Models\User;
 use App\Models\WorkOrder;
 use App\Models\WorkOrderStatus;
 use App\Models\WorkOrderStatusTransition;
+use App\Models\WorkOrderTechnicianStatus;
+use App\Models\WorkOrderType;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -36,7 +43,7 @@ final class WorkOrdersCrudTest extends TestCase
 
     public function test_admin_can_create_update_and_delete_work_orders(): void
     {
-        [$admin, $establishment, , , $received] = $this->seedContext();
+        [$admin, $establishment, , , $received, , , $type, $priority] = $this->seedContext();
 
         $this->actingAs($admin)
             ->get('/work-orders')
@@ -44,6 +51,7 @@ final class WorkOrdersCrudTest extends TestCase
             ->assertInertia(fn (Assert $page) => $page
                 ->component('WorkOrders/Index')
                 ->has('filters')
+                ->has('statusOptions')
                 ->has('can.create'));
 
         $this->actingAs($admin)
@@ -51,6 +59,8 @@ final class WorkOrdersCrudTest extends TestCase
                 'subject' => 'Install unit',
                 'status_id' => $received->id,
                 'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
                 'is_urgent' => false,
                 'code' => 'OT-100',
             ])
@@ -81,6 +91,9 @@ final class WorkOrdersCrudTest extends TestCase
                 ->where('workOrder.subject', 'Install unit')
                 ->where('workOrder.status_is_open', true)
                 ->where('fields_locked', false)
+                ->has('technicianStatusOptions')
+                ->has('attendanceTypeOptions')
+                ->has('checklistItems')
                 ->where('can.update_closed', true));
 
         $this->actingAs($admin)
@@ -88,6 +101,8 @@ final class WorkOrdersCrudTest extends TestCase
                 'subject' => 'Install unit updated',
                 'status_id' => $received->id,
                 'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
                 'is_urgent' => true,
                 'code' => 'OT-100',
             ])
@@ -182,6 +197,22 @@ final class WorkOrdersCrudTest extends TestCase
         $this->actingAs($editor)
             ->put("/work-orders/{$workOrder->id}", [
                 'subject' => 'Locked job',
+                'reference' => 'REF-ALLOWED',
+                'purchase_order' => 'PO-ALLOWED',
+                'status_id' => $closed->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'OT-LOCK',
+            ])
+            ->assertRedirect(route('work-orders.edit', $workOrder));
+
+        $workOrder->refresh();
+        $this->assertSame('REF-ALLOWED', $workOrder->reference);
+        $this->assertSame('PO-ALLOWED', $workOrder->purchase_order);
+
+        $this->actingAs($editor)
+            ->put("/work-orders/{$workOrder->id}", [
+                'subject' => 'Locked job',
                 'status_id' => $received->id,
                 'establishment_id' => $establishment->id,
                 'is_urgent' => false,
@@ -193,6 +224,20 @@ final class WorkOrdersCrudTest extends TestCase
         $this->assertSame($received->id, $workOrder->status_id);
         $this->assertSame('Locked job', $workOrder->subject);
 
+        $techCompany = Company::factory()->create(['name' => 'Close Tech', 'is_active' => true]);
+        $relationship = CompanyRelationship::factory()->create([
+            'owner_company_id' => $company->id,
+            'related_company_id' => $techCompany->id,
+            'kind' => CompanyRelationshipKind::Technician,
+        ]);
+
+        WorkOrderStatusTransition::query()->create([
+            'from_status_id' => $received->id,
+            'to_status_id' => $closed->id,
+            'requires_confirmation' => false,
+            'requires_justification' => false,
+        ]);
+
         $this->actingAs($admin)
             ->put("/work-orders/{$workOrder->id}", [
                 'subject' => 'Admin can edit closed',
@@ -200,6 +245,12 @@ final class WorkOrdersCrudTest extends TestCase
                 'establishment_id' => $establishment->id,
                 'is_urgent' => false,
                 'code' => 'OT-LOCK',
+                'technicians' => [
+                    [
+                        'company_relationship_id' => $relationship->id,
+                        'is_selected' => true,
+                    ],
+                ],
             ])
             ->assertRedirect(route('work-orders.edit', $workOrder));
 
@@ -284,7 +335,7 @@ final class WorkOrdersCrudTest extends TestCase
 
     public function test_work_orders_are_isolated_by_active_company(): void
     {
-        [$admin, $establishmentA, , , $received, , $companyA] = $this->seedContext();
+        [$admin, $establishmentA, , , $received, , $companyA, $type, $priority] = $this->seedContext();
 
         $companyB = Company::factory()->create(['name' => 'Company B']);
         $this->attachToCompany($admin, $companyB, active: false);
@@ -307,6 +358,8 @@ final class WorkOrdersCrudTest extends TestCase
                 'subject' => 'Owned by A',
                 'status_id' => $received->id,
                 'establishment_id' => $establishmentA->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
                 'is_urgent' => false,
                 'code' => 'OT-A-1',
             ])
@@ -318,11 +371,25 @@ final class WorkOrdersCrudTest extends TestCase
 
         $admin->forceFill(['active_company_id' => $companyB->id])->save();
 
+        $typeB = WorkOrderType::query()->create([
+            'name' => 'Corrective B',
+            'code' => 'COR-B',
+            'color' => '#112233',
+        ]);
+        $priorityB = ClientPriority::query()->create([
+            'name' => 'Normal B',
+            'code' => 'N-B',
+            'color' => '#445566',
+            'level' => 1,
+        ]);
+
         $this->actingAs($admin)
             ->post('/work-orders', [
                 'subject' => 'Owned by B',
                 'status_id' => $received->id,
                 'establishment_id' => $establishmentB->id,
+                'work_order_type_id' => $typeB->id,
+                'client_priority_id' => $priorityB->id,
                 'is_urgent' => false,
                 'code' => 'OT-B-1',
             ])
@@ -353,7 +420,7 @@ final class WorkOrdersCrudTest extends TestCase
 
     public function test_create_work_order_from_contract_prefills_and_persists_relation(): void
     {
-        [$admin, $establishment, , , $received, , $company] = $this->seedContext();
+        [$admin, $establishment, , , $received, , $company, $type, $priority] = $this->seedContext();
 
         $clientId = (int) $establishment->company_id;
         $status = ContractStatus::query()->create([
@@ -388,6 +455,8 @@ final class WorkOrdersCrudTest extends TestCase
                 'status_id' => $received->id,
                 'establishment_id' => $establishment->id,
                 'contract_id' => $contract->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
                 'is_urgent' => false,
                 'code' => 'OT-CONTRACT-1',
             ])
@@ -413,8 +482,225 @@ final class WorkOrdersCrudTest extends TestCase
         unset($company);
     }
 
+    public function test_create_requires_type_and_priority_and_derives_currency(): void
+    {
+        [$admin, $establishment, , , $received, , , $type, $priority, $currency] = $this->seedContext();
+
+        $this->actingAs($admin)
+            ->from('/work-orders/create')
+            ->post('/work-orders', [
+                'subject' => 'Missing type priority',
+                'status_id' => $received->id,
+                'establishment_id' => $establishment->id,
+                'is_urgent' => false,
+                'code' => 'OT-REQ-1',
+            ])
+            ->assertRedirect('/work-orders/create')
+            ->assertSessionHasErrors(['work_order_type_id', 'client_priority_id']);
+
+        $this->actingAs($admin)
+            ->post('/work-orders', [
+                'subject' => 'Derived currency',
+                'status_id' => $received->id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
+                'is_urgent' => false,
+                'code' => 'OT-REQ-2',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'work_order_created_successfully');
+
+        $workOrder = WorkOrder::query()->where('subject', 'Derived currency')->firstOrFail();
+        $this->assertSame($currency->id, (int) $workOrder->currency_id);
+        $this->assertSame((int) $establishment->delegation_id, (int) $workOrder->delegation_id);
+    }
+
+    public function test_tasks_survive_update_and_edit_exposes_them(): void
+    {
+        [$admin, $establishment, , , $received, , , $type, $priority] = $this->seedContext();
+
+        $this->actingAs($admin)
+            ->post('/work-orders', [
+                'subject' => 'Task A + Task B',
+                'status_id' => $received->id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
+                'is_urgent' => false,
+                'code' => 'OT-TASKS-1',
+            ])
+            ->assertRedirect();
+
+        $workOrder = WorkOrder::query()->where('subject', 'Task A + Task B')->firstOrFail();
+
+        $this->assertSame(
+            2,
+            TaskToPerform::query()
+                ->where('document_id', $workOrder->id)
+                ->where('document_type', 'work_order')
+                ->count(),
+        );
+
+        $this->actingAs($admin)
+            ->put("/work-orders/{$workOrder->id}", [
+                'subject' => 'Task A + Task B',
+                'status_id' => $received->id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
+                'is_urgent' => false,
+                'code' => $workOrder->code,
+                'tasks' => [
+                    [
+                        'title' => 'Inspect unit',
+                        'description' => 'Check airflow',
+                        'is_completed' => false,
+                    ],
+                    [
+                        'title' => 'Replace filter',
+                        'description' => 'Install new filter',
+                        'is_completed' => true,
+                    ],
+                ],
+            ])
+            ->assertRedirect(route('work-orders.edit', $workOrder));
+
+        $this->assertDatabaseHas('tasks_to_perform', [
+            'document_id' => $workOrder->id,
+            'document_type' => 'work_order',
+            'title' => 'Inspect unit',
+        ]);
+
+        $this->actingAs($admin)
+            ->get("/work-orders/{$workOrder->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('WorkOrders/Edit')
+                ->has('workOrder.tasks', 2)
+                ->where('workOrder.tasks.0.title', 'Inspect unit'));
+    }
+
+    public function test_technician_attendance_fields_persist(): void
+    {
+        [$admin, $establishment, , , $received, , $company, $type, $priority] = $this->seedContext();
+
+        $techCompany = Company::factory()->create(['name' => 'Tech Co', 'is_active' => true]);
+        $relationship = CompanyRelationship::factory()->create([
+            'owner_company_id' => $company->id,
+            'related_company_id' => $techCompany->id,
+            'kind' => CompanyRelationshipKind::Technician,
+        ]);
+        $techStatus = WorkOrderTechnicianStatus::query()->create([
+            'name' => 'Confirmed',
+            'color' => '#00aa00',
+        ]);
+        $attendance = TechnicianAttendanceConfirmationType::query()->create([
+            'name' => 'WhatsApp',
+        ]);
+
+        $this->actingAs($admin)
+            ->post('/work-orders', [
+                'subject' => 'Attendance OT',
+                'status_id' => $received->id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
+                'is_urgent' => false,
+                'code' => 'OT-ATT-1',
+                'technicians' => [
+                    [
+                        'company_relationship_id' => $relationship->id,
+                        'is_selected' => true,
+                        'status_id' => $techStatus->id,
+                        'attendance_confirmation_type_id' => $attendance->id,
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $workOrder = WorkOrder::query()->where('subject', 'Attendance OT')->firstOrFail();
+        $row = $workOrder->technicians()->firstOrFail();
+
+        $this->assertSame($techStatus->id, (int) $row->status_id);
+        $this->assertSame($attendance->id, (int) $row->attendance_confirmation_type_id);
+
+        $this->actingAs($admin)
+            ->get("/work-orders/{$workOrder->id}/edit")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('WorkOrders/Edit')
+                ->where('workOrder.technicians.0.status_id', $techStatus->id)
+                ->where('workOrder.technicians.0.attendance_confirmation_type_id', $attendance->id));
+    }
+
+    public function test_in_progress_status_requires_technician(): void
+    {
+        [$admin, $establishment, , , $received, , , $type, $priority] = $this->seedContext();
+        $inProgress = $this->makeStatus(18, WorkOrderStage::WorkOrder, 'En Progreso', 3, true);
+
+        WorkOrderStatusTransition::query()->create([
+            'from_status_id' => $received->id,
+            'to_status_id' => $inProgress->id,
+            'requires_confirmation' => false,
+            'requires_justification' => false,
+        ]);
+
+        $workOrder = WorkOrder::factory()->workOrder()->create([
+            'establishment_id' => $establishment->id,
+            'status_id' => $received->id,
+            'subject' => 'Needs tech',
+            'code' => 'OT-TECH-1',
+            'work_order_type_id' => $type->id,
+            'client_priority_id' => $priority->id,
+        ]);
+
+        $this->actingAs($admin)
+            ->from("/work-orders/{$workOrder->id}/edit")
+            ->put("/work-orders/{$workOrder->id}", [
+                'subject' => 'Needs tech',
+                'status_id' => $inProgress->id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
+                'is_urgent' => false,
+                'code' => 'OT-TECH-1',
+                'technicians' => [],
+            ])
+            ->assertRedirect("/work-orders/{$workOrder->id}/edit")
+            ->assertSessionHasErrors('technicians');
+    }
+
+    public function test_work_order_pdf_and_totals_endpoints(): void
+    {
+        [$admin, $establishment, , , $received, , , $type, $priority] = $this->seedContext();
+
+        $this->actingAs($admin)
+            ->post('/work-orders', [
+                'subject' => 'PDF subject',
+                'status_id' => $received->id,
+                'establishment_id' => $establishment->id,
+                'work_order_type_id' => $type->id,
+                'client_priority_id' => $priority->id,
+                'is_urgent' => false,
+                'code' => 'OT-PDF-1',
+            ])
+            ->assertRedirect();
+
+        $workOrder = WorkOrder::query()->where('subject', 'PDF subject')->firstOrFail();
+
+        $this->actingAs($admin)
+            ->get("/work-orders/{$workOrder->id}/pdf")
+            ->assertOk();
+
+        $this->actingAs($admin)
+            ->getJson('/work-orders/totals?pending=1')
+            ->assertOk()
+            ->assertJsonStructure(['count', 'total_amount', 'cost_amount', 'margin_percentage']);
+    }
+
     /**
-     * @return array{0: User, 1: Establishment, 2: WorkOrderStatus, 3: WorkOrderStatus, 4: WorkOrderStatus, 5: WorkOrderStatus, 6: Company}
+     * @return array{0: User, 1: Establishment, 2: WorkOrderStatus, 3: WorkOrderStatus, 4: WorkOrderStatus, 5: WorkOrderStatus, 6: Company, 7: WorkOrderType, 8: ClientPriority, 9: Currency}
      */
     private function seedContext(): array
     {
@@ -464,13 +750,40 @@ final class WorkOrdersCrudTest extends TestCase
             ['rejects_to_estimate' => true],
         );
 
+        $currency = Currency::query()->create([
+            'name' => 'Euro',
+            'code' => 'EUR',
+        ]);
+
+        $delegation = Delegation::query()->create([
+            'name' => 'Madrid',
+            'company_id' => $client->id,
+            'currency_id' => $currency->id,
+            'cost_includes_vat' => false,
+            'recovers_vat' => true,
+        ]);
+
         $establishment = Establishment::query()->create([
             'company_id' => $client->id,
+            'delegation_id' => $delegation->id,
             'name' => 'Store 1',
             'code' => 'S1',
         ]);
 
-        return [$admin, $establishment, $pending, $approved, $received, $rejected, $company];
+        $type = WorkOrderType::query()->create([
+            'name' => 'Corrective',
+            'code' => 'COR',
+            'color' => '#aabbcc',
+        ]);
+
+        $priority = ClientPriority::query()->create([
+            'name' => 'Normal',
+            'code' => 'N',
+            'color' => '#ccddee',
+            'level' => 1,
+        ]);
+
+        return [$admin, $establishment, $pending, $approved, $received, $rejected, $company, $type, $priority, $currency];
     }
 
     /**

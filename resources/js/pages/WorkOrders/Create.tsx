@@ -2,12 +2,18 @@ import { FormEvent } from 'react';
 import { Head, useForm } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { defaultWorkOrderFormValues, WorkOrderForm } from '@/components/work-orders/WorkOrderForm';
+import { EstimateWorkSummary } from '@/components/estimates/EstimateWorkSummary';
+import {
+    defaultWorkOrderFormValues,
+    WorkOrderForm,
+    type WorkOrderPriorityOption,
+} from '@/components/work-orders/WorkOrderForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { AppLayout } from '@/layouts/AppLayout';
 import { workOrdersService } from '@/services';
-import type { UserOption } from '@/support/types/domain/common';
+import type { CompanyOption, UserOption, WorkOrderArticleOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
+import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
 
 type CreateWorkOrderProps = {
     suggestedCode: string | null;
@@ -16,15 +22,17 @@ type CreateWorkOrderProps = {
     defaultEstablishmentId: number | null;
     defaultContractId: number | null;
     defaultSubject: string | null;
-    statusOptions: UserOption[];
+    statusOptions: WorkOrderStatusOption[];
     typeOptions: UserOption[];
-    priorityOptions: UserOption[];
+    priorityOptions: WorkOrderPriorityOption[];
     userOptions: UserOption[];
     establishmentOptions: EstablishmentOption[];
-    contractOptions: UserOption[];
+    contractOptions?: UserOption[];
     requesterOptions: UserOption[];
-    technicianOptions: UserOption[];
-    articleOptions: UserOption[];
+    technicianOptions: CompanyOption[];
+    articleOptions: WorkOrderArticleOption[];
+    technicianStatusOptions?: UserOption[];
+    attendanceTypeOptions?: UserOption[];
 };
 
 export default function CreateWorkOrder({
@@ -39,12 +47,18 @@ export default function CreateWorkOrder({
     priorityOptions,
     userOptions,
     establishmentOptions,
-    contractOptions,
+    contractOptions = [],
     requesterOptions,
     technicianOptions,
     articleOptions,
+    technicianStatusOptions = [],
+    attendanceTypeOptions = [],
 }: CreateWorkOrderProps) {
     const { t } = useTranslation();
+    const defaultEstablishment = defaultEstablishmentId
+        ? establishmentOptions.find((option) => option.id === defaultEstablishmentId)
+        : null;
+
     const form = useForm(
         defaultWorkOrderFormValues({
             code: suggestedCode ?? '',
@@ -53,6 +67,7 @@ export default function CreateWorkOrder({
             status_id: defaultStatusId ? String(defaultStatusId) : '',
             establishment_id: defaultEstablishmentId ? String(defaultEstablishmentId) : '',
             contract_id: defaultContractId ? String(defaultContractId) : '',
+            currency_id: defaultEstablishment?.currency_id ? String(defaultEstablishment.currency_id) : '',
         }),
     );
 
@@ -74,9 +89,12 @@ export default function CreateWorkOrder({
                     description={t('workOrders.createDescription')}
                     backHref={workOrdersService.indexPath}
                     backLabel={t('common.backTo', { resource: t('workOrders.resourcePlural') })}
+                    actions={<EstimateWorkSummary lines={form.data.lines} technicians={form.data.technicians} />}
                 />
 
                 <WorkOrderForm
+                    mode="create"
+                    section="all"
                     values={form.data}
                     errors={form.errors}
                     processing={form.processing}
@@ -91,6 +109,8 @@ export default function CreateWorkOrder({
                     requesterOptions={requesterOptions}
                     technicianOptions={technicianOptions}
                     articleOptions={articleOptions}
+                    technicianStatusOptions={technicianStatusOptions}
+                    attendanceTypeOptions={attendanceTypeOptions}
                     onChange={(key, value) => form.setData(key, value)}
                     onSubmit={submit}
                     submitLabel={t('common.createItem', { resource: t('workOrders.resource') })}

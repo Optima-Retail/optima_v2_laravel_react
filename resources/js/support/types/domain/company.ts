@@ -37,5 +37,4 @@ export type CompanyFormData = {
     language_id: number | null;
     latitude: string | null;
     longitude: string | null;
-    legacy_erp_id: number | null;
 };

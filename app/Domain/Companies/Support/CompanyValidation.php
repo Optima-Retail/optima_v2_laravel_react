@@ -83,7 +83,6 @@ final class CompanyValidation
             'language_id' => ['nullable', 'integer', Rule::exists('languages', 'id')->whereNull('deleted_at')],
             'latitude' => self::latitudeRules(),
             'longitude' => self::longitudeRules(),
-            'legacy_erp_id' => ['nullable', 'string', 'max:64'],
         ];
     }
 
@@ -163,7 +162,6 @@ final class CompanyValidation
             'longitude' => self::longitudeRules(),
             'tax_rate' => ['nullable', 'numeric'],
             'tax_included' => ['nullable', 'boolean'],
-            'legacy_erp_id' => ['nullable', 'string', 'max:64'],
             'integration_external_id' => ['nullable', 'string', 'max:80'],
             'notes' => ['nullable', 'string'],
             'notes_alert' => ['nullable', 'boolean'],
@@ -219,14 +217,11 @@ final class CompanyValidation
             'kind' => ['required', Rule::enum(CompanyRelationshipKind::class)],
             'status' => ['required', Rule::enum(CompanyRelationshipStatus::class)],
             'classification' => ['required', Rule::enum(CompanyRelationshipClassification::class)],
-            'owner_reference' => ['nullable', 'string', 'max:80'],
-            'related_reference' => ['nullable', 'string', 'max:80'],
             'brand_id' => [
                 'nullable',
                 'integer',
                 Rule::exists('brands', 'id')->whereNull('deleted_at'),
             ],
-            'external_code' => ['nullable', 'string', 'max:80'],
             'notes' => ['nullable', 'string'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
@@ -327,7 +322,7 @@ final class CompanyValidation
             'tradename', 'slug', 'tax_id', 'country_id', 'residence_country_id',
             'person_type', 'email', 'phone', 'website', 'address_line_1',
             'address_line_2', 'city', 'province_id', 'postal_code', 'employee_count',
-            'brand_id', 'language_id', 'latitude', 'longitude', 'legacy_erp_id',
+            'brand_id', 'language_id', 'latitude', 'longitude',
         ];
     }
 
@@ -337,7 +332,7 @@ final class CompanyValidation
     public static function relationshipNullableKeys(): array
     {
         return [
-            'owner_reference', 'related_reference', 'brand_id', 'external_code',
+            'brand_id',
             'notes', 'starts_at', 'ends_at', 'related_company_id',
             'delegation_id', 'billing_language_id', 'series_id',
             'integration_id', 'integration_external_id', 'reported_customer_relationship_id',

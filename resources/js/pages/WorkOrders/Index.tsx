@@ -1,25 +1,36 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Head, Link } from '@inertiajs/react';
-import { ClipboardList, Plus, Settings2 } from 'lucide-react';
+import { ChevronDown, ClipboardList, Plus, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CellComponent, ColumnDefinition } from 'tabulator-tables';
+import {
+    EstablishmentDocumentTotals,
+    type EstablishmentDocumentTotalsData,
+} from '@/components/establishments/EstablishmentDocumentTotals';
 import { PageHeader } from '@/components/page/PageHeader';
 import {
     RemoteDataTable,
     type RemoteDataColumnHelpers,
     type RemoteDataTableHandle,
+    type RemoteQueryState,
 } from '@/components/table/RemoteDataTable';
+import { WorkOrderBulkStatusModal } from '@/components/work-orders/WorkOrderBulkStatusModal';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { numberingPatternsService, workOrdersService } from '@/services';
+import { useToastStore } from '@/stores/toastStore';
 import {
     isDeleteActionClick,
     tabulatorActionsCell,
     tabulatorColorBadge,
     tabulatorDeleteButton,
     tabulatorEditLink,
+    tabulatorPdfLink,
+    tabulatorTextLink,
 } from '@/support/tabulator';
+import { formatDateTime } from '@/support/datetime';
 import type { WorkOrderListItem } from '@/support/types/domain/work-order';
+import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
 
 type WorkOrdersIndexProps = {
     filters: {
@@ -31,6 +42,7 @@ type WorkOrdersIndexProps = {
         direction: string;
         per_page: string;
     };
+    statusOptions: WorkOrderStatusOption[];
     can: {
         create: boolean;
         update: boolean;
@@ -39,89 +51,393 @@ type WorkOrdersIndexProps = {
     };
 };
 
-export default function WorkOrdersIndex({ filters, can }: WorkOrdersIndexProps) {
+const EMPTY_TOTALS: EstablishmentDocumentTotalsData = {
+    count: 0,
+    total_amount: 0,
+    cost_amount: 0,
+    margin_percentage: 0,
+};
+
+function subjectLabel(row: WorkOrderListItem, empty: string): string {
+    const code = row.work_order_num?.trim() || row.code?.trim();
+    const subject = row.subject?.trim();
+
+    if (code && subject) {
+        return `${code} - ${subject}`;
+    }
+
+    return code || subject || String(row.id) || empty;
+}
+
+function formatAmount(value: number | null | undefined, locale: string, empty: string): string {
+    if (value === null || value === undefined) {
+        return empty;
+    }
+
+    return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(value);
+}
+
+function formatPercent(value: number | null | undefined, locale: string, empty: string): string {
+    if (value === null || value === undefined) {
+        return empty;
+    }
+
+    return `${new Intl.NumberFormat(locale, {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+    }).format(value)} %`;
+}
+
+function formatTableDate(value: string | null | undefined, locale: string, empty: string): string {
+    return formatDateTime(value, locale) || empty;
+}
+
+function totalsQueryFromFilters(filters: Record<string, string>): string {
+    const params = new URLSearchParams();
+
+    for (const key of ['search', 'pending', 'created_from', 'created_to'] as const) {
+        const value = filters[key]?.trim();
+
+        if (value) {
+            params.set(key, value);
+        }
+    }
+
+    if (!params.has('pending')) {
+        params.set('pending', '1');
+    }
+
+    return params.toString();
+}
+
+export default function WorkOrdersIndex({ filters, statusOptions, can }: WorkOrdersIndexProps) {
     const { t, i18n } = useTranslation();
+    const pushToast = useToastStore((state) => state.push);
     const tableRef = useRef<RemoteDataTableHandle>(null);
     const canRef = useRef(can);
+    const actionsMenuRef = useRef<HTMLDivElement>(null);
+    const empty = t('common.emDash');
+    const noDate = t('establishments.documentColumns.noDate');
+    const [totals, setTotals] = useState<EstablishmentDocumentTotalsData>(EMPTY_TOTALS);
+    const [selectedRows, setSelectedRows] = useState<WorkOrderListItem[]>([]);
+    const [actionsOpen, setActionsOpen] = useState(false);
+    const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
+    const [bulkStatusProcessing, setBulkStatusProcessing] = useState(false);
+    const [totalsQuery, setTotalsQuery] = useState(() =>
+        totalsQueryFromFilters({
+            search: filters.search,
+            pending: filters.pending || '1',
+            created_from: filters.created_from,
+            created_to: filters.created_to,
+        }),
+    );
 
     useEffect(() => {
         canRef.current = can;
     }, [can]);
 
+    useEffect(() => {
+        if (!actionsOpen) {
+            return;
+        }
+
+        function onPointerDown(event: MouseEvent) {
+            if (!actionsMenuRef.current?.contains(event.target as Node)) {
+                setActionsOpen(false);
+            }
+        }
+
+        document.addEventListener('mousedown', onPointerDown);
+
+        return () => document.removeEventListener('mousedown', onPointerDown);
+    }, [actionsOpen]);
+
+    useEffect(() => {
+        const controller = new AbortController();
+
+        void fetch(`${workOrdersService.totalsPath}?${totalsQuery}`, {
+            headers: { Accept: 'application/json' },
+            signal: controller.signal,
+            credentials: 'same-origin',
+        })
+            .then(async (response) => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                return (await response.json()) as EstablishmentDocumentTotalsData;
+            })
+            .then((payload) => {
+                setTotals({
+                    count: Number(payload.count ?? 0),
+                    total_amount: Number(payload.total_amount ?? 0),
+                    cost_amount: Number(payload.cost_amount ?? 0),
+                    margin_percentage: Number(payload.margin_percentage ?? 0),
+                });
+            })
+            .catch((error: unknown) => {
+                if (error instanceof DOMException && error.name === 'AbortError') {
+                    return;
+                }
+
+                setTotals(EMPTY_TOTALS);
+            });
+
+        return () => controller.abort();
+    }, [totalsQuery]);
+
+    const initialFilterValues = useMemo(
+        () => ({
+            search: filters.search,
+            pending: filters.pending || '1',
+            created_from: filters.created_from,
+            created_to: filters.created_to,
+        }),
+        [filters.created_from, filters.created_to, filters.pending, filters.search],
+    );
+
+    const selectionOptions = useMemo(
+        () =>
+            can.update
+                ? {
+                      selectableRows: true,
+                      rowHeader: {
+                          formatter: 'rowSelection' as const,
+                          titleFormatter: 'rowSelection' as const,
+                          headerSort: false,
+                          resizable: false,
+                          frozen: true,
+                          width: 44,
+                          minWidth: 44,
+                      },
+                  }
+                : undefined,
+        [can.update],
+    );
+
+    function handleQueryChange(query: RemoteQueryState) {
+        setTotalsQuery(
+            totalsQueryFromFilters({
+                search: query.search ?? '',
+                pending: query.pending ?? '1',
+                created_from: query.created_from ?? '',
+                created_to: query.created_to ?? '',
+            }),
+        );
+    }
+
+    function openBulkStatus() {
+        setActionsOpen(false);
+
+        if (selectedRows.length === 0) {
+            pushToast(t('workOrders.bulkStatusNeedSelection'), 'error');
+
+            return;
+        }
+
+        setBulkStatusOpen(true);
+    }
+
+    async function submitBulkStatus(payload: { statusId: number; justification: string }) {
+        setBulkStatusProcessing(true);
+
+        try {
+            const result = await workOrdersService.bulkStatus({
+                ids: selectedRows.map((row) => row.id),
+                status_id: payload.statusId,
+                status_justification: payload.justification || null,
+            });
+
+            setBulkStatusOpen(false);
+            setSelectedRows([]);
+            tableRef.current?.getTable()?.deselectRow();
+            tableRef.current?.replaceData();
+            setTotalsQuery(totalsQueryFromFilters(tableRef.current?.getFilters() ?? initialFilterValues));
+
+            if (result.failed.length === 0) {
+                pushToast(t('workOrders.bulkStatusSuccess', { count: result.updated }), 'success');
+            } else if (result.updated > 0) {
+                pushToast(
+                    t('workOrders.bulkStatusPartial', {
+                        updated: result.updated,
+                        failed: result.failed.length,
+                    }),
+                    'error',
+                );
+            } else {
+                pushToast(t('workOrders.bulkStatusFailed'), 'error');
+            }
+        } catch {
+            pushToast(t('workOrders.bulkStatusFailed'), 'error');
+        } finally {
+            setBulkStatusProcessing(false);
+        }
+    }
+
     function buildColumns({ titleFormatter, getTable }: RemoteDataColumnHelpers): ColumnDefinition[] {
         return [
             {
-                title: t('common.id'),
-                field: 'id',
-                width: 72,
-                headerSort: true,
-                cssClass: 'cell-muted',
-                titleFormatter,
-            },
-            {
-                title: t('common.code'),
-                field: 'code',
-                minWidth: 110,
-                headerSort: true,
-                cssClass: 'cell-muted',
-                titleFormatter,
-                formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
-            },
-            {
-                title: t('workOrders.subject'),
+                title: t('establishments.documentColumns.subject'),
                 field: 'subject',
-                minWidth: 200,
+                minWidth: 220,
+                widthGrow: 3,
                 headerSort: true,
                 cssClass: 'cell-strong',
                 titleFormatter,
-                formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
+                formatter: (cell: CellComponent) => {
+                    const row = cell.getRow().getData() as WorkOrderListItem;
+                    const label = subjectLabel(row, empty);
+
+                    if (!canRef.current.update) {
+                        return label;
+                    }
+
+                    return tabulatorTextLink(workOrdersService.editPath(row.id), label);
+                },
             },
             {
                 title: t('workOrders.establishment'),
                 field: 'establishment_name',
                 minWidth: 160,
+                widthGrow: 1,
                 headerSort: false,
                 cssClass: 'cell-muted',
-                formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
+                formatter: (cell: CellComponent) => cell.getValue() || empty,
             },
             {
-                title: t('workOrders.status'),
+                title: t('establishments.documentColumns.type'),
+                field: 'type_name',
+                minWidth: 140,
+                headerSort: false,
+                formatter: (cell: CellComponent) => {
+                    const row = cell.getRow().getData() as WorkOrderListItem;
+                    const name = row.type_name;
+
+                    if (!name) {
+                        return `<span class="text-ink-muted">${empty}</span>`;
+                    }
+
+                    return tabulatorColorBadge(name, row.type_color || '#94a3b8');
+                },
+            },
+            {
+                title: t('establishments.documentColumns.status'),
                 field: 'status_name',
-                minWidth: 160,
+                minWidth: 150,
                 headerSort: false,
                 formatter: (cell: CellComponent) => {
                     const row = cell.getRow().getData() as WorkOrderListItem;
                     const name = row.status_name;
 
                     if (!name) {
-                        return `<span class="text-ink-muted">${t('common.emDash')}</span>`;
+                        return `<span class="text-ink-muted">${empty}</span>`;
                     }
 
                     return tabulatorColorBadge(name, row.status_color || '#94a3b8');
                 },
             },
             {
-                title: t('workOrders.responsibleUser'),
-                field: 'responsible_user_name',
-                minWidth: 140,
+                title: t('establishments.documentColumns.createdAt'),
+                field: 'created_at',
+                minWidth: 150,
+                headerSort: true,
+                cssClass: 'cell-muted',
+                titleFormatter,
+                formatter: (cell: CellComponent) =>
+                    formatTableDate(cell.getValue() as string | null, i18n.language, noDate),
+            },
+            {
+                title: t('establishments.documentColumns.interventionAt'),
+                field: 'intervention_at',
+                minWidth: 150,
                 headerSort: false,
                 cssClass: 'cell-muted',
-                formatter: (cell: CellComponent) => cell.getValue() || t('common.emDash'),
+                formatter: (cell: CellComponent) =>
+                    formatTableDate(cell.getValue() as string | null, i18n.language, noDate),
+            },
+            {
+                title: t('establishments.documentColumns.totalCost'),
+                field: 'cost_amount',
+                minWidth: 120,
+                headerSort: false,
+                hozAlign: 'right',
+                headerHozAlign: 'right',
+                cssClass: 'cell-muted',
+                formatter: (cell: CellComponent) => {
+                    const row = cell.getRow().getData() as WorkOrderListItem;
+
+                    return formatAmount(row.cost_amount, i18n.language, empty);
+                },
+            },
+            {
+                title: t('establishments.documentColumns.totalAmount'),
+                field: 'total_euros',
+                minWidth: 120,
+                headerSort: false,
+                hozAlign: 'right',
+                headerHozAlign: 'right',
+                cssClass: 'cell-muted',
+                formatter: (cell: CellComponent) => {
+                    const row = cell.getRow().getData() as WorkOrderListItem;
+
+                    return formatAmount(row.total_euros, i18n.language, empty);
+                },
+            },
+            {
+                title: t('establishments.documentColumns.margin'),
+                field: 'margin_percentage',
+                minWidth: 110,
+                headerSort: false,
+                hozAlign: 'right',
+                headerHozAlign: 'right',
+                formatter: (cell: CellComponent) => {
+                    const row = cell.getRow().getData() as WorkOrderListItem;
+                    const value = row.margin_percentage;
+                    const label = formatPercent(value, i18n.language, empty);
+
+                    if (value === null || value === undefined) {
+                        return `<span class="text-ink-muted">${label}</span>`;
+                    }
+
+                    const tone = value > 0 ? 'text-success' : value < 0 ? 'text-danger' : 'text-ink';
+
+                    return `<span class="${tone} font-semibold tabular-nums">${label}</span>`;
+                },
             },
             {
                 title: t('common.actions'),
                 field: 'actions',
-                width: 104,
+                minWidth: 148,
+                width: 148,
+                widthGrow: 0,
+                widthShrink: 0,
                 hozAlign: 'right',
                 headerHozAlign: 'right',
                 headerSort: false,
                 formatter: (cell: CellComponent) => {
                     const workOrder = cell.getRow().getData() as WorkOrderListItem;
                     const parts: string[] = [];
-                    const name = workOrder.subject || workOrder.code || workOrder.id;
+                    const name = subjectLabel(workOrder, String(workOrder.id));
+
+                    parts.push(
+                        tabulatorPdfLink(
+                            workOrdersService.pdfPath(workOrder.id),
+                            t('workOrders.downloadPdf', { name }),
+                        ),
+                    );
 
                     if (canRef.current.update) {
-                        parts.push(tabulatorEditLink(workOrdersService.editPath(workOrder.id), t('common.editItem', { name })));
+                        parts.push(
+                            tabulatorEditLink(
+                                workOrdersService.editPath(workOrder.id),
+                                t('common.editItem', { name }),
+                            ),
+                        );
                     }
 
                     if (canRef.current.delete) {
@@ -140,7 +456,7 @@ export default function WorkOrdersIndex({ filters, can }: WorkOrdersIndexProps) 
                     const confirmed = await confirmAction({
                         title: t('common.deleteTitle', { resource: t('workOrders.resource') }),
                         message: t('common.deleteMessage', {
-                            name: workOrder.subject || workOrder.code || workOrder.id,
+                            name: subjectLabel(workOrder, String(workOrder.id)),
                         }),
                         confirmLabel: t('common.delete'),
                         tone: 'danger',
@@ -154,6 +470,9 @@ export default function WorkOrdersIndex({ filters, can }: WorkOrdersIndexProps) 
                         preserveScroll: true,
                         onSuccess: () => {
                             getTable()?.replaceData();
+                            setTotalsQuery(
+                                totalsQueryFromFilters(tableRef.current?.getFilters() ?? initialFilterValues),
+                            );
                         },
                     });
                 },
@@ -170,6 +489,35 @@ export default function WorkOrdersIndex({ filters, can }: WorkOrdersIndexProps) 
                     description={t('workOrders.descriptionPage')}
                     actions={
                         <div className="flex flex-wrap items-center gap-2">
+                            {can.update ? (
+                                <div className="relative" ref={actionsMenuRef}>
+                                    <button
+                                        type="button"
+                                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink transition-colors hover:bg-canvas"
+                                        aria-expanded={actionsOpen}
+                                        aria-haspopup="menu"
+                                        onClick={() => setActionsOpen((open) => !open)}
+                                    >
+                                        {t('common.actions')}
+                                        <ChevronDown className="size-3.5" aria-hidden />
+                                    </button>
+                                    {actionsOpen ? (
+                                        <div
+                                            role="menu"
+                                            className="absolute right-0 z-20 mt-1 min-w-48 overflow-hidden rounded-lg border border-line bg-surface py-1 shadow-lg"
+                                        >
+                                            <button
+                                                type="button"
+                                                role="menuitem"
+                                                className="flex w-full items-center px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-canvas"
+                                                onClick={openBulkStatus}
+                                            >
+                                                {t('workOrders.bulkStatusAction')}
+                                            </button>
+                                        </div>
+                                    ) : null}
+                                </div>
+                            ) : null}
                             {can.configure_pattern ? (
                                 <Link
                                     href={numberingPatternsService.indexPath}
@@ -192,6 +540,8 @@ export default function WorkOrdersIndex({ filters, can }: WorkOrdersIndexProps) 
                     }
                 />
 
+                <EstablishmentDocumentTotals totals={totals} />
+
                 <RemoteDataTable<WorkOrderListItem>
                     ref={tableRef}
                     ajaxURL={workOrdersService.dataPath}
@@ -201,12 +551,10 @@ export default function WorkOrdersIndex({ filters, can }: WorkOrdersIndexProps) 
                         dir: filters.direction === 'asc' ? 'asc' : 'desc',
                     }}
                     pageSize={Number(filters.per_page) || 25}
-                    initialFilters={{
-                        search: filters.search,
-                        pending: filters.pending || '1',
-                        created_from: filters.created_from,
-                        created_to: filters.created_to,
-                    }}
+                    initialFilters={initialFilterValues}
+                    onQueryChange={handleQueryChange}
+                    onRowSelectionChanged={setSelectedRows}
+                    options={selectionOptions}
                     filterFields={[
                         {
                             type: 'search',
@@ -239,9 +587,20 @@ export default function WorkOrdersIndex({ filters, can }: WorkOrdersIndexProps) 
                     syncUrlBase={workOrdersService.indexPath}
                     emptyIcon={<ClipboardList className="size-5" aria-hidden />}
                     emptyMessage={t('common.empty', { resource: t('workOrders.resourcePlural') })}
-                    deps={[i18n.language]}
+                    deps={[i18n.language, can.update]}
                 />
             </div>
+
+            <WorkOrderBulkStatusModal
+                open={bulkStatusOpen}
+                selectedCount={selectedRows.length}
+                statusOptions={statusOptions}
+                processing={bulkStatusProcessing}
+                onClose={() => setBulkStatusOpen(false)}
+                onConfirm={(payload) => {
+                    void submitBulkStatus(payload);
+                }}
+            />
         </AppLayout>
     );
 }

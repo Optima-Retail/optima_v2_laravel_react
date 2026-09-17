@@ -35,7 +35,6 @@ return new class extends Migration
             $table->foreignId('language_id')->nullable()->constrained('languages')->nullOnDelete();
             $table->decimal('latitude', 20, 16)->nullable();
             $table->decimal('longitude', 20, 16)->nullable();
-            $table->string('legacy_erp_id', 64)->nullable();
             $table->timestamps();
             $table->softDeletes();
 
@@ -43,7 +42,6 @@ return new class extends Migration
             $table->unique('tax_id');
             $table->index('kind');
             $table->index('is_active');
-            $table->index('legacy_erp_id');
         });
 
         Schema::create('company_user', function (Blueprint $table): void {

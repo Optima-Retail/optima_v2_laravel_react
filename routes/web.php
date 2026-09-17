@@ -407,6 +407,10 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:work_orders.view')->group(function (): void {
             Route::get('/work-orders', [WorkOrderController::class, 'index'])->name('work-orders.index');
             Route::get('/work-orders/data', [WorkOrderController::class, 'data'])->name('work-orders.data');
+            Route::get('/work-orders/totals', [WorkOrderController::class, 'totals'])->name('work-orders.totals');
+            Route::get('/work-orders/{work_order}/pdf', [WorkOrderController::class, 'downloadPdf'])
+                ->whereNumber('work_order')
+                ->name('work-orders.pdf');
         });
 
         Route::middleware('permission:work_orders.create')->group(function (): void {
@@ -415,6 +419,8 @@ Route::middleware('auth')->group(function (): void {
         });
 
         Route::middleware('permission:work_orders.update')->group(function (): void {
+            Route::post('/work-orders/bulk-status', [WorkOrderController::class, 'bulkStatus'])
+                ->name('work-orders.bulk-status');
             Route::get('/work-orders/{work_order}/edit', [WorkOrderController::class, 'edit'])
                 ->whereNumber('work_order')
                 ->name('work-orders.edit');
@@ -522,6 +528,9 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:form_templates.create')->group(function (): void {
             Route::get('/form-templates/create', [FormTemplateController::class, 'create'])->name('form-templates.create');
             Route::post('/form-templates', [FormTemplateController::class, 'store'])->name('form-templates.store');
+            Route::post('/form-templates/{form_template}/duplicate', [FormTemplateController::class, 'duplicate'])
+                ->whereNumber('form_template')
+                ->name('form-templates.duplicate');
         });
 
         Route::middleware('permission:form_templates.update')->group(function (): void {
@@ -542,10 +551,15 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:forms.view')->group(function (): void {
             Route::get('/forms', [FormController::class, 'index'])->name('forms.index');
             Route::get('/forms/data', [FormController::class, 'data'])->name('forms.data');
+            Route::get('/forms/{form}/pdf', [FormController::class, 'downloadPdf'])
+                ->whereNumber('form')
+                ->name('forms.pdf');
         });
 
         Route::middleware('permission:forms.create')->group(function (): void {
             Route::get('/forms/create', [FormController::class, 'create'])->name('forms.create');
+            Route::get('/forms/template-suggestions', [FormController::class, 'templateSuggestions'])
+                ->name('forms.template-suggestions');
             Route::post('/forms', [FormController::class, 'store'])->name('forms.store');
         });
 
@@ -559,6 +573,12 @@ Route::middleware('auth')->group(function (): void {
             Route::post('/forms/{form}/advance', [FormController::class, 'advance'])
                 ->whereNumber('form')
                 ->name('forms.advance');
+            Route::post('/forms/{form}/fields/{field}/file', [FormController::class, 'uploadFieldFile'])
+                ->whereNumber(['form', 'field'])
+                ->name('forms.fields.upload');
+            Route::get('/forms/{form}/fields/{field}/file', [FormController::class, 'showFieldFile'])
+                ->whereNumber(['form', 'field'])
+                ->name('forms.fields.file');
         });
 
         Route::middleware('permission:forms.delete')->group(function (): void {

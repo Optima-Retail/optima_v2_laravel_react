@@ -43,7 +43,7 @@ Companion UI: `/var/www/achraf.es/optima_prod/optimafront` (not a second databas
 1. **No ID reuse for operational rows.** `legacy_id == new_id` is forbidden except for **catalogs whose seeders already force legacy IDs**.
 2. **Do not invent mappings.** Unclear items stay unresolved.
 3. **Identity is not a table rename.** Clients, suppliers and technicians become `companies` **plus** typed `company_relationships`.
-4. **Preserve provenance.** Use `companies.legacy_erp_id`, mapping tables, and `company_relationships.legacy_status_id` where defined.
+4. **Preserve provenance.** Use mapping tables and `company_relationships.legacy_status_id` where defined.
 5. **Do not migrate domains that have no v2 tables yet** (invoices, CRM overlay, tickets, stock, treasury). Work orders/estimates **do** have `work_orders` — see [09-work-orders.md](09-work-orders.md).
 6. **Reference data first.** Status/type catalogs are seeded with preserved IDs; operational FKs depend on them.
 

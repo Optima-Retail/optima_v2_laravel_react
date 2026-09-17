@@ -20,6 +20,7 @@ import {
     tabulatorCopyButton,
     tabulatorDeleteButton,
     tabulatorEditLink,
+    tabulatorPdfLink,
 } from '@/support/tabulator';
 import { useToastStore } from '@/stores/toastStore';
 
@@ -114,13 +115,14 @@ export default function FormsIndex({ filters, typeOptions, statusOptions, can }:
             {
                 title: t('common.actions'),
                 field: 'actions',
-                width: 140,
+                width: 176,
                 hozAlign: 'right',
                 headerHozAlign: 'right',
                 headerSort: false,
                 formatter: (cell: CellComponent) => {
                     const row = cell.getRow().getData() as ListItem;
                     const parts: string[] = [
+                        tabulatorPdfLink(formsService.pdfPath(row.id), t('forms.downloadPdf')),
                         tabulatorCopyButton(t('forms.copyPublicLink')),
                     ];
 

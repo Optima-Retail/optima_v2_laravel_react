@@ -14,8 +14,10 @@ import { AppLayout } from '@/layouts/AppLayout';
 import { formTemplatesService } from '@/services';
 import {
     isDeleteActionClick,
+    isDuplicateActionClick,
     tabulatorActionsCell,
     tabulatorDeleteButton,
+    tabulatorDuplicateButton,
     tabulatorEditLink,
 } from '@/support/tabulator';
 
@@ -95,13 +97,17 @@ export default function FormTemplatesIndex({ filters, typeOptions, can }: IndexP
             {
                 title: t('common.actions'),
                 field: 'actions',
-                width: 104,
+                width: 136,
                 hozAlign: 'right',
                 headerHozAlign: 'right',
                 headerSort: false,
                 formatter: (cell: CellComponent) => {
                     const row = cell.getRow().getData() as ListItem;
                     const parts: string[] = [];
+
+                    if (canRef.current.create) {
+                        parts.push(tabulatorDuplicateButton(t('formTemplates.duplicateItem', { name: row.name })));
+                    }
 
                     if (canRef.current.update) {
                         parts.push(
@@ -119,11 +125,21 @@ export default function FormTemplatesIndex({ filters, typeOptions, can }: IndexP
                     return tabulatorActionsCell(parts);
                 },
                 cellClick: async (_event, cell) => {
+                    const row = cell.getRow().getData() as ListItem;
+
+                    if (isDuplicateActionClick(_event) && canRef.current.create) {
+                        formTemplatesService.duplicate(row.id, {
+                            preserveScroll: true,
+                            onSuccess: () => getTable()?.replaceData(),
+                        });
+
+                        return;
+                    }
+
                     if (!isDeleteActionClick(_event) || !canRef.current.delete) {
                         return;
                     }
 
-                    const row = cell.getRow().getData() as ListItem;
                     const confirmed = await confirmAction({
                         title: t('common.deleteTitle', { resource: t('formTemplates.resource') }),
                         message: t('common.deleteMessage', { name: row.name }),

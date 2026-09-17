@@ -224,15 +224,13 @@ final class QualityScoreProcessor
     {
         return match ($actionId) {
             QualityActionId::TiempoEnvioPresupuesto => $workOrder->isEstimate()
-                && $workOrder->sent_at !== null
-                && $workOrder->legacy_erp_id === null,
+                && $workOrder->sent_at !== null,
             QualityActionId::OtRealizadaCodRojo,
             QualityActionId::OtRealizadaCodAmarilloNaranja,
             QualityActionId::OtRealizadaCodVerde,
             QualityActionId::OtRealizadaCodPreventivo => $workOrder->isConfirmedWorkOrder()
                 && $workOrder->parent_work_order_id === null
                 && $workOrder->incident_id === null
-                && $workOrder->legacy_erp_id === null
                 && $workOrder->intervention_at !== null
                 && ! in_array((int) $workOrder->status_id, [
                     /* Cerrada - Cancelada */ 11,

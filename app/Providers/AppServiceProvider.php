@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domain\Forms\Events\FormCompleted;
+use App\Listeners\SendFormCompletedNotification;
 use App\Models\Role;
 use App\Models\WorkOrder;
 use App\Policies\RolePolicy;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
@@ -35,5 +38,7 @@ class AppServiceProvider extends ServiceProvider
                 ->where('is_work_order', true)
                 ->firstOrFail();
         });
+
+        Event::listen(FormCompleted::class, SendFormCompletedNotification::class);
     }
 }

@@ -70,7 +70,6 @@ export default function EditCompany({
         language_id: company.language_id ? String(company.language_id) : '',
         latitude: company.latitude !== null && company.latitude !== undefined ? String(company.latitude) : '',
         longitude: company.longitude !== null && company.longitude !== undefined ? String(company.longitude) : '',
-        legacy_erp_id: company.legacy_erp_id !== null && company.legacy_erp_id !== undefined ? String(company.legacy_erp_id) : '',
         logo: null as File | null,
         remove_logo: false,
     });

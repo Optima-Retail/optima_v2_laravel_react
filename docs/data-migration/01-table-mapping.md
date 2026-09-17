@@ -232,7 +232,7 @@ Work orders and estimates are **`work_orders`** — see [09-work-orders.md](09-w
 | `Tecnico::$fillable` `activo` | Column dropped; use `estado_id` → `legacy_status_id` |
 | Duplicate CRM `companies` | Different domain |
 | Many `estados` IDs | Not seeded in v2 |
-| FileMaker IDs (`id_filemaker`, `id_fixner`) | `legacy_erp_id` on companies only; rest unresolved |
+| FileMaker IDs (`id_filemaker`, `id_fixner`) | unresolved (no `legacy_erp_id` column) |
 
 ---
 

@@ -1,6 +1,6 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Head, useForm } from '@inertiajs/react';
-import { ArrowRight, Copy, Save, Trash2 } from 'lucide-react';
+import { ArrowRight, Copy, FileDown, Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
@@ -16,6 +16,7 @@ import { AppLayout } from '@/layouts/AppLayout';
 import { formsService } from '@/services';
 import { APP_PLATFORM_OPTIONS } from '@/support/types/domain/app-platform';
 import { useToastStore } from '@/stores/toastStore';
+import { FormFieldInput, type FormFieldPayload } from '@/components/forms/FormFieldInput';
 
 type Option = { id: number; label: string };
 
@@ -29,6 +30,8 @@ type FormFieldRow = {
     is_required: boolean;
     is_visible: boolean;
     is_locked: boolean;
+    conditional_field_id: number | null;
+    payload: FormFieldPayload;
 };
 
 type FormSectionRow = {
@@ -126,13 +129,84 @@ export default function EditForm({
                 is_required: field.is_required,
                 is_visible: field.is_visible,
                 is_locked: field.is_locked,
+                conditional_field_id: field.conditional_field_id,
             })),
         })),
     });
 
+    // Kept outside useForm's own (strongly-typed) data — mixing an open-ended
+    // Record<string, unknown> field into that generic breaks Inertia's dotted
+    // FormDataKeys inference for the whole form. Merged back in at submit time
+    // via form.transform().
+    const [fieldPayloads, setFieldPayloads] = useState<Record<number, FormFieldPayload>>(() => {
+        const initial: Record<number, FormFieldPayload> = {};
+
+        formRecord.sections.forEach((section) => {
+            section.fields.forEach((field) => {
+                initial[field.id] = field.payload;
+            });
+        });
+
+        return initial;
+    });
+
+    // A form whose current status has no further status to advance to is closed
+    // for editing (matches the backend lock in FormService::guardEditable()).
+    const isClosed = formRecord.next_status_id === null;
+
+    // Current answer per field id, used to resolve conditional visibility —
+    // a field whose conditional_field_id target doesn't match payload.value
+    // isn't shown, and isn't required either (see FormFieldValidator).
+    const fieldValues = useMemo(() => {
+        const values: Record<number, string> = {};
+
+        form.data.sections.forEach((section) => {
+            section.fields.forEach((field) => {
+                values[field.id] = field.value;
+            });
+        });
+
+        return values;
+    }, [form.data.sections]);
+
+    function isFieldVisible(field: { is_visible: boolean; conditional_field_id: number | null; id: number }): boolean {
+        if (!field.is_visible) {
+            return false;
+        }
+
+        if (field.conditional_field_id === null) {
+            return true;
+        }
+
+        const expected = fieldPayloads[field.id]?.value;
+
+        if (expected === undefined || expected === null || expected === '') {
+            return true;
+        }
+
+        return fieldValues[field.conditional_field_id] === expected;
+    }
+
     function submit(event: FormEvent) {
         event.preventDefault();
+        form.transform((data) => ({
+            ...data,
+            sections: data.sections.map((section) => ({
+                ...section,
+                fields: section.fields.map((field) => ({
+                    ...field,
+                    payload: fieldPayloads[field.id] ?? null,
+                })),
+            })),
+        }));
         formsService.update(formRecord.id, form);
+    }
+
+    function advanceStatus() {
+        formsService.advance(formRecord.id, {
+            onError: (errors: Record<string, string>) => form.setError(errors as never),
+            onSuccess: () => form.clearErrors(),
+        });
     }
 
     async function destroyForm() {
@@ -158,6 +232,14 @@ export default function EditForm({
         form.setData('sections', sections);
     }
 
+    function updateFieldPayload(fieldId: number, payload: FormFieldPayload) {
+        setFieldPayloads((prev) => ({ ...prev, [fieldId]: payload }));
+    }
+
+    function fieldError(sectionIndex: number, fieldIndex: number, key: 'value' | 'payload'): string | undefined {
+        return (form.errors as Record<string, string | undefined>)[`sections.${sectionIndex}.fields.${fieldIndex}.${key}`];
+    }
+
     return (
         <AppLayout title={t('common.editResource', { resource: t('forms.resource') })}>
             <Head title={t('common.editItem', { name: displayName })} />
@@ -168,6 +250,17 @@ export default function EditForm({
                     description={t('common.updateDetails', { name: displayName })}
                     backHref={formsService.indexPath}
                     backLabel={t('common.backTo', { resource: t('forms.resourcePlural') })}
+                    actions={
+                        <a
+                            href={formsService.pdfPath(formRecord.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-sm font-semibold text-ink transition-colors hover:border-brand/40 hover:text-brand"
+                        >
+                            <FileDown className="size-3.5" aria-hidden />
+                            {t('forms.downloadPdf')}
+                        </a>
+                    }
                 />
 
                 <form onSubmit={submit} className="space-y-5">
@@ -315,6 +408,7 @@ export default function EditForm({
 
                     <div className="space-y-4 rounded-2xl border border-line bg-surface p-6 sm:p-8">
                         <h2 className="text-base font-semibold text-ink">{t('forms.fieldsTitle')}</h2>
+                        {isClosed ? <p className="text-sm text-ink-muted">{t('forms.formClosed')}</p> : null}
                         {form.data.sections.length === 0 ? (
                             <p className="text-sm text-ink-muted">{t('forms.fieldsEmpty')}</p>
                         ) : (
@@ -323,22 +417,31 @@ export default function EditForm({
                                     <h3 className="text-sm font-semibold text-ink">
                                         {section.label || t('forms.untitledSection')}
                                     </h3>
-                                    {section.fields.map((field, fieldIndex) => (
-                                        <Field
-                                            key={field.id}
-                                            label={`${field.label || field.type}${field.is_required ? ' *' : ''}`}
-                                            htmlFor={`field-${field.id}`}
-                                        >
-                                            <Input
-                                                id={`field-${field.id}`}
-                                                value={field.value}
-                                                disabled={field.is_locked}
-                                                onChange={(event) =>
-                                                    updateFieldValue(sectionIndex, fieldIndex, event.target.value)
-                                                }
-                                            />
-                                        </Field>
-                                    ))}
+                                    {section.fields.filter(isFieldVisible).map((field) => {
+                                        const fieldIndex = section.fields.indexOf(field);
+
+                                        return (
+                                            <Field
+                                                key={field.id}
+                                                label={`${field.label || field.type}${field.is_required ? ' *' : ''}`}
+                                                htmlFor={`field-${field.id}`}
+                                                helpField={false}
+                                            >
+                                                <FormFieldInput
+                                                    formId={formRecord.id}
+                                                    field={{
+                                                        ...field,
+                                                        is_locked: field.is_locked || isClosed,
+                                                        payload: fieldPayloads[field.id] ?? null,
+                                                    }}
+                                                    onChangeValue={(value) => updateFieldValue(sectionIndex, fieldIndex, value)}
+                                                    onChangePayload={(payload) => updateFieldPayload(field.id, payload)}
+                                                    error={fieldError(sectionIndex, fieldIndex, 'value')}
+                                                    payloadError={fieldError(sectionIndex, fieldIndex, 'payload')}
+                                                />
+                                            </Field>
+                                        );
+                                    })}
                                 </div>
                             ))
                         )}
@@ -352,19 +455,17 @@ export default function EditForm({
                             </Button>
                         ) : null}
                         {formRecord.next_status_id ? (
-                            <Button
-                                type="button"
-                                variant="secondary"
-                                onClick={() => formsService.advance(formRecord.id)}
-                            >
+                            <Button type="button" variant="secondary" onClick={advanceStatus}>
                                 <ArrowRight className="size-4" aria-hidden />
                                 {t('forms.advanceStatus')}
                             </Button>
                         ) : null}
-                        <Button type="submit" loading={form.processing}>
-                            <Save className="size-4" aria-hidden />
-                            {t('common.save')}
-                        </Button>
+                        {!isClosed ? (
+                            <Button type="submit" loading={form.processing}>
+                                <Save className="size-4" aria-hidden />
+                                {t('common.save')}
+                            </Button>
+                        ) : null}
                     </div>
                 </form>
             </div>

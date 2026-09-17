@@ -58,7 +58,6 @@ class Establishment extends Model
         'longitude',
         'tax_rate',
         'tax_included',
-        'legacy_erp_id',
         'integration_external_id',
         'notes',
         'notes_alert',

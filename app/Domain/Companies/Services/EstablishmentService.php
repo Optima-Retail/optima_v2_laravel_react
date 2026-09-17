@@ -449,7 +449,6 @@ final class EstablishmentService
             'longitude' => Coordinates::format($establishment->longitude),
             'tax_rate' => $establishment->tax_rate,
             'tax_included' => $establishment->tax_included,
-            'legacy_erp_id' => $establishment->legacy_erp_id,
             'integration_external_id' => $establishment->integration_external_id,
             'notes' => $establishment->notes,
             'notes_alert' => $establishment->notes_alert,
@@ -515,7 +514,7 @@ final class EstablishmentService
             'address_line_1', 'address_line_2', 'city', 'province_id', 'postal_code',
             'country_id', 'timezone_id', 'language_id', 'establishment_type_id', 'delegation_id', 'series_id',
             'billing_company_id', 'responsible_user_id',
-            'latitude', 'longitude', 'tax_rate', 'legacy_erp_id', 'integration_external_id',
+            'latitude', 'longitude', 'tax_rate', 'integration_external_id',
             'notes', 'internal_notes',
         ] as $key) {
             if (array_key_exists($key, $data) && $data[$key] === '') {

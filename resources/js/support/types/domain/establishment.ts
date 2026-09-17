@@ -62,7 +62,6 @@ export type EstablishmentFormData = {
     longitude: string | null;
     tax_rate: number | string | null;
     tax_included: boolean | null;
-    legacy_erp_id: number | null;
     integration_external_id: string | null;
     notes: string | null;
     notes_alert: boolean | null;

@@ -224,13 +224,6 @@ fields:
     mapping: rename
     confidence: high
 
-  legacy_erp_id:
-    sources:
-      - tecnicos.id_fixner
-    mapping: rename
-    notes: clientes/proveedores FileMaker ids UNRESOLVED
-    confidence: high
-
 unresolved_fields:
   - empresas extra columns beyond id,nombre
   - companies.brand_id vs relationship.brand_id

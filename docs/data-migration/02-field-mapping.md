@@ -55,7 +55,7 @@ Other `empresas` columns: **UNRESOLVED** — model fillable is incomplete vs pro
 | clientes | idioma_id | companies | language_id | FK | language catalog map | no | | medium |
 | clientes | *(none)* | companies | is_active | default / conditional | true unless business says otherwise | yes | Client `estado` is on **relationship**, not company | medium |
 | clientes | marca_id | companies | brand_id | unresolved | Brand is a **relationship** field in v2; `companies.brand_id` exists but UI treats brand on relationship | no | Prefer relationship.brand_id | medium |
-| clientes | id_fixner / FileMaker | companies | legacy_erp_id | unresolved | Confirm live column name | no | Index exists | low |
+| clientes | id_partener / FileMaker | — | — | unresolved | No `legacy_erp_id` column in v2 | no | Dropped from schema | — |
 | clientes | latitud / longitud | companies | latitude / longitude | rename | decimal 10,7 | no | Confirm columns exist on clientes | low |
 
 ### 2b. Customer profile → `company_relationships`
@@ -69,7 +69,7 @@ Owner: operating company (OR/ORIL/… — **UNRESOLVED which**). Related: party 
 | clientes | *(none)* | company_relationships | kind | constant | `customer` | yes | | high |
 | clientes | estado | company_relationships | status | unresolved | Cast boolean in model; v2 enum `prospect\|active\|blocked\|inactive\|archived` | yes (default active) | **UNRESOLVED** 1/0 → which strings | unresolved |
 | clientes | is_intercompany | company_relationships | classification | conditional | `intercompany` if true else default `commercial` | yes | Other classifications have no legacy source | medium |
-| clientes | codigo | company_relationships | owner_reference | rename | trim | no | Client code in Optima | high |
+| clientes | codigo | — | — | ignored | Dropped: use company_relationships.id | no | | — |
 | clientes | marca_id | company_relationships | brand_id | FK | brand map; NOT NULL in legacy | no in v2 | Required in practice for customers | high |
 | clientes | delegacion_id | company_relationships | delegation_id | FK | delegation map | no | | high |
 | clientes | billing_language_id | company_relationships | billing_language_id | FK | language map | no | Distinct from company.language_id | high |
@@ -141,7 +141,7 @@ Any client-only invoice/OT counters not listed above: **ignored / future domain*
 | proveedores | telefono | companies | phone | rename | | no | | high |
 | proveedores | direccion_* / poblacion / cp / pais_id | companies | address_* / city / postal_code / country_id | rename / FK | | no | provincia same issue as clients | medium |
 | proveedores | *(none)* | companies | kind | constant | `party` | yes | | high |
-| proveedores | codigo | company_relationships | owner_reference | rename | | no | | high |
+| proveedores | codigo | — | — | ignored | Dropped: use company_relationships.id | no | | — |
 | proveedores | delegacion_id | company_relationships | delegation_id | FK | | no | | high |
 | proveedores | impuesto | company_relationships | tax_rate | rename | decimal 10,2 | no | | high |
 | proveedores | observaciones* | company_relationships | notes / internal_notes / alerts | rename | | no | | high |
@@ -168,9 +168,9 @@ Any client-only invoice/OT counters not listed above: **ignored / future domain*
 | tecnicos | numero_empleados | companies | employee_count | rename | unsigned int | no | | high |
 | tecnicos | latitud / longitud | companies | latitude / longitude | rename | | no | | high |
 | tecnicos | idioma_id | companies | language_id | FK | default English in model | no | | high |
-| tecnicos | id_fixner | companies | legacy_erp_id | rename | stringify | no | | high |
+| tecnicos | id_partener | — | — | unresolved | No `legacy_erp_id` column in v2 | no | | — |
 | tecnicos | *(none)* | companies | kind | constant | `party` | yes | | high |
-| tecnicos | codigo / codigo_tecnico | company_relationships | owner_reference / external_code | unresolved | Two codes; which is which | no | **UNRESOLVED** both vs one field | unresolved |
+| tecnicos | codigo / codigo_tecnico | — / users | — / username | ignored | Dropped numbering; app login uses users.username | no | | — |
 | tecnicos | delegacion_id | company_relationships | delegation_id | FK | | no | | high |
 | tecnicos | impuesto | company_relationships | tax_rate | rename | | no | | high |
 | tecnicos | tarifas | company_relationships | rates_notes | rename | | no | | medium |

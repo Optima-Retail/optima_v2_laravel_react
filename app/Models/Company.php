@@ -51,7 +51,6 @@ class Company extends Model
         'language_id',
         'latitude',
         'longitude',
-        'legacy_erp_id',
     ];
 
     /**

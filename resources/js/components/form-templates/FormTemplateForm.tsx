@@ -1,4 +1,5 @@
 import type { FormEvent, ReactNode } from 'react';
+import { useMemo } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
@@ -19,6 +20,8 @@ export type FormTemplateFieldValues = {
     is_repeatable: boolean;
     is_visible: boolean;
     is_locked: boolean;
+    conditional_field_id: number | null;
+    payload: { value?: string } | null;
 };
 
 export type FormTemplateSectionValues = {
@@ -120,6 +123,8 @@ export function emptyField(sortOrder = 0): FormTemplateFieldValues {
         is_repeatable: false,
         is_visible: true,
         is_locked: false,
+        conditional_field_id: null,
+        payload: null,
     };
 }
 
@@ -140,6 +145,22 @@ export function FormTemplateForm({
     actions,
 }: FormTemplateFormProps) {
     const { t } = useTranslation();
+
+    // Only fields already saved in a previous update have a stable id, so only
+    // those can be picked as a conditional target — a brand-new sibling field in
+    // this same edit has no id yet for another field to point at.
+    const conditionalFieldOptions = useMemo(
+        () =>
+            values.sections.flatMap((section) =>
+                section.fields
+                    .filter((field): field is FormTemplateFieldValues & { id: number } => field.id !== undefined)
+                    .map((field) => ({
+                        id: field.id,
+                        label: field.label || `#${field.id} (${field.type})`,
+                    })),
+            ),
+        [values.sections],
+    );
 
     function updateSections(sections: FormTemplateSectionValues[]) {
         onChange('sections', sections);
@@ -433,6 +454,63 @@ export function FormTemplateForm({
                                                 }}
                                             />
                                         </Field>
+                                        <Field
+                                            label={t('formTemplates.conditionalOn')}
+                                            htmlFor={`field-conditional-${sectionIndex}-${fieldIndex}`}
+                                            helpField={false}
+                                        >
+                                            <Select
+                                                id={`field-conditional-${sectionIndex}-${fieldIndex}`}
+                                                value={field.conditional_field_id ?? ''}
+                                                onChange={(event) => {
+                                                    const next = [...values.sections];
+                                                    const fields = [...section.fields];
+                                                    const conditionalFieldId = event.target.value
+                                                        ? Number(event.target.value)
+                                                        : null;
+                                                    fields[fieldIndex] = {
+                                                        ...field,
+                                                        conditional_field_id: conditionalFieldId,
+                                                        payload: conditionalFieldId === null ? null : (field.payload ?? { value: '' }),
+                                                    };
+                                                    next[sectionIndex] = { ...section, fields };
+                                                    updateSections(next);
+                                                }}
+                                            >
+                                                <option value="">{t('formTemplates.conditionalOnNone')}</option>
+                                                {conditionalFieldOptions
+                                                    .filter((option) => option.id !== field.id)
+                                                    .map((option) => (
+                                                        <option key={option.id} value={option.id}>
+                                                            {option.label}
+                                                        </option>
+                                                    ))}
+                                            </Select>
+                                            <p className="text-xs text-ink-muted">{t('formTemplates.conditionalHint')}</p>
+                                        </Field>
+                                        {field.conditional_field_id !== null ? (
+                                            <Field
+                                                label={t('formTemplates.conditionalValue')}
+                                                htmlFor={`field-conditional-value-${sectionIndex}-${fieldIndex}`}
+                                                helpField={false}
+                                            >
+                                                <Input
+                                                    id={`field-conditional-value-${sectionIndex}-${fieldIndex}`}
+                                                    value={field.payload?.value ?? ''}
+                                                    placeholder={t('formTemplates.conditionalValuePlaceholder')}
+                                                    onChange={(event) => {
+                                                        const next = [...values.sections];
+                                                        const fields = [...section.fields];
+                                                        fields[fieldIndex] = {
+                                                            ...field,
+                                                            payload: { ...field.payload, value: event.target.value },
+                                                        };
+                                                        next[sectionIndex] = { ...section, fields };
+                                                        updateSections(next);
+                                                    }}
+                                                />
+                                            </Field>
+                                        ) : null}
                                         <div className="flex flex-wrap items-center justify-between gap-3 sm:col-span-2">
                                             <div className="flex flex-wrap gap-4 text-sm">
                                                 {(

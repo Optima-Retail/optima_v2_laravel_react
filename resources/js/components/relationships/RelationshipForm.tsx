@@ -39,10 +39,7 @@ export type RelationshipFormValues = {
     kind: string;
     status: string;
     classification: string;
-    owner_reference: string;
-    related_reference: string;
     brand_id: string;
-    external_code: string;
     notes: string;
     starts_at: string;
     ends_at: string;
@@ -482,33 +479,6 @@ export function RelationshipForm({
                         </Field>
                     </>
                 ) : null}
-
-                <Field label={t('relationships.ownerReference')} htmlFor="owner_reference" error={errors.owner_reference}>
-                    <Input
-                        id="owner_reference"
-                        value={values.owner_reference}
-                        invalid={Boolean(errors.owner_reference)}
-                        onChange={(event) => onChange('owner_reference', event.target.value)}
-                    />
-                </Field>
-
-                <Field label={t('relationships.relatedReference')} htmlFor="related_reference" error={errors.related_reference}>
-                    <Input
-                        id="related_reference"
-                        value={values.related_reference}
-                        invalid={Boolean(errors.related_reference)}
-                        onChange={(event) => onChange('related_reference', event.target.value)}
-                    />
-                </Field>
-
-                <Field label={t('relationships.externalCode')} htmlFor="external_code" error={errors.external_code}>
-                    <Input
-                        id="external_code"
-                        value={values.external_code}
-                        invalid={Boolean(errors.external_code)}
-                        onChange={(event) => onChange('external_code', event.target.value)}
-                    />
-                </Field>
 
                 <Field label={t('relationships.startsAt')} htmlFor="starts_at" error={errors.starts_at}>
                     <Input

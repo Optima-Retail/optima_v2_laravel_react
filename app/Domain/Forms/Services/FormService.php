@@ -7,6 +7,7 @@ namespace App\Domain\Forms\Services;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\ActiveCompany;
 use App\Domain\Forms\Enums\FormSubjectType;
+use App\Domain\Forms\Events\FormCompleted;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
 use App\Models\Form;
@@ -21,8 +22,12 @@ use App\Models\WorkOrder;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class FormService
 {
@@ -144,6 +149,8 @@ final class FormService
      */
     public function update(Form $form, array $data): Form
     {
+        $this->guardEditable($form);
+
         return DB::transaction(function () use ($form, $data): Form {
             $form->update([
                 'name' => $data['name'] ?? $form->name,
@@ -172,10 +179,18 @@ final class FormService
         $nextId = $form->status?->next_status_id;
 
         if ($nextId === null) {
-            return $form;
+            throw ValidationException::withMessages([
+                'form_status_id' => 'This form has already reached its final status.',
+            ]);
         }
 
-        return DB::transaction(function () use ($form, $nextId): Form {
+        $errors = app(FormFieldValidator::class)->validate($form);
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        $form = DB::transaction(function () use ($form, $nextId): Form {
             $form->update([
                 'form_status_id' => $nextId,
                 'was_edited' => true,
@@ -184,6 +199,15 @@ final class FormService
             return $form->fresh(['sections.fields', 'type', 'status', 'template', 'workOrder', 'companyRelationship.relatedCompany', 'user'])
                 ?? $form;
         });
+
+        // Fire only the moment the form lands on a status with nowhere further
+        // to go — the filling-side equivalent of legacy's Formulario reaching
+        // "Terminado" — not on every intermediate advance.
+        if ($form->status?->next_status_id === null) {
+            FormCompleted::dispatch($form);
+        }
+
+        return $form;
     }
 
     public function delete(Form $form): void
@@ -193,6 +217,79 @@ final class FormService
         }
 
         DB::transaction(fn () => $form->delete());
+    }
+
+    /**
+     * Store a photo/signature for an "imagen"/"firma"/"trabajo" field. `$target`
+     * is `value` for a plain image/signature field, or `before`/`after` for a
+     * work item's two photos — each lives at a stable per-field disk path, not
+     * inline base64, matching this app's attachment convention elsewhere.
+     * Replacing a file deletes the one it replaces instead of orphaning it.
+     */
+    public function storeFieldFile(Form $form, FormField $field, string $target, UploadedFile $file): FormField
+    {
+        $this->guardEditable($form);
+        abort_unless($field->section?->form_id === $form->id, 404);
+
+        $disk = 'local';
+        $path = $file->store("forms/{$form->id}/fields/{$field->id}", $disk);
+        $previous = $this->fieldFilePath($field, $target);
+
+        $this->setFieldFilePath($field, $target, $path);
+        $field->save();
+
+        if ($previous !== null && $previous !== $path) {
+            Storage::disk($disk)->delete($previous);
+        }
+
+        return $field->fresh();
+    }
+
+    public function streamFieldFile(Form $form, FormField $field, string $target): StreamedResponse
+    {
+        abort_unless($field->section?->form_id === $form->id, 404);
+
+        $path = $this->fieldFilePath($field, $target);
+        abort_if($path === null, 404);
+
+        return Storage::disk('local')->response($path);
+    }
+
+    private function fieldFilePath(FormField $field, string $target): ?string
+    {
+        $path = match ($target) {
+            'value' => $field->value,
+            'before' => $field->payload['before'] ?? null,
+            'after' => $field->payload['after'] ?? null,
+            default => null,
+        };
+
+        return filled($path) ? (string) $path : null;
+    }
+
+    private function setFieldFilePath(FormField $field, string $target, string $path): void
+    {
+        match ($target) {
+            'value' => $field->value = $path,
+            'before', 'after' => $field->payload = [...($field->payload ?? []), $target => $path],
+            default => null,
+        };
+    }
+
+    /**
+     * A form whose current status has no further status to advance to is
+     * treated as closed — mirrors legacy blocking edits once a Formulario
+     * reaches "Terminado".
+     */
+    private function guardEditable(Form $form): void
+    {
+        $form->loadMissing('status');
+
+        if ($form->status !== null && $form->status->next_status_id === null) {
+            throw ValidationException::withMessages([
+                'form_status_id' => 'This form has reached its final status and can no longer be edited.',
+            ]);
+        }
     }
 
     public function canAccess(?Company $owner, Form $form): bool
@@ -323,6 +420,7 @@ final class FormService
                     'is_required' => $field->is_required,
                     'is_visible' => $field->is_visible,
                     'is_locked' => $field->is_locked,
+                    'conditional_field_id' => $field->conditional_field_id,
                     'payload' => $field->payload,
                 ])->values()->all(),
             ])->values()->all(),
@@ -386,17 +484,7 @@ final class FormService
      */
     public function workOrderOptions(Company $owner): array
     {
-        return WorkOrder::query()
-            ->where(function (Builder $query) use ($owner): void {
-                $query->where('owner_company_id', $owner->id)
-                    ->orWhere(function (Builder $legacy) use ($owner): void {
-                        $companyIds = $owner->ownedRelationships()
-                            ->where('kind', CompanyRelationshipKind::Customer->value)
-                            ->pluck('related_company_id');
-                        $legacy->whereNull('owner_company_id')
-                            ->whereHas('establishment', fn (Builder $q) => $q->whereIn('company_id', $companyIds));
-                    });
-            })
+        return $this->workOrderScope($owner)
             ->orderByDesc('id')
             ->limit(300)
             ->get(['id', 'code', 'subject'])
@@ -405,6 +493,33 @@ final class FormService
                 'label' => trim(($wo->code ?? '').' — '.($wo->subject ?? '')),
             ])
             ->values()->all();
+    }
+
+    /**
+     * A work order the client submitted must belong to the active company's own
+     * scope (the same rule as workOrderOptions()), not just exist in the DB —
+     * otherwise the template-suggestions endpoint would leak cross-company data.
+     */
+    public function findAccessibleWorkOrder(Company $owner, int $workOrderId): ?WorkOrder
+    {
+        return $this->workOrderScope($owner)->whereKey($workOrderId)->first();
+    }
+
+    /**
+     * @return Builder<WorkOrder>
+     */
+    private function workOrderScope(Company $owner): Builder
+    {
+        return WorkOrder::query()->where(function (Builder $query) use ($owner): void {
+            $query->where('owner_company_id', $owner->id)
+                ->orWhere(function (Builder $legacy) use ($owner): void {
+                    $companyIds = $owner->ownedRelationships()
+                        ->where('kind', CompanyRelationshipKind::Customer->value)
+                        ->pluck('related_company_id');
+                    $legacy->whereNull('owner_company_id')
+                        ->whereHas('establishment', fn (Builder $q) => $q->whereIn('company_id', $companyIds));
+                });
+        });
     }
 
     /**

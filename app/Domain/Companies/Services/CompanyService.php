@@ -354,7 +354,6 @@ final class CompanyService
             'language_id' => $company->language_id,
             'latitude' => Coordinates::format($company->latitude),
             'longitude' => Coordinates::format($company->longitude),
-            'legacy_erp_id' => $company->legacy_erp_id,
         ];
     }
 
@@ -391,7 +390,7 @@ final class CompanyService
             'tradename', 'slug', 'tax_id', 'country_id', 'residence_country_id',
             'person_type', 'email', 'phone', 'website', 'address_line_1',
             'address_line_2', 'city', 'province_id', 'postal_code', 'employee_count',
-            'brand_id', 'language_id', 'latitude', 'longitude', 'legacy_erp_id',
+            'brand_id', 'language_id', 'latitude', 'longitude',
         ];
 
         foreach ($nullable as $key) {
