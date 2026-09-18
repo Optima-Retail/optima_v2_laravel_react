@@ -13,7 +13,8 @@ import { TechnicianSearchModal } from '@/components/estimates/TechnicianSearchMo
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
-import { MultiSelect } from '@/components/ui/MultiSelect';
+import { AsyncMultiSelect } from '@/components/ui/AsyncMultiSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
@@ -170,15 +171,6 @@ export function EstimateForm({
         [establishmentOptions, values.establishment_id],
     );
 
-    const establishmentSelect = useMemo(
-        () =>
-            establishmentOptions.map((option) => ({
-                value: String(option.id),
-                label: option.label,
-            })),
-        [establishmentOptions],
-    );
-
     const filteredRequesters = useMemo(() => {
         if (!selectedEstablishment) {
             return requesterOptions;
@@ -315,13 +307,14 @@ export function EstimateForm({
                                     error={errors.establishment_id}
                                     required
                                 >
-                                    <SearchableSelect
+                                    <AsyncSearchableSelect
                                         id="establishment_id"
+                                        resource="establishments"
                                         value={values.establishment_id}
                                         invalid={Boolean(errors.establishment_id)}
                                         onChange={setEstablishment}
                                         emptyLabel={t('common.select')}
-                                        options={establishmentSelect}
+                                        seedOptions={establishmentOptions}
                                     />
                                 </Field>
                             ) : (
@@ -472,14 +465,15 @@ export function EstimateForm({
                                 htmlFor="responsible_user_id"
                                 error={errors.responsible_user_id}
                             >
-                                <SearchableSelect
+                                <AsyncSearchableSelect
                                     id="responsible_user_id"
                                     value={values.responsible_user_id}
                                     invalid={Boolean(errors.responsible_user_id)}
                                     disabled={locked}
                                     onChange={(value) => onChange('responsible_user_id', value)}
                                     emptyLabel={t('common.select')}
-                                    options={toSelectOptions(userOptions)}
+                                    resource="users"
+                                    seedOptions={userOptions}
                                 />
                             </Field>
 
@@ -488,12 +482,13 @@ export function EstimateForm({
                                 htmlFor="collaborator_ids"
                                 error={errors.collaborator_ids}
                             >
-                                <MultiSelect
+                                <AsyncMultiSelect
                                     id="collaborator_ids"
+                                    resource="users"
                                     value={values.collaborator_ids}
                                     disabled={locked}
                                     onChange={(next) => onChange('collaborator_ids', next)}
-                                    options={toSelectOptions(userOptions)}
+                                    seedOptions={userOptions}
                                     placeholder={t('workOrders.collaboratorsPlaceholder')}
                                 />
                             </Field>

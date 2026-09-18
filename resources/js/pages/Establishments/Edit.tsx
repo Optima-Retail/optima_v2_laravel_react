@@ -18,9 +18,9 @@ import type { ProvinceOption } from '@/support/types/domain/province';
 
 type EditEstablishmentProps = {
     establishment: EstablishmentFormData;
-    attachments: EstablishmentAttachmentItem[];
-    workOrderTotals: EstablishmentDocumentTotalsData | null;
-    estimateTotals: EstablishmentDocumentTotalsData | null;
+    attachments?: EstablishmentAttachmentItem[];
+    workOrderTotals?: EstablishmentDocumentTotalsData | null;
+    estimateTotals?: EstablishmentDocumentTotalsData | null;
     companyOptions: CompanyOption[];
     countryOptions: UserOption[];
     provinceOptions: ProvinceOption[];

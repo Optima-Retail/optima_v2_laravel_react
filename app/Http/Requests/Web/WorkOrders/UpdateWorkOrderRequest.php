@@ -35,18 +35,15 @@ final class UpdateWorkOrderRequest extends FormRequest
         /** @var WorkOrder $workOrder */
         $workOrder = $this->route('work_order');
         $service = app(WorkOrderService::class);
-        $establishmentIds = array_column($service->establishmentOptions($owner), 'id');
-        $establishmentIds = $establishmentIds === [] ? [0] : $establishmentIds;
-        $contractIds = array_column(
-            $service->contractOptions(
-                $owner,
-                $workOrder->contract_id !== null ? [(int) $workOrder->contract_id] : [],
-            ),
-            'id',
-        );
         $stage = $workOrder->stage?->value ?? (string) $workOrder->stage;
 
-        return array_merge(WorkOrderFormInput::baseRules($owner->id, $establishmentIds, $stage, $contractIds), [
+        return array_merge(WorkOrderFormInput::baseRules(
+            $owner->id,
+            $service->accessibleCompanyIds($owner),
+            $stage,
+            $workOrder->contract_id !== null ? [(int) $workOrder->contract_id] : [],
+            $workOrder->establishment_id !== null ? [(int) $workOrder->establishment_id] : [],
+        ), [
             'code' => ['nullable', 'string', 'max:64'],
         ]);
     }

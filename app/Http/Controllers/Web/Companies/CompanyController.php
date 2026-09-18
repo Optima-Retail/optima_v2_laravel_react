@@ -164,10 +164,12 @@ final class CompanyController extends Controller
             'company' => $this->companies->toFormData($company),
             'countryOptions' => $this->companies->countryOptions(),
             'provinceOptions' => $this->provinces->options(),
-            'brandOptions' => $this->companies->brandOptions(),
+            'brandOptions' => $this->companies->brandOptions(
+                $company->brand_id !== null ? (int) $company->brand_id : null,
+            ),
             'languageOptions' => $this->companies->languageOptions(),
-            'members' => $this->companies->members($company),
-            'assignableUserOptions' => $this->companies->assignableUserOptions($company),
+            'members' => Inertia::defer(fn () => $this->companies->members($company)),
+            'assignableUserOptions' => [],
             'can' => [
                 'delete' => $request->user()?->can('delete', $company) ?? false,
                 'manage_users' => $request->user()?->can('update', $company) ?? false,

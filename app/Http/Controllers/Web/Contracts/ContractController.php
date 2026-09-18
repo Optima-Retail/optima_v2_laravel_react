@@ -119,8 +119,8 @@ final class ContractController extends Controller
             ),
             'contractStatusOptions' => $this->contracts->contractStatusOptions(),
             'languageOptions' => $this->contracts->languageOptions(),
-            'userOptions' => $this->contracts->userOptions($owner),
-            'establishmentOptions' => $this->contracts->establishmentOptions($owner),
+            'userOptions' => [],
+            'establishmentOptions' => [],
             'workOrderTypeOptions' => $this->contracts->workOrderTypeOptions(),
             'formTemplateOptions' => $this->contracts->formTemplateOptions($owner),
         ]);
@@ -147,12 +147,12 @@ final class ContractController extends Controller
 
         return Inertia::render('Contracts/Edit', [
             'contract' => $this->contracts->toFormData($contract),
-            'attachments' => $canViewAttachments
+            'attachments' => Inertia::defer(fn () => $canViewAttachments
                 ? $this->attachments->listForContract($contract)
-                : [],
-            'workOrderTotals' => $canViewWorkOrders
+                : []),
+            'workOrderTotals' => Inertia::defer(fn () => $canViewWorkOrders
                 ? $this->workOrders->totalsForContract($owner, (int) $contract->id, WorkOrderStage::WorkOrder)
-                : null,
+                : null),
             'companyOptions' => $this->contracts->clientCompanyOptions(
                 $owner,
                 $contract->company_id !== null ? (int) $contract->company_id : null,
@@ -161,7 +161,10 @@ final class ContractController extends Controller
                 $contract->contract_status_id !== null ? (int) $contract->contract_status_id : null,
             ),
             'languageOptions' => $this->contracts->languageOptions(),
-            'userOptions' => $this->contracts->userOptions($owner),
+            'userOptions' => $this->contracts->userOptions(
+                $owner,
+                $contract->responsible_user_id !== null ? [(int) $contract->responsible_user_id] : [],
+            ),
             'establishmentOptions' => $this->contracts->establishmentOptions(
                 $owner,
                 $contract->establishments->pluck('id')->map(fn ($id) => (int) $id)->all(),

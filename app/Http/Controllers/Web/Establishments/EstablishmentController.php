@@ -111,8 +111,8 @@ final class EstablishmentController extends Controller
             'languageOptions' => $this->establishments->languageOptions(),
             'establishmentTypeOptions' => $this->establishments->establishmentTypeOptions(),
             'seriesOptions' => $this->establishments->seriesOptions(),
-            'userOptions' => $this->establishments->userOptions($owner),
-            'technicianOptions' => $this->establishments->technicianOptions($owner),
+            'userOptions' => [],
+            'technicianOptions' => [],
             'workOrderTypeOptions' => $this->establishments->workOrderTypeOptions(),
             'formTemplateOptions' => $this->establishments->formTemplateOptions($owner),
         ]);
@@ -138,17 +138,27 @@ final class EstablishmentController extends Controller
         $canViewWorkOrders = $user?->can('viewAny', WorkOrder::class) ?? false;
         $canViewEstimates = $user !== null && app(EstimatePolicy::class)->viewAny($user);
 
+        $formData = $this->establishments->toFormData($establishment);
+        $userSeedIds = array_values(array_filter([
+            ...array_map('intval', $formData['collaborator_ids'] ?? []),
+            isset($formData['responsible_user_id']) ? (int) $formData['responsible_user_id'] : null,
+        ]));
+        $technicianSeedIds = array_values(array_unique(array_filter([
+            ...array_map('intval', $formData['blocked_technician_ids'] ?? []),
+            ...array_map('intval', $formData['favorite_technician_ids'] ?? []),
+        ])));
+
         return Inertia::render('Establishments/Edit', [
-            'establishment' => $this->establishments->toFormData($establishment),
-            'attachments' => $canViewAttachments
+            'establishment' => $formData,
+            'attachments' => Inertia::defer(fn () => $canViewAttachments
                 ? $this->attachments->listForEstablishment($establishment, $canViewPrivate)
-                : [],
-            'workOrderTotals' => $canViewWorkOrders
+                : []),
+            'workOrderTotals' => Inertia::defer(fn () => $canViewWorkOrders
                 ? $this->workOrders->totalsForEstablishment($owner, (int) $establishment->id, WorkOrderStage::WorkOrder)
-                : null,
-            'estimateTotals' => $canViewEstimates
+                : null),
+            'estimateTotals' => Inertia::defer(fn () => $canViewEstimates
                 ? $this->workOrders->totalsForEstablishment($owner, (int) $establishment->id, WorkOrderStage::Estimate)
-                : null,
+                : null),
             'companyOptions' => $this->establishments->clientCompanyOptions(
                 $owner,
                 includeIds: array_values(array_filter([
@@ -165,8 +175,8 @@ final class EstablishmentController extends Controller
             'seriesOptions' => $this->establishments->seriesOptions(
                 $establishment->series_id !== null ? (int) $establishment->series_id : null,
             ),
-            'userOptions' => $this->establishments->userOptions($owner),
-            'technicianOptions' => $this->establishments->technicianOptions($owner),
+            'userOptions' => $this->establishments->userOptions($owner, $userSeedIds),
+            'technicianOptions' => $this->establishments->technicianOptions($owner, $technicianSeedIds),
             'workOrderTypeOptions' => $this->establishments->workOrderTypeOptions(),
             'formTemplateOptions' => $this->establishments->formTemplateOptions($owner),
             'can' => [

@@ -1,3 +1,4 @@
+import { Deferred } from '@inertiajs/react';
 import { useMemo, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EstablishmentAttachmentsPanel } from '@/components/establishments/EstablishmentAttachmentsPanel';
@@ -9,14 +10,14 @@ import { EstablishmentTemplatesPanel } from '@/components/establishments/Establi
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
-import { MultiSelect } from '@/components/ui/MultiSelect';
+import { AsyncMultiSelect } from '@/components/ui/AsyncMultiSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import { CompanySearchableSelect } from '@/components/companies/CompanySearchableSelect';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import { toCompanySelectOptions } from '@/support/companySelect';
 import { clampDecimalPlaces } from '@/support/coordinates';
 import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import type {
@@ -283,8 +284,8 @@ export function EstablishmentForm({
     const isEdit = establishmentId != null;
     const showAttachmentsTab = isEdit && Boolean(can.view_attachments);
     const showTemplatesTab = isEdit;
-    const showWorkOrdersTab = isEdit && Boolean(can.view_work_orders) && workOrderTotals != null;
-    const showEstimatesTab = isEdit && Boolean(can.view_estimates) && estimateTotals != null;
+    const showWorkOrdersTab = isEdit && Boolean(can.view_work_orders);
+    const showEstimatesTab = isEdit && Boolean(can.view_estimates);
 
     const tabItems = useMemo<TabItem[]>(() => {
         const items: TabItem[] = [
@@ -308,7 +309,9 @@ export function EstablishmentForm({
         if (showAttachmentsTab) {
             items.push({
                 id: 'attachments',
-                label: t('establishments.tabs.attachments', { count: attachments.length }),
+                label: t('establishments.tabs.attachments', {
+                    count: attachments?.length ?? '…',
+                }),
             });
         }
 
@@ -318,7 +321,7 @@ export function EstablishmentForm({
 
         return items;
     }, [
-        attachments.length,
+        attachments?.length,
         showAttachmentsTab,
         showEstimatesTab,
         showTemplatesTab,
@@ -588,13 +591,14 @@ export function EstablishmentForm({
                     </Field>
 
                     <Field label={t('establishments.responsibleUser')} htmlFor="responsible_user_id" error={errors.responsible_user_id}>
-                        <SearchableSelect
+                        <AsyncSearchableSelect
                             id="responsible_user_id"
+                            resource="users"
                             value={values.responsible_user_id}
                             invalid={Boolean(errors.responsible_user_id)}
                             onChange={(value) => onChange('responsible_user_id', value)}
                             emptyLabel={t('common.none')}
-                            options={toSelectOptions(userOptions)}
+                            seedOptions={userOptions}
                         />
                     </Field>
 
@@ -604,11 +608,12 @@ export function EstablishmentForm({
                         error={errors.collaborator_ids}
                         className="sm:col-span-2"
                     >
-                        <MultiSelect
+                        <AsyncMultiSelect
                             id="collaborator_ids"
+                            resource="users"
                             value={values.collaborator_ids}
                             onChange={(collaboratorIds) => onChange('collaborator_ids', collaboratorIds)}
-                            options={toSelectOptions(userOptions)}
+                            seedOptions={userOptions}
                             placeholder={t('establishments.collaboratorsPlaceholder')}
                             invalid={Boolean(errors.collaborator_ids)}
                         />
@@ -624,13 +629,19 @@ export function EstablishmentForm({
                             error={errors.blocked_technician_ids}
                             className="sm:col-span-2"
                         >
-                            <MultiSelect
+                            <AsyncMultiSelect
                                 id="blocked_technician_ids"
+                                resource="technicians"
                                 value={values.blocked_technician_ids}
                                 onChange={(ids) => onChange('blocked_technician_ids', ids)}
-                                options={toCompanySelectOptions(technicianOptions)}
+                                seedOptions={technicianOptions}
                                 placeholder={t('establishments.blockedTechniciansPlaceholder')}
                                 invalid={Boolean(errors.blocked_technician_ids)}
+                                mapOption={(row) => ({
+                                    value: String(row.id),
+                                    label: row.label,
+                                    logo_url: row.logo_url ?? null,
+                                })}
                             />
                         </Field>
 
@@ -640,13 +651,19 @@ export function EstablishmentForm({
                             error={errors.favorite_technician_ids}
                             className="sm:col-span-2"
                         >
-                            <MultiSelect
+                            <AsyncMultiSelect
                                 id="favorite_technician_ids"
+                                resource="technicians"
                                 value={values.favorite_technician_ids}
                                 onChange={(ids) => onChange('favorite_technician_ids', ids)}
-                                options={toCompanySelectOptions(technicianOptions)}
+                                seedOptions={technicianOptions}
                                 placeholder={t('establishments.favoriteTechniciansPlaceholder')}
                                 invalid={Boolean(errors.favorite_technician_ids)}
+                                mapOption={(row) => ({
+                                    value: String(row.id),
+                                    label: row.label,
+                                    logo_url: row.logo_url ?? null,
+                                })}
                             />
                         </Field>
                     </div>
@@ -797,48 +814,58 @@ export function EstablishmentForm({
                     </div>
                 </TabPanel>
 
-                {showWorkOrdersTab && establishmentId != null && workOrderTotals != null ? (
+                {showWorkOrdersTab && establishmentId != null ? (
                     <TabPanel id="work-orders">
-                        <EstablishmentDocumentsPanel
-                            establishmentId={establishmentId}
-                            stage="work_order"
-                            totals={workOrderTotals}
-                            can={{
-                                create: Boolean(can.create_work_orders),
-                                update: Boolean(can.update_work_orders),
-                                delete: Boolean(can.delete_work_orders),
-                            }}
-                        />
+                        <Deferred data="workOrderTotals" fallback={<p className="text-sm text-ink-muted">{t('common.loading')}</p>}>
+                            {workOrderTotals != null ? (
+                                <EstablishmentDocumentsPanel
+                                    establishmentId={establishmentId}
+                                    stage="work_order"
+                                    totals={workOrderTotals}
+                                    can={{
+                                        create: Boolean(can.create_work_orders),
+                                        update: Boolean(can.update_work_orders),
+                                        delete: Boolean(can.delete_work_orders),
+                                    }}
+                                />
+                            ) : null}
+                        </Deferred>
                     </TabPanel>
                 ) : null}
 
-                {showEstimatesTab && establishmentId != null && estimateTotals != null ? (
+                {showEstimatesTab && establishmentId != null ? (
                     <TabPanel id="estimates">
-                        <EstablishmentDocumentsPanel
-                            establishmentId={establishmentId}
-                            stage="estimate"
-                            totals={estimateTotals}
-                            can={{
-                                create: Boolean(can.create_estimates),
-                                update: Boolean(can.update_estimates),
-                                delete: Boolean(can.delete_estimates),
-                            }}
-                        />
+                        <Deferred data="estimateTotals" fallback={<p className="text-sm text-ink-muted">{t('common.loading')}</p>}>
+                            {estimateTotals != null ? (
+                                <EstablishmentDocumentsPanel
+                                    establishmentId={establishmentId}
+                                    stage="estimate"
+                                    totals={estimateTotals}
+                                    can={{
+                                        create: Boolean(can.create_estimates),
+                                        update: Boolean(can.update_estimates),
+                                        delete: Boolean(can.delete_estimates),
+                                    }}
+                                />
+                            ) : null}
+                        </Deferred>
                     </TabPanel>
                 ) : null}
 
                 {showAttachmentsTab && establishmentId != null ? (
                     <TabPanel id="attachments">
-                        <EstablishmentAttachmentsPanel
-                            establishmentId={establishmentId}
-                            attachments={attachments}
-                            can={{
-                                upload_attachments: Boolean(can.upload_attachments),
-                                download_attachments: Boolean(can.download_attachments),
-                                delete_attachments: Boolean(can.delete_attachments),
-                                view_private_attachments: Boolean(can.view_private_attachments),
-                            }}
-                        />
+                        <Deferred data="attachments" fallback={<p className="text-sm text-ink-muted">{t('common.loading')}</p>}>
+                            <EstablishmentAttachmentsPanel
+                                establishmentId={establishmentId}
+                                attachments={attachments ?? []}
+                                can={{
+                                    upload_attachments: Boolean(can.upload_attachments),
+                                    download_attachments: Boolean(can.download_attachments),
+                                    delete_attachments: Boolean(can.delete_attachments),
+                                    view_private_attachments: Boolean(can.view_private_attachments),
+                                }}
+                            />
+                        </Deferred>
                     </TabPanel>
                 ) : null}
 

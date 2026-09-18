@@ -4,8 +4,10 @@ import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
-import { MultiSelect } from '@/components/ui/MultiSelect';
+import { AsyncMultiSelect } from '@/components/ui/AsyncMultiSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { CompanySearchableSelect } from '@/components/companies/CompanySearchableSelect';
 import { cn } from '@/support/cn';
 import { toCompanySelectOptions } from '@/support/companySelect';
 import type { CompanyOption, UserOption } from '@/support/types/domain/common';
@@ -277,7 +279,38 @@ export function IncidentForm({
                             className={showRelated ? undefined : 'sm:col-span-2'}
                         >
                             {hasType ? (
-                                values.origin_type ? (
+                                values.origin_type === 'establishment' ? (
+                                    <AsyncSearchableSelect
+                                        id="origin_id"
+                                        resource="establishments"
+                                        value={values.origin_id}
+                                        invalid={Boolean(errors.origin_id)}
+                                        onChange={(value) => onChange('origin_id', value)}
+                                        emptyLabel={t('common.select')}
+                                        seedOptions={establishmentOptions}
+                                        queryParams={{ rich: false }}
+                                    />
+                                ) : values.origin_type === 'company' ? (
+                                    <CompanySearchableSelect
+                                        id="origin_id"
+                                        scope="client"
+                                        value={values.origin_id}
+                                        invalid={Boolean(errors.origin_id)}
+                                        onChange={(value) => onChange('origin_id', value)}
+                                        emptyLabel={t('common.select')}
+                                        seedOptions={clientOptions}
+                                    />
+                                ) : values.origin_type === 'brand' ? (
+                                    <AsyncSearchableSelect
+                                        id="origin_id"
+                                        resource="brands"
+                                        value={values.origin_id}
+                                        invalid={Boolean(errors.origin_id)}
+                                        onChange={(value) => onChange('origin_id', value)}
+                                        emptyLabel={t('common.select')}
+                                        seedOptions={brandOptions}
+                                    />
+                                ) : values.origin_type ? (
                                     <SearchableSelect
                                         id="origin_id"
                                         value={values.origin_id}
@@ -302,8 +335,9 @@ export function IncidentForm({
                             error={errors.related_id}
                         >
                             {hasType ? (
-                                <SearchableSelect
+                                <AsyncSearchableSelect
                                     id="related_id"
+                                    resource="evaluations"
                                     value={values.related_id}
                                     invalid={Boolean(errors.related_id)}
                                     onChange={(value) => {
@@ -311,7 +345,7 @@ export function IncidentForm({
                                         onChange('related_id', value);
                                     }}
                                     emptyLabel={t('common.select')}
-                                    options={toSelectOptions(evaluationOptions)}
+                                    seedOptions={evaluationOptions}
                                 />
                             ) : (
                                 <p className="text-sm text-danger">{t('incidents.selectTypeFirst')}</p>
@@ -330,13 +364,14 @@ export function IncidentForm({
                         required
                     >
                         {hasType ? (
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="responsible_user_id"
+                                resource="users"
                                 value={values.responsible_user_id}
                                 invalid={Boolean(errors.responsible_user_id)}
                                 onChange={(value) => onChange('responsible_user_id', value)}
                                 emptyLabel={t('common.select')}
-                                options={toSelectOptions(userOptions)}
+                                seedOptions={userOptions}
                             />
                         ) : (
                             <p className="text-sm text-danger">{t('incidents.selectTypeFirst')}</p>
@@ -348,13 +383,14 @@ export function IncidentForm({
                         htmlFor="qc_responsible_user_id"
                         error={errors.qc_responsible_user_id}
                     >
-                        <SearchableSelect
+                        <AsyncSearchableSelect
                             id="qc_responsible_user_id"
+                            resource="users"
                             value={values.qc_responsible_user_id}
                             invalid={Boolean(errors.qc_responsible_user_id)}
                             onChange={(value) => onChange('qc_responsible_user_id', value)}
                             emptyLabel={t('common.select')}
-                            options={toSelectOptions(userOptions)}
+                            seedOptions={userOptions}
                         />
                     </Field>
 
@@ -364,11 +400,12 @@ export function IncidentForm({
                         error={errors.collaborator_ids}
                         className="sm:col-span-2"
                     >
-                        <MultiSelect
+                        <AsyncMultiSelect
                             id="collaborator_ids"
+                            resource="users"
                             value={values.collaborator_ids}
                             onChange={(collaboratorIds) => onChange('collaborator_ids', collaboratorIds)}
-                            options={toSelectOptions(userOptions)}
+                            seedOptions={userOptions}
                             placeholder={t('incidents.collaboratorsPlaceholder')}
                             invalid={Boolean(errors.collaborator_ids)}
                         />
@@ -448,13 +485,14 @@ export function IncidentForm({
                                 htmlFor="requester_user_id"
                                 error={errors.requester_user_id}
                             >
-                                <SearchableSelect
+                                <AsyncSearchableSelect
                                     id="requester_user_id"
+                                    resource="users"
                                     value={values.requester_user_id}
                                     invalid={Boolean(errors.requester_user_id)}
                                     onChange={(value) => onChange('requester_user_id', value)}
                                     emptyLabel={t('common.select')}
-                                    options={toSelectOptions(userOptions)}
+                                    seedOptions={userOptions}
                                 />
                             </Field>
 

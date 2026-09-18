@@ -65,14 +65,95 @@ final class CompanyMemberUsers
         bool $activeMembershipOnly = true,
         ?int $excludeUserId = null,
     ): array {
+        return self::searchOptionsForCompanyId(
+            $companyId,
+            includeUserIds: $includeUserIds,
+            activeMembershipOnly: $activeMembershipOnly,
+            excludeUserId: $excludeUserId,
+            limit: null,
+        );
+    }
+
+    /**
+     * Seed options for Inertia pages (selected users only). Full lists load via /select-options/users.
+     *
+     * @param  list<int>  $includeUserIds
+     * @return list<array{id: int, label: string}>
+     */
+    public static function optionsByIds(array $includeUserIds): array
+    {
         $includeUserIds = array_values(array_unique(array_filter(
             array_map('intval', $includeUserIds),
             fn (int $id): bool => $id > 0,
         )));
 
+        if ($includeUserIds === []) {
+            return [];
+        }
+
+        return User::query()
+            ->whereNull('deleted_at')
+            ->whereIn('id', $includeUserIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email'])
+            ->map(fn (User $user): array => self::toOption($user))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Lightweight options for async user pickers.
+     *
+     * @param  list<int>  $includeUserIds
+     * @return list<array{id: int, label: string}>
+     */
+    public static function searchOptions(
+        ?Company $company,
+        ?string $search = null,
+        array $includeUserIds = [],
+        bool $activeMembershipOnly = true,
+        ?int $excludeUserId = null,
+        ?int $limit = 50,
+    ): array {
+        return self::searchOptionsForCompanyId(
+            $company?->id,
+            search: $search,
+            includeUserIds: $includeUserIds,
+            activeMembershipOnly: $activeMembershipOnly,
+            excludeUserId: $excludeUserId,
+            limit: $limit,
+        );
+    }
+
+    /**
+     * @param  list<int>  $includeUserIds
+     * @return list<array{id: int, label: string}>
+     */
+    public static function searchOptionsForCompanyId(
+        ?int $companyId,
+        ?string $search = null,
+        array $includeUserIds = [],
+        bool $activeMembershipOnly = true,
+        ?int $excludeUserId = null,
+        ?int $limit = 50,
+    ): array {
+        $includeUserIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeUserIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        $needle = trim((string) $search);
+
         $users = self::query($companyId, $activeMembershipOnly)
             ->when($excludeUserId !== null, fn ($query) => $query->whereKeyNot($excludeUserId))
+            ->when($needle !== '', function ($query) use ($needle): void {
+                $query->where(function ($inner) use ($needle): void {
+                    $inner->where('name', 'like', "%{$needle}%")
+                        ->orWhere('email', 'like', "%{$needle}%");
+                });
+            })
             ->orderBy('name')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
             ->get(['id', 'name', 'email']);
 
         if ($includeUserIds !== []) {
@@ -93,14 +174,22 @@ final class CompanyMemberUsers
         }
 
         return $users
-            ->map(fn (User $user): array => [
-                'id' => $user->id,
-                'label' => $user->email !== null && $user->email !== ''
-                    ? "{$user->name} ({$user->email})"
-                    : $user->name,
-            ])
+            ->map(fn (User $user): array => self::toOption($user))
             ->values()
             ->all();
+    }
+
+    /**
+     * @return array{id: int, label: string}
+     */
+    private static function toOption(User $user): array
+    {
+        return [
+            'id' => $user->id,
+            'label' => $user->email !== null && $user->email !== ''
+                ? "{$user->name} ({$user->email})"
+                : $user->name,
+        ];
     }
 
     public static function existsRule(?int $companyId): Exists

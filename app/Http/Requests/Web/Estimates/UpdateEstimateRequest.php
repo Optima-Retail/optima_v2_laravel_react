@@ -41,23 +41,15 @@ final class UpdateEstimateRequest extends FormRequest
         abort_if($owner === null, 403);
 
         $service = app(WorkOrderService::class);
-        $establishmentIds = array_column($service->establishmentOptions($owner), 'id');
-        $establishmentIds = $establishmentIds === [] ? [0] : $establishmentIds;
         /** @var WorkOrder $estimate */
         $estimate = $this->route('estimate');
-        $contractIds = array_column(
-            $service->contractOptions(
-                $owner,
-                $estimate->contract_id !== null ? [(int) $estimate->contract_id] : [],
-            ),
-            'id',
-        );
 
         return array_merge(WorkOrderFormInput::baseRules(
             $owner->id,
-            $establishmentIds,
+            $service->accessibleCompanyIds($owner),
             WorkOrderStage::Estimate->value,
-            $contractIds,
+            $estimate->contract_id !== null ? [(int) $estimate->contract_id] : [],
+            $estimate->establishment_id !== null ? [(int) $estimate->establishment_id] : [],
         ), [
             'code' => ['nullable', 'string', 'max:64'],
         ]);

@@ -199,7 +199,7 @@ final class CompanyRelationshipController extends Controller
                 $owner->id,
                 $relationship->related_company_id !== null ? (int) $relationship->related_company_id : null,
             ),
-            'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
+            'formOptions' => $this->relationships->formOptions($this->activeCompany($request), $relationship),
             'can' => [
                 'delete' => ($request->user()?->can('delete', $relationship) ?? false)
                     && $this->relationships->canBeDeleted($relationship),
@@ -235,7 +235,7 @@ final class CompanyRelationshipController extends Controller
                 $owner->id,
                 $relationship->related_company_id !== null ? (int) $relationship->related_company_id : null,
             ),
-            'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
+            'formOptions' => $this->relationships->formOptions($this->activeCompany($request), $relationship),
             'can' => [
                 'delete' => ($request->user()?->can('delete', $relationship) ?? false)
                     && $this->relationships->canBeDeleted($relationship),
@@ -259,7 +259,7 @@ final class CompanyRelationshipController extends Controller
                 $owner->id,
                 $relationship->related_company_id !== null ? (int) $relationship->related_company_id : null,
             ),
-            'formOptions' => $this->relationships->formOptions($this->activeCompany($request)),
+            'formOptions' => $this->relationships->formOptions($this->activeCompany($request), $relationship),
             'initialTab' => $request->string('tab')->trim()->toString() ?: 'general',
             'selectedIncidentId' => $request->integer('incident') ?: null,
             'chat' => $user !== null

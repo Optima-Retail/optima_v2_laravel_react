@@ -113,21 +113,31 @@ final class WorkOrderFormInput
     }
 
     /**
-     * @param  list<int>  $establishmentIds
-     * @param  list<int>  $contractIds
+     * @param  list<int>  $accessibleCompanyIds  Client company IDs owned by the active company.
+     * @param  list<int>  $includeContractIds  Keep currently selected contracts valid even if out of scope.
+     * @param  list<int>  $includeEstablishmentIds  Keep currently selected establishments valid even if inactive.
      * @return array<string, mixed>
      */
     public static function baseRules(
         int $ownerCompanyId,
-        array $establishmentIds,
+        array $accessibleCompanyIds,
         string $stage,
-        array $contractIds = [],
+        array $includeContractIds = [],
+        array $includeEstablishmentIds = [],
     ): array {
         $statusKind = $stage === WorkOrderStage::WorkOrder->value
             ? WorkOrderStage::WorkOrder->value
             : WorkOrderStage::Estimate->value;
 
-        $contractIds = $contractIds === [] ? [0] : $contractIds;
+        $accessibleCompanyIds = $accessibleCompanyIds === [] ? [0] : $accessibleCompanyIds;
+        $includeContractIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeContractIds),
+            fn (int $id): bool => $id > 0,
+        )));
+        $includeEstablishmentIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeEstablishmentIds),
+            fn (int $id): bool => $id > 0,
+        )));
 
         return [
             'subject' => ['required', 'string', 'max:255'],
@@ -143,8 +153,33 @@ final class WorkOrderFormInput
             'work_order_type_id' => ['nullable', 'integer', Rule::exists('work_order_types', 'id')->whereNull('deleted_at')],
             'client_priority_id' => ['nullable', 'integer', Rule::exists('client_priorities', 'id')->whereNull('deleted_at')],
             'is_urgent' => ['required', 'boolean'],
-            'establishment_id' => ['required', 'integer', Rule::in($establishmentIds)],
-            'contract_id' => ['nullable', 'integer', Rule::in($contractIds)],
+            'establishment_id' => [
+                'required',
+                'integer',
+                Rule::exists('establishments', 'id')->where(function ($query) use ($accessibleCompanyIds, $includeEstablishmentIds): void {
+                    $query->where(function ($inner) use ($accessibleCompanyIds, $includeEstablishmentIds): void {
+                        $inner->whereIn('company_id', $accessibleCompanyIds)
+                            ->where('is_active', true);
+
+                        if ($includeEstablishmentIds !== []) {
+                            $inner->orWhereIn('id', $includeEstablishmentIds);
+                        }
+                    });
+                }),
+            ],
+            'contract_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('contracts', 'id')->where(function ($query) use ($accessibleCompanyIds, $includeContractIds): void {
+                    $query->where(function ($inner) use ($accessibleCompanyIds, $includeContractIds): void {
+                        $inner->whereIn('company_id', $accessibleCompanyIds);
+
+                        if ($includeContractIds !== []) {
+                            $inner->orWhereIn('id', $includeContractIds);
+                        }
+                    });
+                }),
+            ],
             'currency_id' => ['nullable', 'integer', Rule::exists('currencies', 'id')->whereNull('deleted_at')],
             'responsible_user_id' => ['nullable', 'integer', CompanyMemberUsers::existsRule($ownerCompanyId)],
             'requester_id' => ['nullable', 'integer', Rule::exists('requesters', 'id')->whereNull('deleted_at')],

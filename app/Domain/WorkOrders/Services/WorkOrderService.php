@@ -6,6 +6,7 @@ namespace App\Domain\WorkOrders\Services;
 
 use App\Domain\Chats\Enums\ChatDocumentType;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Domain\Companies\Services\EstablishmentService;
 use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Config\Checklists\Enums\ChecklistDocumentType;
 use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
@@ -72,17 +73,42 @@ final class WorkOrderService
     }
 
     /**
-     * Active establishments for selects. Keep `$includeIds` so edit still shows saved inactive values.
+     * Seed options for Inertia pages (selected establishments only). Full lists load via /select-options/establishments.
      *
      * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string, company_id: int, company_name: string|null, company_logo_url: string|null, brand_name: string|null, currency_id: int|null, currency_label: string|null}>
      */
     public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
+        return $this->searchEstablishmentOptions($owner, includeIds: $includeIds, onlyIncludeIds: true);
+    }
+
+    /**
+     * Lightweight options for async establishment pickers.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, company_id: int, company_name: string|null, company_logo_url: string|null, brand_name: string|null, currency_id: int|null, currency_label: string|null}>
+     */
+    public function searchEstablishmentOptions(
+        Company $owner,
+        ?string $search = null,
+        array $includeIds = [],
+        ?int $companyId = null,
+        ?int $limit = 50,
+        bool $onlyIncludeIds = false,
+    ): array {
         $ids = $this->accessibleCompanyIds($owner);
 
         if ($ids === []) {
             return [];
+        }
+
+        if ($companyId !== null && $companyId > 0) {
+            if (! in_array($companyId, $ids, true)) {
+                return [];
+            }
+
+            $ids = [$companyId];
         }
 
         $includeIds = array_values(array_unique(array_filter(
@@ -90,17 +116,31 @@ final class WorkOrderService
             fn (int $id): bool => $id > 0,
         )));
 
-        $brandNames = CompanyRelationship::query()
-            ->with('brand:id,name')
-            ->where('owner_company_id', $owner->id)
-            ->where('kind', CompanyRelationshipKind::Customer->value)
-            ->whereIn('related_company_id', $ids)
-            ->get(['related_company_id', 'brand_id'])
-            ->mapWithKeys(fn (CompanyRelationship $relationship): array => [
-                (int) $relationship->related_company_id => $relationship->brand?->name,
-            ]);
+        if ($onlyIncludeIds) {
+            if ($includeIds === []) {
+                return [];
+            }
 
-        return Establishment::query()
+            $brandNames = $this->brandNamesForCompanies($owner, $ids);
+
+            return Establishment::query()
+                ->with([
+                    'company:id,name,logo',
+                    'delegation:id,currency_id',
+                    'delegation.currency:id,name,code',
+                ])
+                ->whereIn('id', $includeIds)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'company_id', 'delegation_id'])
+                ->map(fn (Establishment $establishment): array => $this->mapEstablishmentOption($establishment, $brandNames))
+                ->values()
+                ->all();
+        }
+
+        $needle = trim((string) $search);
+        $brandNames = $this->brandNamesForCompanies($owner, $ids);
+
+        $rows = Establishment::query()
             ->with([
                 'company:id,name,logo',
                 'delegation:id,currency_id',
@@ -114,38 +154,122 @@ final class WorkOrderService
                     $query->orWhereIn('id', $includeIds);
                 }
             })
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'company_id', 'delegation_id'])
-            ->map(function (Establishment $establishment) use ($brandNames): array {
-                $currency = $establishment->delegation?->currency;
-
-                return [
-                    'id' => $establishment->id,
-                    'label' => $establishment->code
-                        ? "{$establishment->name} ({$establishment->code})"
-                        : $establishment->name,
-                    'company_id' => (int) $establishment->company_id,
-                    'company_name' => $establishment->company?->name,
-                    'company_logo_url' => $establishment->company?->logoUrl(),
-                    'brand_name' => $brandNames->get((int) $establishment->company_id),
-                    'currency_id' => $currency?->id !== null ? (int) $currency->id : null,
-                    'currency_label' => $currency?->name,
-                ];
+            ->when($needle !== '', function ($query) use ($needle): void {
+                $query->where(function ($inner) use ($needle): void {
+                    $inner->where('name', 'like', "%{$needle}%")
+                        ->orWhere('code', 'like', "%{$needle}%")
+                        ->orWhere('store_code', 'like', "%{$needle}%");
+                });
             })
+            ->orderBy('name')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
+            ->get(['id', 'name', 'code', 'company_id', 'delegation_id'])
+            ->map(fn (Establishment $establishment): array => $this->mapEstablishmentOption($establishment, $brandNames))
             ->values()
             ->all();
+
+        if ($includeIds !== []) {
+            $missingIds = array_values(array_diff(
+                $includeIds,
+                array_map(fn (array $row): int => (int) $row['id'], $rows),
+            ));
+
+            if ($missingIds !== []) {
+                $extra = Establishment::query()
+                    ->with([
+                        'company:id,name,logo',
+                        'delegation:id,currency_id',
+                        'delegation.currency:id,name,code',
+                    ])
+                    ->whereIn('id', $missingIds)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'code', 'company_id', 'delegation_id'])
+                    ->map(fn (Establishment $establishment): array => $this->mapEstablishmentOption($establishment, $brandNames))
+                    ->all();
+
+                $rows = array_values(array_merge($extra, $rows));
+            }
+        }
+
+        return $rows;
     }
 
     /**
+     * @param  list<int>  $companyIds
+     * @return Collection<int, string|null>
+     */
+    private function brandNamesForCompanies(Company $owner, array $companyIds)
+    {
+        return CompanyRelationship::query()
+            ->with('brand:id,name')
+            ->where('owner_company_id', $owner->id)
+            ->where('kind', CompanyRelationshipKind::Customer->value)
+            ->whereIn('related_company_id', $companyIds)
+            ->get(['related_company_id', 'brand_id'])
+            ->mapWithKeys(fn (CompanyRelationship $relationship): array => [
+                (int) $relationship->related_company_id => $relationship->brand?->name,
+            ]);
+    }
+
+    /**
+     * @param  Collection<int, string|null>  $brandNames
+     * @return array{id: int, label: string, company_id: int, company_name: string|null, company_logo_url: string|null, brand_name: string|null, currency_id: int|null, currency_label: string|null}
+     */
+    private function mapEstablishmentOption(Establishment $establishment, $brandNames): array
+    {
+        $currency = $establishment->delegation?->currency;
+
+        return [
+            'id' => $establishment->id,
+            'label' => $establishment->code
+                ? "{$establishment->name} ({$establishment->code})"
+                : $establishment->name,
+            'company_id' => (int) $establishment->company_id,
+            'company_name' => $establishment->company?->name,
+            'company_logo_url' => $establishment->company?->logoUrl(),
+            'brand_name' => $brandNames->get((int) $establishment->company_id),
+            'currency_id' => $currency?->id !== null ? (int) $currency->id : null,
+            'currency_label' => $currency?->name,
+        ];
+    }
+
+    /**
+     * Seed options for Inertia pages (selected contracts only). Full lists load via /select-options/contracts.
+     *
      * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string}>
      */
     public function contractOptions(Company $owner, array $includeIds = []): array
     {
+        return $this->searchContractOptions($owner, includeIds: $includeIds, onlyIncludeIds: true);
+    }
+
+    /**
+     * Lightweight options for async contract pickers.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string}>
+     */
+    public function searchContractOptions(
+        Company $owner,
+        ?string $search = null,
+        array $includeIds = [],
+        ?int $companyId = null,
+        ?int $limit = 50,
+        bool $onlyIncludeIds = false,
+    ): array {
         $companyIds = $this->accessibleCompanyIds($owner);
 
         if ($companyIds === []) {
             return [];
+        }
+
+        if ($companyId !== null && $companyId > 0) {
+            if (! in_array($companyId, $companyIds, true)) {
+                return [];
+            }
+
+            $companyIds = [$companyId];
         }
 
         $includeIds = array_values(array_unique(array_filter(
@@ -153,33 +277,77 @@ final class WorkOrderService
             fn (int $id): bool => $id > 0,
         )));
 
-        return Contract::query()
-            ->where(function ($query) use ($companyIds, $includeIds): void {
-                $query->whereIn('company_id', $companyIds);
+        if ($onlyIncludeIds) {
+            if ($includeIds === []) {
+                return [];
+            }
 
-                if ($includeIds !== []) {
-                    $query->orWhereIn('id', $includeIds);
-                }
+            return Contract::query()
+                ->whereIn('id', $includeIds)
+                ->orderByDesc('id')
+                ->get(['id', 'code', 'description', 'work_order_subject'])
+                ->map(fn (Contract $contract): array => $this->mapContractOption($contract))
+                ->values()
+                ->all();
+        }
+
+        $needle = trim((string) $search);
+
+        $rows = Contract::query()
+            ->whereIn('company_id', $companyIds)
+            ->when($needle !== '', function ($query) use ($needle): void {
+                $query->where(function ($inner) use ($needle): void {
+                    $inner->where('code', 'like', "%{$needle}%")
+                        ->orWhere('description', 'like', "%{$needle}%")
+                        ->orWhere('work_order_subject', 'like', "%{$needle}%");
+                });
             })
             ->orderByDesc('id')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
             ->get(['id', 'code', 'description', 'work_order_subject'])
-            ->map(function (Contract $contract): array {
-                $label = $contract->code
-                    ?: $contract->description
-                    ?: $contract->work_order_subject
-                    ?: '#'.$contract->id;
-
-                if ($contract->code && filled($contract->description)) {
-                    $label = $contract->code.' — '.$contract->description;
-                }
-
-                return [
-                    'id' => (int) $contract->id,
-                    'label' => $label,
-                ];
-            })
+            ->map(fn (Contract $contract): array => $this->mapContractOption($contract))
             ->values()
             ->all();
+
+        if ($includeIds !== []) {
+            $missingIds = array_values(array_diff(
+                $includeIds,
+                array_map(fn (array $row): int => (int) $row['id'], $rows),
+            ));
+
+            if ($missingIds !== []) {
+                $extra = Contract::query()
+                    ->whereIn('id', $missingIds)
+                    ->orderByDesc('id')
+                    ->get(['id', 'code', 'description', 'work_order_subject'])
+                    ->map(fn (Contract $contract): array => $this->mapContractOption($contract))
+                    ->all();
+
+                $rows = array_values(array_merge($extra, $rows));
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array{id: int, label: string}
+     */
+    private function mapContractOption(Contract $contract): array
+    {
+        $label = $contract->code
+            ?: $contract->description
+            ?: $contract->work_order_subject
+            ?: '#'.$contract->id;
+
+        if ($contract->code && filled($contract->description)) {
+            $label = $contract->code.' — '.$contract->description;
+        }
+
+        return [
+            'id' => (int) $contract->id,
+            'label' => $label,
+        ];
     }
 
     /**
@@ -192,28 +360,28 @@ final class WorkOrderService
         ?int $requestedContractId,
         ?int $requestedEstablishmentId = null,
     ): array {
+        $companyIds = $this->accessibleCompanyIds($owner);
         $contractId = null;
 
-        if ($requestedContractId !== null && $requestedContractId > 0) {
-            $allowed = collect($this->contractOptions($owner))
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+        if ($requestedContractId !== null && $requestedContractId > 0 && $companyIds !== []) {
+            $exists = Contract::query()
+                ->whereKey($requestedContractId)
+                ->whereIn('company_id', $companyIds)
+                ->exists();
 
-            $contractId = in_array($requestedContractId, $allowed, true) ? $requestedContractId : null;
+            $contractId = $exists ? $requestedContractId : null;
         }
 
         $establishmentId = null;
 
-        if ($requestedEstablishmentId !== null && $requestedEstablishmentId > 0) {
-            $allowedEstablishments = collect($this->establishmentOptions($owner))
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+        if ($requestedEstablishmentId !== null && $requestedEstablishmentId > 0 && $companyIds !== []) {
+            $exists = Establishment::query()
+                ->whereKey($requestedEstablishmentId)
+                ->whereIn('company_id', $companyIds)
+                ->where('is_active', true)
+                ->exists();
 
-            $establishmentId = in_array($requestedEstablishmentId, $allowedEstablishments, true)
-                ? $requestedEstablishmentId
-                : null;
+            $establishmentId = $exists ? $requestedEstablishmentId : null;
         }
 
         $subject = null;
@@ -225,13 +393,15 @@ final class WorkOrderService
 
             $subject = filled($contract?->work_order_subject) ? (string) $contract->work_order_subject : null;
 
-            if ($establishmentId === null && $contract !== null) {
+            if ($establishmentId === null && $contract !== null && $companyIds !== []) {
                 $linkedIds = $contract->establishments->pluck('id')->map(fn ($id) => (int) $id)->all();
-                $allowedEstablishments = collect($this->establishmentOptions($owner))
+                $candidates = Establishment::query()
+                    ->whereIn('id', $linkedIds)
+                    ->whereIn('company_id', $companyIds)
+                    ->where('is_active', true)
                     ->pluck('id')
                     ->map(fn ($id) => (int) $id)
                     ->all();
-                $candidates = array_values(array_intersect($linkedIds, $allowedEstablishments));
 
                 if (count($candidates) === 1) {
                     $establishmentId = $candidates[0];
@@ -331,19 +501,43 @@ final class WorkOrderService
     }
 
     /**
+     * Seed options for Inertia pages (selected users only). Full lists load via /select-options/users.
+     *
      * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
     public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return CompanyMemberUsers::options($owner, $includeUserIds);
+        unset($owner);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
     }
 
     /**
+     * Seed options for Inertia pages (selected requesters only). Full lists load via /select-options/requesters.
+     *
+     * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string, company_id: int}>
      */
-    public function requesterOptions(Company $owner, ?int $establishmentId = null): array
+    public function requesterOptions(Company $owner, ?int $establishmentId = null, array $includeIds = []): array
     {
+        return $this->searchRequesterOptions($owner, establishmentId: $establishmentId, includeIds: $includeIds, onlyIncludeIds: true);
+    }
+
+    /**
+     * Lightweight options for async requester pickers.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, company_id: int}>
+     */
+    public function searchRequesterOptions(
+        Company $owner,
+        ?string $search = null,
+        ?int $establishmentId = null,
+        array $includeIds = [],
+        ?int $limit = 50,
+        bool $onlyIncludeIds = false,
+    ): array {
         $companyIds = $this->accessibleCompanyIds($owner);
 
         if ($establishmentId !== null) {
@@ -354,13 +548,40 @@ final class WorkOrderService
             }
         }
 
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        if ($onlyIncludeIds) {
+            if ($includeIds === []) {
+                return [];
+            }
+
+            return Requester::query()
+                ->whereIn('id', $includeIds)
+                ->orderBy('name')
+                ->get(['id', 'name', 'company_id'])
+                ->map(fn (Requester $requester): array => [
+                    'id' => $requester->id,
+                    'label' => $requester->name,
+                    'company_id' => (int) $requester->company_id,
+                ])
+                ->values()
+                ->all();
+        }
+
         if ($companyIds === []) {
             return [];
         }
 
-        return Requester::query()
+        $needle = trim((string) $search);
+
+        $rows = Requester::query()
             ->whereIn('company_id', $companyIds)
+            ->when($needle !== '', fn ($query) => $query->where('name', 'like', "%{$needle}%"))
             ->orderBy('name')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
             ->get(['id', 'name', 'company_id'])
             ->map(fn (Requester $requester): array => [
                 'id' => $requester->id,
@@ -369,29 +590,41 @@ final class WorkOrderService
             ])
             ->values()
             ->all();
+
+        if ($includeIds !== []) {
+            $missingIds = array_values(array_diff(
+                $includeIds,
+                array_map(fn (array $row): int => (int) $row['id'], $rows),
+            ));
+
+            if ($missingIds !== []) {
+                $extra = Requester::query()
+                    ->whereIn('id', $missingIds)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'company_id'])
+                    ->map(fn (Requester $requester): array => [
+                        'id' => $requester->id,
+                        'label' => $requester->name,
+                        'company_id' => (int) $requester->company_id,
+                    ])
+                    ->all();
+
+                $rows = array_values(array_merge($extra, $rows));
+            }
+        }
+
+        return $rows;
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * Seed options for Inertia pages (selected technicians only). Full lists load via /select-options/technicians.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function technicianOptions(Company $owner): array
+    public function technicianOptions(Company $owner, array $includeIds = []): array
     {
-        return CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename,logo,is_active')
-            ->where('owner_company_id', $owner->id)
-            ->where('kind', CompanyRelationshipKind::Technician->value)
-            ->whereHas('relatedCompany', fn ($query) => $query->where('is_active', true))
-            ->orderBy('id')
-            ->get()
-            ->map(function (CompanyRelationship $relationship): array {
-                $name = $relationship->relatedCompany?->tradename
-                    ?: $relationship->relatedCompany?->name
-                    ?: '#'.$relationship->id;
-
-                return $relationship->toSelectOption($name);
-            })
-            ->values()
-            ->all();
+        return app(EstablishmentService::class)->technicianOptions($owner, $includeIds);
     }
 
     /**
@@ -410,6 +643,8 @@ final class WorkOrderService
         ?int $clientPriorityId = null,
         ?int $workOrderTypeId = null,
         array $includeArticleIds = [],
+        ?string $search = null,
+        ?int $limit = null,
     ): array {
         if ($establishmentId === null || $establishmentId <= 0) {
             return $this->articleOptionsForIds($includeArticleIds);
@@ -421,10 +656,19 @@ final class WorkOrderService
             return $this->articleOptionsForIds($includeArticleIds);
         }
 
+        $needle = trim((string) $search);
+
         $rows = ArticleClient::query()
             ->with(['article.languages'])
             ->where('company_relationship_id', $relationship->id)
+            ->when($needle !== '', function ($query) use ($needle): void {
+                $query->whereHas('article', function ($articles) use ($needle): void {
+                    $articles->where('code', 'like', "%{$needle}%")
+                        ->orWhereHas('languages', fn ($languages) => $languages->where('name', 'like', "%{$needle}%"));
+                });
+            })
             ->orderBy('article_id')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
             ->get();
 
         $rate = $this->clientRateFor($relationship->id, $clientPriorityId, $workOrderTypeId);

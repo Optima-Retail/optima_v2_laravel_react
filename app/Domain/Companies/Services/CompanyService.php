@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\Companies\Services;
 
+use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Companies\Support\Coordinates;
-use App\Models\Brand;
+use App\Domain\Config\Brands\Services\BrandService;
 use App\Models\Company;
 use App\Models\CompanyUser;
 use App\Models\Country;
@@ -167,14 +168,74 @@ final class CompanyService
     /**
      * @return list<array{id: int, label: string}>
      */
-    public function assignableUserOptions(Company $company): array
+    public function assignableUserOptions(Company $company, array $includeUserIds = []): array
     {
-        $memberIds = $company->users()->pluck('users.id');
+        return $this->searchAssignableUserOptions($company, includeUserIds: $includeUserIds, limit: null);
+    }
 
-        return User::query()
+    /**
+     * Seed options for Inertia pages (selected assignable user only). Full lists load via /select-options/users?scope=assignable.
+     *
+     * @param  list<int>  $includeUserIds
+     * @return list<array{id: int, label: string}>
+     */
+    public function seedAssignableUserOptions(Company $company, array $includeUserIds = []): array
+    {
+        unset($company);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
+    }
+
+    /**
+     * Lightweight options for async assignable-user pickers (users not already members).
+     *
+     * @param  list<int>  $includeUserIds
+     * @return list<array{id: int, label: string}>
+     */
+    public function searchAssignableUserOptions(
+        Company $company,
+        ?string $search = null,
+        array $includeUserIds = [],
+        ?int $limit = 50,
+    ): array {
+        $memberIds = $company->users()->pluck('users.id');
+        $needle = trim((string) $search);
+        $includeUserIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeUserIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        $users = User::query()
+            ->whereNull('deleted_at')
+            ->where('is_active', true)
             ->when($memberIds->isNotEmpty(), fn ($query) => $query->whereNotIn('id', $memberIds))
+            ->when($needle !== '', function ($query) use ($needle): void {
+                $query->where(function ($inner) use ($needle): void {
+                    $inner->where('name', 'like', "%{$needle}%")
+                        ->orWhere('email', 'like', "%{$needle}%");
+                });
+            })
             ->orderBy('name')
-            ->get(['id', 'name', 'email'])
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
+            ->get(['id', 'name', 'email']);
+
+        if ($includeUserIds !== []) {
+            $missingIds = array_values(array_diff(
+                $includeUserIds,
+                $users->pluck('id')->all(),
+            ));
+
+            if ($missingIds !== []) {
+                $extra = User::query()
+                    ->whereNull('deleted_at')
+                    ->whereIn('id', $missingIds)
+                    ->get(['id', 'name', 'email']);
+
+                $users = $users->concat($extra)->unique('id')->sortBy('name')->values();
+            }
+        }
+
+        return $users
             ->map(fn (User $user): array => [
                 'id' => $user->id,
                 'label' => "{$user->name} ({$user->email})",
@@ -270,19 +331,13 @@ final class CompanyService
     }
 
     /**
+     * Seed options for Inertia pages (selected brands only). Full lists load via /select-options/brands.
+     *
      * @return list<array{id: int, label: string}>
      */
-    public function brandOptions(): array
+    public function brandOptions(?int $includeId = null): array
     {
-        return Brand::query()
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (Brand $brand): array => [
-                'id' => $brand->id,
-                'label' => $brand->name,
-            ])
-            ->values()
-            ->all();
+        return app(BrandService::class)->brandOptions($includeId);
     }
 
     /**

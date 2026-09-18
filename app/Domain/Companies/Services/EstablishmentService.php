@@ -329,31 +329,109 @@ final class EstablishmentService
     }
 
     /**
+     * Seed options for Inertia pages (selected users only). Full lists load via /select-options/users.
+     *
      * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
     public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return CompanyMemberUsers::options($owner, $includeUserIds);
+        unset($owner);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
     }
 
     /**
-     * Technician company relationships owned by the active company.
+     * Seed options for Inertia pages (selected technicians only). Full lists load via /select-options/technicians.
      *
+     * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function technicianOptions(Company $owner): array
+    public function technicianOptions(Company $owner, array $includeIds = []): array
     {
-        return CompanyRelationship::query()
+        return $this->searchTechnicianOptions($owner, includeIds: $includeIds, onlyIncludeIds: true);
+    }
+
+    /**
+     * Lightweight options for async technician pickers.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function searchTechnicianOptions(
+        Company $owner,
+        ?string $search = null,
+        array $includeIds = [],
+        ?int $limit = 50,
+        bool $onlyIncludeIds = false,
+    ): array {
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        if ($onlyIncludeIds) {
+            if ($includeIds === []) {
+                return [];
+            }
+
+            return CompanyRelationship::query()
+                ->with('relatedCompany:id,name,tradename,logo,is_active')
+                ->where('owner_company_id', $owner->id)
+                ->where('kind', CompanyRelationshipKind::Technician->value)
+                ->whereIn('id', $includeIds)
+                ->orderBy('id')
+                ->get()
+                ->map(fn (CompanyRelationship $relationship): array => $relationship->toSelectOption())
+                ->values()
+                ->all();
+        }
+
+        $needle = trim((string) $search);
+
+        $rows = CompanyRelationship::query()
             ->with('relatedCompany:id,name,tradename,logo,is_active')
             ->where('owner_company_id', $owner->id)
             ->where('kind', CompanyRelationshipKind::Technician->value)
-            ->whereHas('relatedCompany', fn ($query) => $query->where('is_active', true))
+            ->whereHas('relatedCompany', function ($query) use ($needle): void {
+                $query->where('is_active', true);
+
+                if ($needle !== '') {
+                    $query->where(function ($inner) use ($needle): void {
+                        $inner->where('name', 'like', "%{$needle}%")
+                            ->orWhere('tradename', 'like', "%{$needle}%")
+                            ->orWhere('tax_id', 'like', "%{$needle}%");
+                    });
+                }
+            })
             ->orderBy('id')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
             ->get()
             ->map(fn (CompanyRelationship $relationship): array => $relationship->toSelectOption())
             ->values()
             ->all();
+
+        if ($includeIds !== []) {
+            $missingIds = array_values(array_diff(
+                $includeIds,
+                array_map(fn (array $row): int => (int) $row['id'], $rows),
+            ));
+
+            if ($missingIds !== []) {
+                $extra = CompanyRelationship::query()
+                    ->with('relatedCompany:id,name,tradename,logo,is_active')
+                    ->where('owner_company_id', $owner->id)
+                    ->where('kind', CompanyRelationshipKind::Technician->value)
+                    ->whereIn('id', $missingIds)
+                    ->get()
+                    ->map(fn (CompanyRelationship $relationship): array => $relationship->toSelectOption())
+                    ->all();
+
+                $rows = array_values(array_merge($extra, $rows));
+            }
+        }
+
+        return $rows;
     }
 
     /**

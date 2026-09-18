@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Contracts\Services;
 
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Domain\Companies\Services\CompanyService;
 use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Config\NumberingPatterns\Enums\NumberingResource;
 use App\Domain\Config\NumberingPatterns\Services\NumberingPatternService;
@@ -51,7 +52,7 @@ final class ContractService
         unset($owner);
 
         return $includeId !== null
-            ? app(\App\Domain\Companies\Services\CompanyService::class)->optionsByIds([$includeId])
+            ? app(CompanyService::class)->optionsByIds([$includeId])
             : [];
     }
 
@@ -66,7 +67,7 @@ final class ContractService
     ): array {
         $ids = $this->accessibleCompanyIds($owner);
 
-        return app(\App\Domain\Companies\Services\CompanyService::class)->searchOptions(
+        return app(CompanyService::class)->searchOptions(
             search: $search,
             includeId: $includeId,
             onlyIds: $ids,
@@ -75,17 +76,42 @@ final class ContractService
     }
 
     /**
-     * Active establishments for accessible client companies.
+     * Seed options for Inertia pages (selected establishments only). Full lists load via /select-options/establishments.
      *
      * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string, company_id: int}>
      */
     public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
+        return $this->searchEstablishmentOptions($owner, includeIds: $includeIds, onlyIncludeIds: true);
+    }
+
+    /**
+     * Lightweight options for async establishment pickers.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, company_id: int}>
+     */
+    public function searchEstablishmentOptions(
+        Company $owner,
+        ?string $search = null,
+        array $includeIds = [],
+        ?int $companyId = null,
+        ?int $limit = 50,
+        bool $onlyIncludeIds = false,
+    ): array {
         $ids = $this->accessibleCompanyIds($owner);
 
         if ($ids === []) {
             return [];
+        }
+
+        if ($companyId !== null && $companyId > 0) {
+            if (! in_array($companyId, $ids, true)) {
+                return [];
+            }
+
+            $ids = [$companyId];
         }
 
         $includeIds = array_values(array_unique(array_filter(
@@ -93,7 +119,29 @@ final class ContractService
             fn (int $id): bool => $id > 0,
         )));
 
-        return Establishment::query()
+        if ($onlyIncludeIds) {
+            if ($includeIds === []) {
+                return [];
+            }
+
+            return Establishment::query()
+                ->whereIn('id', $includeIds)
+                ->orderBy('name')
+                ->get(['id', 'name', 'code', 'company_id'])
+                ->map(fn (Establishment $establishment): array => [
+                    'id' => $establishment->id,
+                    'label' => $establishment->code
+                        ? "{$establishment->name} ({$establishment->code})"
+                        : $establishment->name,
+                    'company_id' => (int) $establishment->company_id,
+                ])
+                ->values()
+                ->all();
+        }
+
+        $needle = trim((string) $search);
+
+        $rows = Establishment::query()
             ->whereIn('company_id', $ids)
             ->where(function ($query) use ($includeIds): void {
                 $query->where('is_active', true);
@@ -102,7 +150,14 @@ final class ContractService
                     $query->orWhereIn('id', $includeIds);
                 }
             })
+            ->when($needle !== '', function ($query) use ($needle): void {
+                $query->where(function ($inner) use ($needle): void {
+                    $inner->where('name', 'like', "%{$needle}%")
+                        ->orWhere('code', 'like', "%{$needle}%");
+                });
+            })
             ->orderBy('name')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
             ->get(['id', 'name', 'code', 'company_id'])
             ->map(fn (Establishment $establishment): array => [
                 'id' => $establishment->id,
@@ -113,6 +168,32 @@ final class ContractService
             ])
             ->values()
             ->all();
+
+        if ($includeIds !== []) {
+            $missingIds = array_values(array_diff(
+                $includeIds,
+                array_map(fn (array $row): int => (int) $row['id'], $rows),
+            ));
+
+            if ($missingIds !== []) {
+                $extra = Establishment::query()
+                    ->whereIn('id', $missingIds)
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'code', 'company_id'])
+                    ->map(fn (Establishment $establishment): array => [
+                        'id' => $establishment->id,
+                        'label' => $establishment->code
+                            ? "{$establishment->name} ({$establishment->code})"
+                            : $establishment->name,
+                        'company_id' => (int) $establishment->company_id,
+                    ])
+                    ->all();
+
+                $rows = array_values(array_merge($extra, $rows));
+            }
+        }
+
+        return $rows;
     }
 
     /**
@@ -160,12 +241,16 @@ final class ContractService
     }
 
     /**
+     * Seed options for Inertia pages (selected users only). Full lists load via /select-options/users.
+     *
      * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
     public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return CompanyMemberUsers::options($owner, $includeUserIds);
+        unset($owner);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
     }
 
     /**

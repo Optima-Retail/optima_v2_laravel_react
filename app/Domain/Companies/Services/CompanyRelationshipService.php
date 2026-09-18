@@ -9,11 +9,11 @@ use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Enums\CompanyRelationshipStatus;
 use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\Companies\Support\CompanyValidation;
+use App\Domain\Config\Brands\Services\BrandService;
 use App\Domain\Config\TechnicianAlternativeDelegations\Services\TechnicianAlternativeDelegationService;
 use App\Domain\Config\TechnicianGlobalServiceTypes\Services\TechnicianGlobalServiceTypeService;
 use App\Domain\Config\TechnicianServiceTypes\Services\TechnicianServiceTypeService;
 use App\Models\ArticleClient;
-use App\Models\Brand;
 use App\Models\ClientPriority;
 use App\Models\ClientRate;
 use App\Models\Company;
@@ -330,6 +330,9 @@ final class CompanyRelationshipService
     }
 
     /**
+     * Catalog options for relationship forms. Large lists (brands, users) are seed-only;
+     * full lists load via /select-options/*.
+     *
      * @return array{
      *     brandOptions: list<array{id: int, label: string}>,
      *     delegationOptions: list<array{id: int, label: string}>,
@@ -342,18 +345,27 @@ final class CompanyRelationshipService
      *     globalServiceTypeOptions: list<array{id: int, label: string, color: string|null}>
      * }
      */
-    public function formOptions(Company $owner): array
+    public function formOptions(Company $owner, ?CompanyRelationship $relationship = null): array
     {
+        $userIds = [];
+        $brandId = null;
+
+        if ($relationship !== null) {
+            $relationship->loadMissing('collaborators');
+            $brandId = $relationship->brand_id !== null ? (int) $relationship->brand_id : null;
+            $userIds = array_values(array_filter([
+                ...$relationship->collaborators->pluck('id')->map(fn ($id) => (int) $id)->all(),
+                $relationship->corrective_work_order_owner_id !== null ? (int) $relationship->corrective_work_order_owner_id : null,
+                $relationship->preventive_work_order_owner_id !== null ? (int) $relationship->preventive_work_order_owner_id : null,
+                $relationship->quality_owner_id !== null ? (int) $relationship->quality_owner_id : null,
+                $relationship->account_owner_id !== null ? (int) $relationship->account_owner_id : null,
+                $relationship->commercial_owner_id !== null ? (int) $relationship->commercial_owner_id : null,
+                $relationship->sourced_by_user_id !== null ? (int) $relationship->sourced_by_user_id : null,
+            ]));
+        }
+
         return [
-            'brandOptions' => Brand::query()
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->map(fn (Brand $brand): array => [
-                    'id' => $brand->id,
-                    'label' => $brand->name,
-                ])
-                ->values()
-                ->all(),
+            'brandOptions' => app(BrandService::class)->brandOptions($brandId),
             'delegationOptions' => Delegation::query()
                 ->orderBy('name')
                 ->get(['id', 'name'])
@@ -391,7 +403,7 @@ final class CompanyRelationshipService
                 ])
                 ->values()
                 ->all(),
-            'userOptions' => CompanyMemberUsers::options($owner),
+            'userOptions' => CompanyMemberUsers::optionsByIds($userIds),
             'priorityOptions' => ClientPriority::query()
                 ->orderBy('level')
                 ->orderBy('name')

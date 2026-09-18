@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus, Search, Trash2 } from 'lucide-react';
 import { CompanyOptionLabel } from '@/components/companies/CompanyOptionLabel';
@@ -7,7 +7,8 @@ import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
-import { MultiSelect } from '@/components/ui/MultiSelect';
+import { AsyncMultiSelect } from '@/components/ui/AsyncMultiSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { Toggle } from '@/components/ui/Toggle';
@@ -22,6 +23,7 @@ import type {
     WorkOrderTechnicianForm,
 } from '@/support/types/domain/work-order';
 import type { WorkOrderStatusOption } from '@/support/types/domain/work-order-status';
+import type { SelectOptionRow } from '@/services/selectOptions';
 
 export type WorkOrderPriorityOption = UserOption & {
     company_ids?: number[];
@@ -316,10 +318,49 @@ export function WorkOrderForm({
         /en\s*progreso/i.test(selectedStatus?.label ?? '');
     const [technicianPickerIndex, setTechnicianPickerIndex] = useState<number | null>(null);
     const [extraTechnicianOptions, setExtraTechnicianOptions] = useState<CompanyOption[]>([]);
+    const [establishmentCache, setEstablishmentCache] = useState<EstablishmentOption[]>(establishmentOptions);
+    const [articleCache, setArticleCache] = useState<WorkOrderArticleOption[]>(articleOptions);
+    const [requesterCache, setRequesterCache] = useState<UserOption[]>(requesterOptions);
+    const [contractCache, setContractCache] = useState<UserOption[]>(contractOptions);
+
+    const mergeEstablishmentCache = useCallback((rows: SelectOptionRow[]) => {
+        setEstablishmentCache((current) => {
+            const byId = new Map(current.map((row) => [row.id, row]));
+            for (const row of rows) {
+                byId.set(row.id, {
+                    id: row.id,
+                    label: row.label,
+                    company_id: Number(row.company_id ?? 0),
+                    company_name: (row.company_name as string | null | undefined) ?? null,
+                    company_logo_url: (row.company_logo_url as string | null | undefined) ?? null,
+                    brand_name: (row.brand_name as string | null | undefined) ?? null,
+                    currency_id: row.currency_id !== undefined && row.currency_id !== null ? Number(row.currency_id) : null,
+                    currency_label: (row.currency_label as string | null | undefined) ?? null,
+                });
+            }
+            return Array.from(byId.values());
+        });
+    }, []);
+
+    const mergeArticleCache = useCallback((rows: SelectOptionRow[]) => {
+        setArticleCache((current) => {
+            const byId = new Map(current.map((row) => [row.id, row]));
+            for (const row of rows) {
+                byId.set(row.id, {
+                    id: row.id,
+                    label: row.label,
+                    code: String(row.code ?? ''),
+                    description: (row.description as string | null | undefined) ?? null,
+                    unit_price: String(row.unit_price ?? '0'),
+                });
+            }
+            return Array.from(byId.values());
+        });
+    }, []);
 
     const selectedEstablishment = useMemo(
-        () => establishmentOptions.find((option) => String(option.id) === values.establishment_id) ?? null,
-        [establishmentOptions, values.establishment_id],
+        () => establishmentCache.find((option) => String(option.id) === values.establishment_id) ?? null,
+        [establishmentCache, values.establishment_id],
     );
 
     // Prod: priorities are the client's configured list (company_priority), not the global catalog.
@@ -353,27 +394,9 @@ export function WorkOrderForm({
         return Array.from(byId.values());
     }, [extraTechnicianOptions, technicianOptions]);
 
-    const establishmentSelect = useMemo(
-        () =>
-            establishmentOptions.map((option) => ({
-                value: String(option.id),
-                label: option.label,
-            })),
-        [establishmentOptions],
-    );
-
-    const contractSelect = useMemo(
-        () =>
-            contractOptions.map((option) => ({
-                value: String(option.id),
-                label: option.label,
-            })),
-        [contractOptions],
-    );
-
     function handleEstablishmentChange(value: string) {
         onChange('establishment_id', value);
-        const option = establishmentOptions.find((item) => String(item.id) === value);
+        const option = establishmentCache.find((item) => String(item.id) === value);
         if (option?.currency_id) {
             onChange('currency_id', String(option.currency_id));
         }
@@ -521,13 +544,15 @@ export function WorkOrderForm({
                         {establishmentLocked && !isCreate ? (
                             <ReadonlyValue value={selectedEstablishment?.label || values.establishment_id} />
                         ) : (
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="establishment_id"
+                                resource="establishments"
                                 value={values.establishment_id}
                                 invalid={Boolean(errors.establishment_id)}
                                 onChange={handleEstablishmentChange}
                                 emptyLabel={t('common.select')}
-                                options={establishmentSelect}
+                                seedOptions={establishmentCache}
+                                onOptionsLoaded={mergeEstablishmentCache}
                             />
                         )}
                     </Field>
@@ -546,15 +571,25 @@ export function WorkOrderForm({
                     {showContract ? (
                         <Field label={t('workOrders.contract')} htmlFor="contract_id" error={errors.contract_id}>
                             {bodyLocked ? (
-                                <ReadonlyValue value={optionLabel(contractOptions, values.contract_id)} />
+                                <ReadonlyValue value={optionLabel(contractCache, values.contract_id)} />
                             ) : (
-                                <SearchableSelect
+                                <AsyncSearchableSelect
                                     id="contract_id"
+                                    resource="contracts"
                                     value={values.contract_id}
                                     invalid={Boolean(errors.contract_id)}
                                     onChange={(value) => onChange('contract_id', value)}
                                     emptyLabel={t('common.select')}
-                                    options={contractSelect}
+                                    seedOptions={contractCache}
+                                    onOptionsLoaded={(rows) =>
+                                        setContractCache((current) => {
+                                            const byId = new Map(current.map((row) => [row.id, row]));
+                                            for (const row of rows) {
+                                                byId.set(row.id, { id: row.id, label: row.label });
+                                            }
+                                            return Array.from(byId.values());
+                                        })
+                                    }
                                 />
                             )}
                         </Field>
@@ -602,28 +637,44 @@ export function WorkOrderForm({
                         {bodyLocked ? (
                             <ReadonlyValue value={optionLabel(userOptions, values.responsible_user_id)} />
                         ) : (
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="responsible_user_id"
+                                resource="users"
                                 value={values.responsible_user_id}
                                 invalid={Boolean(errors.responsible_user_id)}
                                 onChange={(value) => onChange('responsible_user_id', value)}
                                 emptyLabel={t('common.select')}
-                                options={toSelectOptions(userOptions)}
+                                seedOptions={userOptions}
                             />
                         )}
                     </Field>
 
                     <Field label={t('workOrders.requester')} htmlFor="requester_id" error={errors.requester_id}>
                         {bodyLocked ? (
-                            <ReadonlyValue value={optionLabel(requesterOptions, values.requester_id)} />
+                            <ReadonlyValue value={optionLabel(requesterCache, values.requester_id)} />
                         ) : (
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="requester_id"
+                                resource="requesters"
                                 value={values.requester_id}
                                 invalid={Boolean(errors.requester_id)}
                                 onChange={(value) => onChange('requester_id', value)}
                                 emptyLabel={t('common.select')}
-                                options={toSelectOptions(requesterOptions)}
+                                seedOptions={requesterCache}
+                                queryParams={{
+                                    establishmentId: values.establishment_id
+                                        ? Number(values.establishment_id)
+                                        : null,
+                                }}
+                                onOptionsLoaded={(rows) =>
+                                    setRequesterCache((current) => {
+                                        const byId = new Map(current.map((row) => [row.id, row]));
+                                        for (const row of rows) {
+                                            byId.set(row.id, { id: row.id, label: row.label });
+                                        }
+                                        return Array.from(byId.values());
+                                    })
+                                }
                             />
                         )}
                     </Field>
@@ -714,12 +765,13 @@ export function WorkOrderForm({
                 </div>
 
                 <Field label={t('workOrders.collaborators')} htmlFor="collaborator_ids" error={errors.collaborator_ids}>
-                    <MultiSelect
+                    <AsyncMultiSelect
                         id="collaborator_ids"
+                        resource="users"
                         value={values.collaborator_ids}
                         disabled={bodyLocked}
                         onChange={(next) => onChange('collaborator_ids', next)}
-                        options={toSelectOptions(userOptions)}
+                        seedOptions={userOptions}
                         placeholder={t('workOrders.collaboratorsPlaceholder')}
                     />
                 </Field>
@@ -1028,17 +1080,30 @@ export function WorkOrderForm({
                             {values.lines.map((line, index) => (
                                 <div key={line.id ?? `new-${index}`} className="grid gap-3 rounded-xl border border-line p-3 sm:grid-cols-12">
                                     <Field label={t('workOrders.article')} htmlFor={`line-article-${index}`} className="sm:col-span-3" error={errors[`lines.${index}.article_id`]}>
-                                        <SearchableSelect
+                                        <AsyncSearchableSelect
                                             id={`line-article-${index}`}
+                                            resource="articles"
                                             value={line.article_id}
                                             disabled={bodyLocked}
                                             onChange={(value) => {
                                                 const next = [...values.lines];
-                                                next[index] = applyArticleToLine(line, value, articleOptions);
+                                                next[index] = applyArticleToLine(line, value, articleCache);
                                                 onChange('lines', next);
                                             }}
                                             emptyLabel={t('common.select')}
-                                            options={toSelectOptions(articleOptions)}
+                                            seedOptions={articleCache}
+                                            queryParams={{
+                                                establishmentId: values.establishment_id
+                                                    ? Number(values.establishment_id)
+                                                    : null,
+                                                clientPriorityId: values.client_priority_id
+                                                    ? Number(values.client_priority_id)
+                                                    : null,
+                                                workOrderTypeId: values.work_order_type_id
+                                                    ? Number(values.work_order_type_id)
+                                                    : null,
+                                            }}
+                                            onOptionsLoaded={mergeArticleCache}
                                         />
                                     </Field>
                                     <Field label={t('workOrders.lineDescription')} htmlFor={`line-description-${index}`} className="sm:col-span-4" error={errors[`lines.${index}.description`]}>

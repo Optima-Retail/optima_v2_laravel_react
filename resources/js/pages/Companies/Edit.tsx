@@ -1,12 +1,12 @@
 import { FormEvent, useState } from 'react';
-import { Head, useForm } from '@inertiajs/react';
+import { Deferred, Head, useForm } from '@inertiajs/react';
 import { Save, Trash2, UserMinus, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { CompanyForm } from '@/components/companies/CompanyForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { companiesService } from '@/services';
@@ -28,8 +28,8 @@ type EditCompanyProps = {
     provinceOptions: ProvinceOption[];
     brandOptions: UserOption[];
     languageOptions: UserOption[];
-    members: CompanyMember[];
-    assignableUserOptions: UserOption[];
+    members?: CompanyMember[];
+    assignableUserOptions?: UserOption[];
     can: {
         delete: boolean;
         manage_users: boolean;
@@ -43,7 +43,7 @@ export default function EditCompany({
     brandOptions,
     languageOptions,
     members,
-    assignableUserOptions,
+    assignableUserOptions = [],
     can,
 }: EditCompanyProps) {
     const { t } = useTranslation();
@@ -124,15 +124,14 @@ export default function EditCompany({
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                 <Field label={t('companies.users.selectUser')} htmlFor="assign_user_id" className="min-w-0 flex-1">
-                    <SearchableSelect
+                    <AsyncSearchableSelect
                         id="assign_user_id"
+                        resource="users"
                         value={selectedUserId}
                         onChange={setSelectedUserId}
                         emptyLabel={t('common.none')}
-                        options={assignableUserOptions.map((option) => ({
-                            value: String(option.id),
-                            label: option.label,
-                        }))}
+                        queryParams={{ scope: 'assignable', companyId: company.id }}
+                        seedOptions={assignableUserOptions}
                     />
                 </Field>
                 <Button type="button" onClick={assignUser} disabled={!selectedUserId}>
@@ -141,8 +140,9 @@ export default function EditCompany({
                 </Button>
             </div>
 
+            <Deferred data="members" fallback={<p className="text-sm text-ink-muted">{t('common.loading')}</p>}>
             <div className="app-scroll overflow-x-auto overscroll-x-contain rounded-xl border border-line">
-                {members.length > 0 ? (
+                {(members ?? []).length > 0 ? (
                     <table className="min-w-full text-left text-sm">
                         <thead className="border-b border-line bg-canvas text-xs uppercase tracking-[0.08em] text-ink-muted">
                             <tr>
@@ -152,7 +152,7 @@ export default function EditCompany({
                             </tr>
                         </thead>
                         <tbody>
-                            {members.map((member) => (
+                            {(members ?? []).map((member) => (
                                 <tr key={member.id} className="border-b border-line last:border-b-0">
                                     <td className={`${tableBodyCellClass} font-medium text-ink`}>{member.name}</td>
                                     <td className={`${tableBodyCellClass} text-ink-muted`}>{member.email}</td>
@@ -178,6 +178,7 @@ export default function EditCompany({
                     </p>
                 )}
             </div>
+            </Deferred>
         </div>
     ) : undefined;
 

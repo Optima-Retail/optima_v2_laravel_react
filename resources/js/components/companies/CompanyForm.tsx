@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
@@ -281,16 +282,14 @@ export function CompanyForm({
                 </Field>
 
                 <Field label={t('companies.brand')} htmlFor="brand_id" error={errors.brand_id}>
-                    <SearchableSelect
+                    <AsyncSearchableSelect
                         id="brand_id"
+                        resource="brands"
                         value={values.brand_id}
                         invalid={Boolean(errors.brand_id)}
                         onChange={(value) => onChange('brand_id', value)}
                         emptyLabel={t('common.none')}
-                        options={brandOptions.map((option) => ({
-                            value: String(option.id),
-                            label: option.label,
-                        }))}
+                        seedOptions={brandOptions}
                     />
                 </Field>
 

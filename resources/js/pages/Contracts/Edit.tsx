@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from 'react';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { Deferred, Head, router, useForm, usePage } from '@inertiajs/react';
 import { Save, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ContractAttachmentsPanel } from '@/components/contracts/ContractAttachmentsPanel';
@@ -20,8 +20,8 @@ const FORM_TABS = new Set(['details', 'iterations', 'aggregations']);
 
 type EditContractProps = {
     contract: ContractFormData;
-    attachments: ContractAttachmentItem[];
-    workOrderTotals: EstablishmentDocumentTotalsData | null;
+    attachments?: ContractAttachmentItem[];
+    workOrderTotals?: EstablishmentDocumentTotalsData | null;
     companyOptions: UserOption[];
     contractStatusOptions: UserOption[];
     languageOptions: UserOption[];
@@ -99,22 +99,26 @@ export default function EditContract({
             { id: 'aggregations', label: t('contracts.tabAggregations') },
         ];
 
-        if (can.view_work_orders && workOrderTotals != null) {
+        if (can.view_work_orders) {
             items.push({
                 id: 'work-orders',
-                label: t('contracts.tabWorkOrders', { count: workOrderTotals.count }),
+                label: t('contracts.tabWorkOrders', {
+                    count: workOrderTotals?.count ?? '…',
+                }),
             });
         }
 
         if (can.view_attachments) {
             items.push({
                 id: 'attachments',
-                label: t('contracts.tabAttachments', { count: attachments.length }),
+                label: t('contracts.tabAttachments', {
+                    count: attachments?.length ?? '…',
+                }),
             });
         }
 
         return items;
-    }, [attachments.length, can.view_attachments, can.view_work_orders, t, workOrderTotals]);
+    }, [attachments?.length, can.view_attachments, can.view_work_orders, t, workOrderTotals?.count]);
 
     function changeTab(id: string) {
         setActiveTab(id);
@@ -199,31 +203,37 @@ export default function EditContract({
                         <ContractForm {...formProps} section="aggregations" />
                     </TabPanel>
 
-                    {can.view_work_orders && workOrderTotals != null ? (
+                    {can.view_work_orders ? (
                         <TabPanel id="work-orders">
-                            <ContractWorkOrdersPanel
-                                contractId={contract.id}
-                                totals={workOrderTotals}
-                                can={{
-                                    create: can.create_work_orders,
-                                    update: can.update_work_orders,
-                                    delete: can.delete_work_orders,
-                                }}
-                            />
+                            <Deferred data="workOrderTotals" fallback={<p className="text-sm text-ink-muted">{t('common.loading')}</p>}>
+                                {workOrderTotals != null ? (
+                                    <ContractWorkOrdersPanel
+                                        contractId={contract.id}
+                                        totals={workOrderTotals}
+                                        can={{
+                                            create: can.create_work_orders,
+                                            update: can.update_work_orders,
+                                            delete: can.delete_work_orders,
+                                        }}
+                                    />
+                                ) : null}
+                            </Deferred>
                         </TabPanel>
                     ) : null}
 
                     {can.view_attachments ? (
                         <TabPanel id="attachments">
-                            <ContractAttachmentsPanel
-                                contractId={contract.id}
-                                attachments={attachments}
-                                can={{
-                                    upload_attachments: can.upload_attachments,
-                                    download_attachments: can.download_attachments,
-                                    delete_attachments: can.delete_attachments,
-                                }}
-                            />
+                            <Deferred data="attachments" fallback={<p className="text-sm text-ink-muted">{t('common.loading')}</p>}>
+                                <ContractAttachmentsPanel
+                                    contractId={contract.id}
+                                    attachments={attachments ?? []}
+                                    can={{
+                                        upload_attachments: can.upload_attachments,
+                                        download_attachments: can.download_attachments,
+                                        delete_attachments: can.delete_attachments,
+                                    }}
+                                />
+                            </Deferred>
                         </TabPanel>
                     ) : null}
                 </Tabs>

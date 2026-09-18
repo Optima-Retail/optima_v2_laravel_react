@@ -13,6 +13,8 @@ import { TechnicianRatingsPanel } from '@/components/technicians/TechnicianRatin
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { AsyncMultiSelect } from '@/components/ui/AsyncMultiSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { CompanySearchableSelect } from '@/components/companies/CompanySearchableSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
@@ -398,13 +400,14 @@ export function RelationshipForm({
 
                 {showBrandField ? (
                     <Field label={t('relationships.brand')} htmlFor="brand_id" error={errors.brand_id}>
-                        <SearchableSelect
+                        <AsyncSearchableSelect
                             id="brand_id"
+                            resource="brands"
                             value={values.brand_id}
                             invalid={Boolean(errors.brand_id)}
                             onChange={(value) => onChange('brand_id', value)}
                             emptyLabel={brandRequired ? t('common.select') : t('common.none')}
-                            options={toSelectOptions(resolvedBrandOptions)}
+                            seedOptions={resolvedBrandOptions}
                         />
                     </Field>
                 ) : null}
@@ -415,11 +418,12 @@ export function RelationshipForm({
                     error={errors.collaborator_ids}
                     className="sm:col-span-2"
                 >
-                    <MultiSelect
+                    <AsyncMultiSelect
                         id="collaborator_ids"
+                        resource="users"
                         value={values.collaborator_ids}
                         onChange={(collaboratorIds) => onChange('collaborator_ids', collaboratorIds)}
-                        options={toSelectOptions(formOptions.userOptions)}
+                        seedOptions={formOptions.userOptions}
                         placeholder={t('relationships.collaboratorsPlaceholder')}
                         invalid={Boolean(errors.collaborator_ids)}
                     />
@@ -591,69 +595,75 @@ export function RelationshipForm({
                     <TabPanel id="owners">
                         <div className="grid gap-5 sm:grid-cols-2">
                         <Field label={t('relationships.correctiveWorkOrderOwner')} htmlFor="corrective_work_order_owner_id" error={errors.corrective_work_order_owner_id}>
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="corrective_work_order_owner_id"
+                                resource="users"
                                 value={values.corrective_work_order_owner_id}
                                 invalid={Boolean(errors.corrective_work_order_owner_id)}
                                 onChange={(value) => onChange('corrective_work_order_owner_id', value)}
                                 emptyLabel={t('common.none')}
-                                options={toSelectOptions(formOptions.userOptions)}
-                            />
+                                seedOptions={formOptions.userOptions}
+                                />
                         </Field>
 
                         <Field label={t('relationships.preventiveWorkOrderOwner')} htmlFor="preventive_work_order_owner_id" error={errors.preventive_work_order_owner_id}>
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="preventive_work_order_owner_id"
+                                resource="users"
                                 value={values.preventive_work_order_owner_id}
                                 invalid={Boolean(errors.preventive_work_order_owner_id)}
                                 onChange={(value) => onChange('preventive_work_order_owner_id', value)}
                                 emptyLabel={t('common.none')}
-                                options={toSelectOptions(formOptions.userOptions)}
-                            />
+                                seedOptions={formOptions.userOptions}
+                                />
                         </Field>
 
                         <Field label={t('relationships.qualityOwner')} htmlFor="quality_owner_id" error={errors.quality_owner_id}>
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="quality_owner_id"
+                                resource="users"
                                 value={values.quality_owner_id}
                                 invalid={Boolean(errors.quality_owner_id)}
                                 onChange={(value) => onChange('quality_owner_id', value)}
                                 emptyLabel={t('common.none')}
-                                options={toSelectOptions(formOptions.userOptions)}
-                            />
+                                seedOptions={formOptions.userOptions}
+                                />
                         </Field>
 
                         <Field label={t('relationships.accountOwner')} htmlFor="account_owner_id" error={errors.account_owner_id}>
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="account_owner_id"
+                                resource="users"
                                 value={values.account_owner_id}
                                 invalid={Boolean(errors.account_owner_id)}
                                 onChange={(value) => onChange('account_owner_id', value)}
                                 emptyLabel={t('common.none')}
-                                options={toSelectOptions(formOptions.userOptions)}
-                            />
+                                seedOptions={formOptions.userOptions}
+                                />
                         </Field>
 
                         <Field label={t('relationships.commercialOwner')} htmlFor="commercial_owner_id" error={errors.commercial_owner_id}>
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="commercial_owner_id"
+                                resource="users"
                                 value={values.commercial_owner_id}
                                 invalid={Boolean(errors.commercial_owner_id)}
                                 onChange={(value) => onChange('commercial_owner_id', value)}
                                 emptyLabel={t('common.none')}
-                                options={toSelectOptions(formOptions.userOptions)}
-                            />
+                                seedOptions={formOptions.userOptions}
+                                />
                         </Field>
 
                         <Field label={t('relationships.sourcedBy')} htmlFor="sourced_by_user_id" error={errors.sourced_by_user_id}>
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="sourced_by_user_id"
+                                resource="users"
                                 value={values.sourced_by_user_id}
                                 invalid={Boolean(errors.sourced_by_user_id)}
                                 onChange={(value) => onChange('sourced_by_user_id', value)}
                                 emptyLabel={t('common.none')}
-                                options={toSelectOptions(formOptions.userOptions)}
-                            />
+                                seedOptions={formOptions.userOptions}
+                                />
                         </Field>
                         </div>
                     </TabPanel>

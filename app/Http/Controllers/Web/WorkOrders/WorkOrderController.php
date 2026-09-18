@@ -307,14 +307,24 @@ final class WorkOrderController extends Controller
     private function formOptions(Company $owner, WorkOrderStage $stage, ?WorkOrder $workOrder = null): array
     {
         $includeUserIds = [];
+        $includeTechnicianIds = [];
+        $includeArticleIds = $this->lineArticleIds($workOrder);
 
         if ($workOrder !== null) {
-            $workOrder->loadMissing('establishment:id,company_id');
+            $workOrder->loadMissing(['establishment:id,company_id', 'technicians']);
             $includeUserIds = $workOrder->collaborators()->pluck('users.id')->map(fn ($id) => (int) $id)->all();
 
             if ($workOrder->responsible_user_id !== null) {
                 $includeUserIds[] = (int) $workOrder->responsible_user_id;
             }
+
+            $includeTechnicianIds = $workOrder->technicians
+                ->pluck('company_relationship_id')
+                ->filter()
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
         }
 
         return [
@@ -334,14 +344,22 @@ final class WorkOrderController extends Controller
                 $owner,
                 $workOrder?->establishment_id !== null ? [(int) $workOrder->establishment_id] : [],
             ),
-            'requesterOptions' => $this->workOrders->requesterOptions($owner, $workOrder?->establishment_id),
-            'technicianOptions' => $this->workOrders->technicianOptions($owner),
+            'contractOptions' => $this->workOrders->contractOptions(
+                $owner,
+                $workOrder?->contract_id !== null ? [(int) $workOrder->contract_id] : [],
+            ),
+            'requesterOptions' => $this->workOrders->requesterOptions(
+                $owner,
+                $workOrder?->establishment_id,
+                $workOrder?->requester_id !== null ? [(int) $workOrder->requester_id] : [],
+            ),
+            'technicianOptions' => $this->workOrders->technicianOptions($owner, $includeTechnicianIds),
             'articleOptions' => $this->workOrders->articleOptions(
                 $owner,
-                $workOrder?->establishment_id !== null ? (int) $workOrder->establishment_id : null,
-                $workOrder?->client_priority_id !== null ? (int) $workOrder->client_priority_id : null,
-                $workOrder?->work_order_type_id !== null ? (int) $workOrder->work_order_type_id : null,
-                $this->lineArticleIds($workOrder),
+                null,
+                null,
+                null,
+                $includeArticleIds,
             ),
             'technicianStatusOptions' => $this->workOrders->technicianStatusOptions(),
             'attendanceTypeOptions' => $this->workOrders->attendanceTypeOptions(),

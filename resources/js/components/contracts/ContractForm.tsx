@@ -1,4 +1,4 @@
-import { useMemo, type FormEvent, type ReactNode } from 'react';
+import { type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
     ContractSchedulePanel,
@@ -9,7 +9,8 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
-import { MultiSelect } from '@/components/ui/MultiSelect';
+import { AsyncMultiSelect } from '@/components/ui/AsyncMultiSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { CompanySearchableSelect } from '@/components/companies/CompanySearchableSelect';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
@@ -173,19 +174,6 @@ export function ContractForm({
                 ? ['aggregations']
                 : null;
 
-    const filteredEstablishments = useMemo(() => {
-        if (!values.company_id) {
-            return [];
-        }
-
-        return establishmentOptions
-            .filter((option) => String(option.company_id) === values.company_id)
-            .map((option) => ({
-                value: String(option.id),
-                label: option.label,
-            }));
-    }, [establishmentOptions, values.company_id]);
-
     return (
         <FieldHelpScope table="contracts">
             <form onSubmit={onSubmit} className="space-y-5 rounded-2xl border border-line bg-surface p-6 sm:p-8">
@@ -236,10 +224,11 @@ export function ContractForm({
                         </Field>
 
                         <Field label={t('contracts.responsibleUser')} htmlFor="responsible_user_id" error={errors.responsible_user_id} required>
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="responsible_user_id"
+                                resource="users"
                                 value={values.responsible_user_id}
-                                options={toSelectOptions(userOptions)}
+                                seedOptions={userOptions}
                                 invalid={Boolean(errors.responsible_user_id)}
                                 onChange={(value) => onChange('responsible_user_id', value)}
                             />
@@ -295,11 +284,18 @@ export function ContractForm({
                             error={errors.establishment_ids}
                             className="sm:col-span-2"
                         >
-                            <MultiSelect
+                            <AsyncMultiSelect
                                 id="establishment_ids"
+                                resource="establishments"
                                 value={values.establishment_ids}
                                 onChange={(ids) => onChange('establishment_ids', ids)}
-                                options={filteredEstablishments}
+                                seedOptions={establishmentOptions.filter(
+                                    (option) => !values.company_id || String(option.company_id) === values.company_id,
+                                )}
+                                queryParams={{
+                                    companyId: values.company_id ? Number(values.company_id) : null,
+                                    rich: false,
+                                }}
                                 placeholder={
                                     values.company_id
                                         ? t('contracts.establishmentsPlaceholder')

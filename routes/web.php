@@ -66,6 +66,7 @@ use App\Http\Controllers\Web\Incidents\IncidentController;
 use App\Http\Controllers\Web\LocaleController;
 use App\Http\Controllers\Web\Profile\ProfileController;
 use App\Http\Controllers\Web\SavedFilters\SavedFilterController;
+use App\Http\Controllers\Web\SelectOptionsController;
 use App\Http\Controllers\Web\SwitchCompany\SwitchCompanyController;
 use App\Http\Controllers\Web\TechnicianRequests\TechnicianRequestController;
 use App\Http\Controllers\Web\Technicians\TechnicianIncidentController;
@@ -118,6 +119,9 @@ Route::middleware('auth')->group(function (): void {
 
     Route::middleware('company.context')->group(function (): void {
         Route::get('/companies/options', [CompanyController::class, 'options'])->name('companies.options');
+        Route::get('/select-options/{resource}', SelectOptionsController::class)
+            ->whereIn('resource', ['brands', 'users', 'establishments', 'technicians', 'contracts', 'requesters', 'articles', 'work-orders', 'evaluations'])
+            ->name('select-options');
     });
 
     Route::middleware('permission:companies.view')->group(function (): void {

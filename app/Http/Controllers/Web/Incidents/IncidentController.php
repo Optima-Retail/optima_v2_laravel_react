@@ -93,8 +93,6 @@ final class IncidentController extends Controller
     {
         $this->authorize('create', Incident::class);
 
-        $owner = $this->activeCompany($request);
-
         return Inertia::render('Incidents/Create', [
             'defaultIncidentStatusId' => $this->incidents->defaultIncidentStatusId(),
             'defaultRequesterUserId' => $request->user()?->id,
@@ -103,11 +101,11 @@ final class IncidentController extends Controller
             'incidentPriorityOptions' => $this->incidents->incidentPriorityOptions(),
             'incidentTypeOptions' => $this->incidents->incidentTypeOptions(),
             'incidentSubtypeOptions' => $this->incidents->incidentSubtypeOptions(),
-            'userOptions' => $this->incidents->userOptions($owner),
-            'establishmentOptions' => $this->incidents->establishmentOptions($owner),
-            'clientOptions' => $this->incidents->clientOptions($owner),
-            'brandOptions' => $this->incidents->brandOptions($owner),
-            'evaluationOptions' => $this->incidents->evaluationOptions($owner),
+            'userOptions' => [],
+            'establishmentOptions' => [],
+            'clientOptions' => [],
+            'brandOptions' => [],
+            'evaluationOptions' => [],
         ]);
     }
 
@@ -137,7 +135,7 @@ final class IncidentController extends Controller
 
         $owner = $this->activeCompany($request);
         $user = $request->user();
-        $incident->loadMissing('establishment:id,company_id');
+        $incident->loadMissing(['establishment:id,company_id', 'collaborators']);
 
         return Inertia::render('Incidents/Edit', [
             'incident' => $this->incidents->toFormData($incident),
@@ -150,19 +148,41 @@ final class IncidentController extends Controller
             'incidentPriorityOptions' => $this->incidents->incidentPriorityOptions(),
             'incidentTypeOptions' => $this->incidents->incidentTypeOptions(),
             'incidentSubtypeOptions' => $this->incidents->incidentSubtypeOptions(),
-            'userOptions' => $this->incidents->userOptions($owner),
+            'userOptions' => $this->incidents->userOptions($owner, array_values(array_filter([
+                ...$incident->collaborators->pluck('id')->map(fn ($id) => (int) $id)->all(),
+                $incident->responsible_user_id !== null ? (int) $incident->responsible_user_id : null,
+                $incident->qc_responsible_user_id !== null ? (int) $incident->qc_responsible_user_id : null,
+                $incident->requester_user_id !== null ? (int) $incident->requester_user_id : null,
+            ]))),
             'establishmentOptions' => $this->incidents->establishmentOptions(
                 $owner,
-                $incident->establishment_id !== null ? [(int) $incident->establishment_id] : [],
+                array_values(array_filter([
+                    $incident->establishment_id !== null ? (int) $incident->establishment_id : null,
+                    $incident->origin_type === 'establishment' && $incident->origin_id !== null
+                        ? (int) $incident->origin_id
+                        : null,
+                ])),
             ),
             'clientOptions' => $this->incidents->clientOptions(
                 $owner,
-                $incident->establishment?->company_id !== null
-                    ? (int) $incident->establishment->company_id
+                $incident->origin_type === 'company' && $incident->origin_id !== null
+                    ? (int) $incident->origin_id
+                    : ($incident->establishment?->company_id !== null
+                        ? (int) $incident->establishment->company_id
+                        : null),
+            ),
+            'brandOptions' => $this->incidents->brandOptions(
+                $owner,
+                $incident->origin_type === 'brand' && $incident->origin_id !== null
+                    ? (int) $incident->origin_id
                     : null,
             ),
-            'brandOptions' => $this->incidents->brandOptions($owner),
-            'evaluationOptions' => $this->incidents->evaluationOptions($owner),
+            'evaluationOptions' => $this->incidents->evaluationOptions(
+                $owner,
+                $incident->related_type === 'evaluation' && $incident->related_id !== null
+                    ? [(int) $incident->related_id]
+                    : [],
+            ),
             'chat' => $user !== null
                 ? $this->chats->payload(ChatDocumentType::Incident, (int) $incident->id, $user)
                 : null,

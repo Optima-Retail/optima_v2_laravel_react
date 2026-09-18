@@ -259,6 +259,83 @@ final class BrandService
     }
 
     /**
+     * Seed options for Inertia pages (selected brands only). Full lists load via /select-options/brands.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string}>
+     */
+    public function brandOptions(?int $includeId = null, array $includeIds = []): array
+    {
+        $ids = $includeIds;
+        if ($includeId !== null) {
+            $ids[] = $includeId;
+        }
+
+        return $this->optionsByIds($ids);
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return list<array{id: int, label: string}>
+     */
+    public function optionsByIds(array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return Brand::query()
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Brand $brand): array => [
+                'id' => $brand->id,
+                'label' => $brand->name,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Lightweight options for async brand pickers.
+     *
+     * @return list<array{id: int, label: string}>
+     */
+    public function searchOptions(
+        ?string $search = null,
+        ?int $includeId = null,
+        ?int $limit = 50,
+    ): array {
+        $needle = trim((string) $search);
+
+        $rows = Brand::query()
+            ->when($needle !== '', fn ($query) => $query->where('name', 'like', "%{$needle}%"))
+            ->orderBy('name')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
+            ->get(['id', 'name'])
+            ->map(fn (Brand $brand): array => [
+                'id' => $brand->id,
+                'label' => $brand->name,
+            ])
+            ->values()
+            ->all();
+
+        if ($includeId !== null && ! collect($rows)->contains(fn (array $row): bool => (int) $row['id'] === $includeId)) {
+            $extra = Brand::query()->whereKey($includeId)->first(['id', 'name']);
+            if ($extra !== null) {
+                array_unshift($rows, [
+                    'id' => $extra->id,
+                    'label' => $extra->name,
+                ]);
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
      * @return list<int>
      */
     private function intList(mixed $value): array

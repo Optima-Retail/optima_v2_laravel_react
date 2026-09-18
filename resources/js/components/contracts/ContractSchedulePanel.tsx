@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { BaseModal } from '@/components/ui/BaseModal';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { AsyncMultiSelect } from '@/components/ui/AsyncMultiSelect';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
@@ -154,19 +155,6 @@ export function ContractSchedulePanel({
     const [iterationEditor, setIterationEditor] = useState<IterationEditor | null>(null);
     const [aggregationDraftErrors, setAggregationDraftErrors] = useState<Record<string, string>>({});
     const openedAggregationErrorRef = useRef<string | null>(null);
-
-    const establishmentSelect = useMemo(() => {
-        if (!companyId) {
-            return [];
-        }
-
-        return establishmentOptions
-            .filter((option) => String(option.company_id) === companyId)
-            .map((option) => ({
-                value: String(option.id),
-                label: option.label,
-            }));
-    }, [companyId, establishmentOptions]);
 
     const aggregationOptions = useMemo(
         () =>
@@ -1005,10 +993,17 @@ export function ContractSchedulePanel({
                             error={fieldError(errors, iterationErrorPrefix, 'establishment_ids')}
                             className="sm:col-span-2"
                         >
-                            <MultiSelect
+                            <AsyncMultiSelect
                                 id="iteration_establishment_ids"
+                                resource="establishments"
                                 value={iterationEditor.draft.establishment_ids}
-                                options={establishmentSelect}
+                                seedOptions={establishmentOptions.filter(
+                                    (option) => !companyId || String(option.company_id) === companyId,
+                                )}
+                                queryParams={{
+                                    companyId: companyId ? Number(companyId) : null,
+                                    rich: false,
+                                }}
                                 onChange={(values) =>
                                     setIterationEditor({
                                         ...iterationEditor,
@@ -1020,6 +1015,7 @@ export function ContractSchedulePanel({
                                         ? t('contracts.establishmentsPlaceholder')
                                         : t('contracts.selectClientFirst')
                                 }
+                                disabled={!companyId}
                             />
                         </Field>
                         <Field

@@ -6,12 +6,13 @@ namespace App\Domain\Incidents\Services;
 
 use App\Domain\Chats\Enums\ChatDocumentType;
 use App\Domain\Companies\Enums\CompanyRelationshipKind;
+use App\Domain\Companies\Services\CompanyService;
 use App\Domain\Companies\Support\CompanyMemberUsers;
+use App\Domain\Config\Brands\Services\BrandService;
+use App\Domain\Contracts\Services\ContractService;
 use App\Domain\Incidents\Support\IncidentLineStatusRules;
 use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
-use App\Models\Brand;
 use App\Models\Company;
-use App\Models\Establishment;
 use App\Models\Evaluation;
 use App\Models\Incident;
 use App\Models\IncidentPriority;
@@ -59,66 +60,111 @@ final class IncidentService
      */
     public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
-        $ids = $this->accessibleCompanyIds($owner);
+        return app(ContractService::class)
+            ->establishmentOptions($owner, $includeIds);
+    }
 
-        if ($ids === []) {
-            return [];
-        }
+    /**
+     * Seed options for Inertia pages (selected evaluations only). Full lists load via /select-options/evaluations.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string}>
+     */
+    public function evaluationOptions(Company $owner, array $includeIds = []): array
+    {
+        return $this->searchEvaluationOptions($owner, includeIds: $includeIds, onlyIncludeIds: true);
+    }
 
+    /**
+     * Lightweight options for async evaluation pickers.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string}>
+     */
+    public function searchEvaluationOptions(
+        Company $owner,
+        ?string $search = null,
+        array $includeIds = [],
+        ?int $limit = 50,
+        bool $onlyIncludeIds = false,
+    ): array {
+        $companyIds = $this->accessibleCompanyIds($owner);
         $includeIds = array_values(array_unique(array_filter(
             array_map('intval', $includeIds),
             fn (int $id): bool => $id > 0,
         )));
 
-        return Establishment::query()
-            ->whereIn('company_id', $ids)
-            ->where(function ($query) use ($includeIds): void {
-                $query->where('is_active', true);
+        if ($onlyIncludeIds) {
+            if ($includeIds === []) {
+                return [];
+            }
 
-                if ($includeIds !== []) {
-                    $query->orWhereIn('id', $includeIds);
-                }
-            })
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'company_id'])
-            ->map(fn (Establishment $establishment): array => [
-                'id' => $establishment->id,
-                'label' => $establishment->code
-                    ? "{$establishment->name} ({$establishment->code})"
-                    : $establishment->name,
-                'company_id' => (int) $establishment->company_id,
-            ])
-            ->values()
-            ->all();
-    }
+            return Evaluation::query()
+                ->whereIn('id', $includeIds)
+                ->orderByDesc('id')
+                ->get(['id', 'subject', 'public_id'])
+                ->map(fn (Evaluation $evaluation): array => $this->mapEvaluationOption($evaluation))
+                ->values()
+                ->all();
+        }
 
-    /**
-     * Evaluations for accessible client company establishments.
-     *
-     * @return list<array{id: int, label: string}>
-     */
-    public function evaluationOptions(Company $owner): array
-    {
-        $ids = $this->accessibleCompanyIds($owner);
-
-        if ($ids === []) {
+        if ($companyIds === []) {
             return [];
         }
 
-        return Evaluation::query()
-            ->whereHas('establishment', function ($query) use ($ids): void {
-                $query->whereIn('company_id', $ids);
+        $needle = trim((string) $search);
+
+        $rows = Evaluation::query()
+            ->whereHas('establishment', fn ($query) => $query->whereIn('company_id', $companyIds))
+            ->when($needle !== '', function ($query) use ($needle): void {
+                $query->where(function ($inner) use ($needle): void {
+                    $inner->where('subject', 'like', "%{$needle}%")
+                        ->orWhere('public_id', 'like', "%{$needle}%");
+
+                    if (ctype_digit($needle)) {
+                        $inner->orWhere('id', (int) $needle);
+                    }
+                });
             })
             ->orderByDesc('id')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
             ->get(['id', 'subject', 'public_id'])
-            ->map(fn (Evaluation $evaluation): array => [
-                'id' => $evaluation->id,
-                'label' => $evaluation->subject
-                    ? "#{$evaluation->id} — {$evaluation->subject}"
-                    : "#{$evaluation->id} — {$evaluation->public_id}",
-            ])
+            ->map(fn (Evaluation $evaluation): array => $this->mapEvaluationOption($evaluation))
             ->values()
             ->all();
+
+        if ($includeIds !== []) {
+            $missingIds = array_values(array_diff(
+                $includeIds,
+                array_map(fn (array $row): int => (int) $row['id'], $rows),
+            ));
+
+            if ($missingIds !== []) {
+                $extra = Evaluation::query()
+                    ->whereIn('id', $missingIds)
+                    ->orderByDesc('id')
+                    ->get(['id', 'subject', 'public_id'])
+                    ->map(fn (Evaluation $evaluation): array => $this->mapEvaluationOption($evaluation))
+                    ->all();
+
+                $rows = array_values(array_merge($extra, $rows));
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array{id: int, label: string}
+     */
+    private function mapEvaluationOption(Evaluation $evaluation): array
+    {
+        return [
+            'id' => $evaluation->id,
+            'label' => $evaluation->subject
+                ? "#{$evaluation->id} — {$evaluation->subject}"
+                : "#{$evaluation->id} — {$evaluation->public_id}",
+        ];
     }
 
     /**
@@ -207,26 +253,12 @@ final class IncidentService
      */
     public function clientOptions(Company $owner, ?int $includeId = null): array
     {
-        $ids = $this->accessibleCompanyIds($owner);
+        unset($owner);
 
-        if ($ids === []) {
-            return [];
-        }
-
-        return Company::query()
-            ->whereIn('id', $ids)
-            ->where(function ($query) use ($includeId): void {
-                $query->where('is_active', true);
-
-                if ($includeId !== null) {
-                    $query->orWhereKey($includeId);
-                }
-            })
-            ->orderBy('name')
-            ->get(['id', 'name', 'tradename', 'logo'])
-            ->map(fn (Company $company): array => $company->toSelectOption('tradename'))
-            ->values()
-            ->all();
+        return app(CompanyService::class)->optionsByIds(
+            $includeId !== null ? [$includeId] : [],
+            'tradename',
+        );
     }
 
     /**
@@ -234,37 +266,11 @@ final class IncidentService
      *
      * @return list<array{id: int, label: string}>
      */
-    public function brandOptions(Company $owner): array
+    public function brandOptions(Company $owner, ?int $includeId = null): array
     {
-        $ids = $this->accessibleCompanyIds($owner);
+        unset($owner);
 
-        if ($ids === []) {
-            return [];
-        }
-
-        $brandIds = Company::query()
-            ->whereIn('id', $ids)
-            ->whereNotNull('brand_id')
-            ->pluck('brand_id')
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
-
-        if ($brandIds === []) {
-            return [];
-        }
-
-        return Brand::query()
-            ->whereIn('id', $brandIds)
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn (Brand $brand): array => [
-                'id' => $brand->id,
-                'label' => $brand->name,
-            ])
-            ->values()
-            ->all();
+        return app(BrandService::class)->brandOptions($includeId);
     }
 
     /**
@@ -333,7 +339,9 @@ final class IncidentService
      */
     public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return CompanyMemberUsers::options($owner, $includeUserIds);
+        unset($owner);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
     }
 
     /**
