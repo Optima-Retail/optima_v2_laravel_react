@@ -221,48 +221,63 @@ final class ComplimentService
 
     public function canAccess(Company $owner, Compliment $compliment): bool
     {
+        $ownerId = (int) $owner->id;
+        $customerKind = CompanyRelationshipKind::Customer->value;
+
         return match ($compliment->subject_type) {
-            ComplimentSubjectType::Brand => in_array(
-                (int) $compliment->brand_id,
-                $this->accessibleBrandIds($owner),
-                true,
+            ComplimentSubjectType::Brand => $compliment->brand_id !== null && (
+                CompanyRelationship::query()
+                    ->where('owner_company_id', $ownerId)
+                    ->where('kind', $customerKind)
+                    ->where('brand_id', (int) $compliment->brand_id)
+                    ->exists()
+                || Company::query()
+                    ->where('brand_id', (int) $compliment->brand_id)
+                    ->whereIn('id', function ($sub) use ($ownerId, $customerKind): void {
+                        $sub->select('related_company_id')
+                            ->from('company_relationships')
+                            ->where('owner_company_id', $ownerId)
+                            ->where('kind', $customerKind)
+                            ->whereNull('deleted_at');
+                    })
+                    ->exists()
             ),
-            ComplimentSubjectType::Customer => in_array(
-                (int) $compliment->company_relationship_id,
-                $this->accessibleCustomerRelationshipIds($owner),
-                true,
-            ),
-            ComplimentSubjectType::Establishment => in_array(
-                (int) $compliment->establishment_id,
-                $this->accessibleEstablishmentIds($owner),
-                true,
-            ),
+            ComplimentSubjectType::Customer => $compliment->company_relationship_id !== null
+                && CompanyRelationship::query()
+                    ->whereKey((int) $compliment->company_relationship_id)
+                    ->where('owner_company_id', $ownerId)
+                    ->where('kind', $customerKind)
+                    ->exists(),
+            ComplimentSubjectType::Establishment => $compliment->establishment_id !== null
+                && Establishment::query()
+                    ->whereKey((int) $compliment->establishment_id)
+                    ->whereIn('company_id', function ($sub) use ($ownerId, $customerKind): void {
+                        $sub->select('related_company_id')
+                            ->from('company_relationships')
+                            ->where('owner_company_id', $ownerId)
+                            ->where('kind', $customerKind)
+                            ->whereNull('deleted_at');
+                    })
+                    ->exists(),
             default => false,
         };
     }
 
     /**
+     * Seed options for Inertia pages. Full brand lists load via /select-options/brands.
+     *
      * @return list<array{id: int, label: string}>
      */
-    public function brandOptions(Company $owner): array
+    public function brandOptions(Company $owner, ?int $includeId = null): array
     {
-        $ids = $this->accessibleBrandIds($owner);
-
-        if ($ids === []) {
-            return Brand::query()
-                ->orderBy('name')
-                ->limit(200)
-                ->get(['id', 'name'])
-                ->map(fn (Brand $brand): array => [
-                    'id' => $brand->id,
-                    'label' => $brand->name,
-                ])
-                ->values()
-                ->all();
-        }
+        unset($owner);
 
         return Brand::query()
-            ->whereIn('id', $ids)
+            ->when(
+                $includeId !== null && $includeId > 0,
+                fn ($query) => $query->whereKey($includeId),
+                fn ($query) => $query->whereRaw('0 = 1'),
+            )
             ->orderBy('name')
             ->get(['id', 'name'])
             ->map(fn (Brand $brand): array => [
@@ -274,63 +289,125 @@ final class ComplimentService
     }
 
     /**
-     * Active customer relationships for selects. Keep `$includeId` for edit forms.
+     * Seed customer relationship options. Full lists load via /select-options/customers.
      *
      * @return list<array{id: int, label: string, logo_url: string|null}>
      */
     public function customerOptions(Company $owner, ?int $includeId = null): array
     {
-        return CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename,logo,is_active')
-            ->where('owner_company_id', $owner->id)
-            ->where('kind', CompanyRelationshipKind::Customer->value)
-            ->where(function ($query) use ($includeId): void {
-                $query->whereHas('relatedCompany', fn ($company) => $company->where('is_active', true));
-
-                if ($includeId !== null) {
-                    $query->orWhereKey($includeId);
-                }
-            })
-            ->orderBy('id')
-            ->get()
-            ->map(function (CompanyRelationship $relationship): array {
-                $company = $relationship->relatedCompany;
-                $label = $company?->name
-                    ?: $company?->tradename
-                    ?: "#{$relationship->id}";
-
-                return $relationship->toSelectOption($label);
-            })
-            ->values()
-            ->all();
+        return $this->searchCustomerOptions(
+            $owner,
+            includeIds: $includeId !== null && $includeId > 0 ? [$includeId] : [],
+            onlyIncludeIds: true,
+        );
     }
 
     /**
+     * Lightweight options for async customer (company relationship) pickers.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function searchCustomerOptions(
+        Company $owner,
+        ?string $search = null,
+        array $includeIds = [],
+        ?int $limit = 50,
+        bool $onlyIncludeIds = false,
+    ): array {
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
+
+        if ($onlyIncludeIds) {
+            if ($includeIds === []) {
+                return [];
+            }
+
+            return CompanyRelationship::query()
+                ->with('relatedCompany:id,name,tradename,logo,is_active')
+                ->where('owner_company_id', $owner->id)
+                ->where('kind', CompanyRelationshipKind::Customer->value)
+                ->whereIn('id', $includeIds)
+                ->orderBy('id')
+                ->get()
+                ->map(fn (CompanyRelationship $relationship): array => $this->customerSelectOption($relationship))
+                ->values()
+                ->all();
+        }
+
+        $needle = trim((string) $search);
+
+        $rows = CompanyRelationship::query()
+            ->with('relatedCompany:id,name,tradename,logo,is_active')
+            ->where('owner_company_id', $owner->id)
+            ->where('kind', CompanyRelationshipKind::Customer->value)
+            ->where(function ($query) use ($includeIds): void {
+                $query->whereHas('relatedCompany', fn ($company) => $company->where('is_active', true));
+
+                if ($includeIds !== []) {
+                    $query->orWhereIn('id', $includeIds);
+                }
+            })
+            ->when($needle !== '', function ($query) use ($needle): void {
+                $query->whereHas('relatedCompany', function ($company) use ($needle): void {
+                    $company->where(function ($inner) use ($needle): void {
+                        $inner->where('name', 'like', "%{$needle}%")
+                            ->orWhere('tradename', 'like', "%{$needle}%")
+                            ->orWhere('tax_id', 'like', "%{$needle}%");
+                    });
+                });
+            })
+            ->orderBy('id')
+            ->limit(max(1, min($limit ?? 50, 100)))
+            ->get()
+            ->map(fn (CompanyRelationship $relationship): array => $this->customerSelectOption($relationship))
+            ->values()
+            ->all();
+
+        if ($includeIds !== []) {
+            $present = array_map(fn (array $row): int => (int) $row['id'], $rows);
+            $missing = array_values(array_diff($includeIds, $present));
+
+            if ($missing !== []) {
+                $extra = CompanyRelationship::query()
+                    ->with('relatedCompany:id,name,tradename,logo,is_active')
+                    ->where('owner_company_id', $owner->id)
+                    ->where('kind', CompanyRelationshipKind::Customer->value)
+                    ->whereIn('id', $missing)
+                    ->get()
+                    ->map(fn (CompanyRelationship $relationship): array => $this->customerSelectOption($relationship))
+                    ->all();
+
+                $rows = array_values(array_merge($extra, $rows));
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Seed establishment options. Full lists load via /select-options/establishments.
+     *
      * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string}>
      */
     public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
-        $companyIds = $this->accessibleCompanyIds($owner);
-
-        if ($companyIds === []) {
-            return [];
-        }
+        unset($owner);
 
         $includeIds = array_values(array_unique(array_filter(
             array_map('intval', $includeIds),
             fn (int $id): bool => $id > 0,
         )));
 
-        return Establishment::query()
-            ->whereIn('company_id', $companyIds)
-            ->where(function ($query) use ($includeIds): void {
-                $query->where('is_active', true);
+        if ($includeIds === []) {
+            return [];
+        }
 
-                if ($includeIds !== []) {
-                    $query->orWhereIn('id', $includeIds);
-                }
-            })
+        return Establishment::query()
+            ->whereIn('id', $includeIds)
             ->orderBy('name')
             ->get(['id', 'name', 'code'])
             ->map(fn (Establishment $establishment): array => [
@@ -360,12 +437,29 @@ final class ComplimentService
     }
 
     /**
+     * Seed user options. Full lists load via /select-options/users.
+     *
      * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
     public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return CompanyMemberUsers::options($owner, $includeUserIds);
+        unset($owner);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
+    }
+
+    /**
+     * @return array{id: int, label: string, logo_url: string|null}
+     */
+    private function customerSelectOption(CompanyRelationship $relationship): array
+    {
+        $company = $relationship->relatedCompany;
+        $label = $company?->name
+            ?: $company?->tradename
+            ?: "#{$relationship->id}";
+
+        return $relationship->toSelectOption($label);
     }
 
     /**
@@ -414,40 +508,74 @@ final class ComplimentService
     }
 
     /**
+     * Scope compliments to the owner's customers via subqueries (avoids huge whereIn lists).
+     *
      * @return Builder<Compliment>
      */
     private function scopedQuery(Company $owner): Builder
     {
-        $brandIds = $this->accessibleBrandIds($owner);
-        $relationshipIds = $this->accessibleCustomerRelationshipIds($owner);
-        $establishmentIds = $this->accessibleEstablishmentIds($owner);
+        $ownerId = (int) $owner->id;
+        $customerKind = CompanyRelationshipKind::Customer->value;
 
-        return Compliment::query()->where(function (Builder $query) use ($brandIds, $relationshipIds, $establishmentIds): void {
-            if ($brandIds !== []) {
-                $query->orWhere(function (Builder $inner) use ($brandIds): void {
-                    $inner->where('subject_type', ComplimentSubjectType::Brand->value)
-                        ->whereIn('brand_id', $brandIds);
-                });
-            }
+        return Compliment::query()->where(function (Builder $query) use ($ownerId, $customerKind): void {
+            $query->orWhere(function (Builder $inner) use ($ownerId, $customerKind): void {
+                $inner->where('subject_type', ComplimentSubjectType::Brand->value)
+                    ->where(function (Builder $brandScope) use ($ownerId, $customerKind): void {
+                        $brandScope
+                            ->whereIn('brand_id', function ($sub) use ($ownerId, $customerKind): void {
+                                $sub->select('brand_id')
+                                    ->from('company_relationships')
+                                    ->where('owner_company_id', $ownerId)
+                                    ->where('kind', $customerKind)
+                                    ->whereNotNull('brand_id')
+                                    ->whereNull('deleted_at');
+                            })
+                            ->orWhereIn('brand_id', function ($sub) use ($ownerId, $customerKind): void {
+                                $sub->select('companies.brand_id')
+                                    ->from('companies')
+                                    ->join(
+                                        'company_relationships',
+                                        'company_relationships.related_company_id',
+                                        '=',
+                                        'companies.id',
+                                    )
+                                    ->where('company_relationships.owner_company_id', $ownerId)
+                                    ->where('company_relationships.kind', $customerKind)
+                                    ->whereNotNull('companies.brand_id')
+                                    ->whereNull('company_relationships.deleted_at')
+                                    ->whereNull('companies.deleted_at');
+                            });
+                    });
+            });
 
-            if ($relationshipIds !== []) {
-                $query->orWhere(function (Builder $inner) use ($relationshipIds): void {
-                    $inner->where('subject_type', ComplimentSubjectType::Customer->value)
-                        ->whereIn('company_relationship_id', $relationshipIds);
-                });
-            }
+            $query->orWhere(function (Builder $inner) use ($ownerId, $customerKind): void {
+                $inner->where('subject_type', ComplimentSubjectType::Customer->value)
+                    ->whereIn('company_relationship_id', function ($sub) use ($ownerId, $customerKind): void {
+                        $sub->select('id')
+                            ->from('company_relationships')
+                            ->where('owner_company_id', $ownerId)
+                            ->where('kind', $customerKind)
+                            ->whereNull('deleted_at');
+                    });
+            });
 
-            if ($establishmentIds !== []) {
-                $query->orWhere(function (Builder $inner) use ($establishmentIds): void {
-                    $inner->where('subject_type', ComplimentSubjectType::Establishment->value)
-                        ->whereIn('establishment_id', $establishmentIds);
-                });
-            }
-
-            // Avoid empty OR (matches everything) when owner has no clients yet.
-            if ($brandIds === [] && $relationshipIds === [] && $establishmentIds === []) {
-                $query->whereRaw('0 = 1');
-            }
+            $query->orWhere(function (Builder $inner) use ($ownerId, $customerKind): void {
+                $inner->where('subject_type', ComplimentSubjectType::Establishment->value)
+                    ->whereIn('establishment_id', function ($sub) use ($ownerId, $customerKind): void {
+                        $sub->select('establishments.id')
+                            ->from('establishments')
+                            ->join(
+                                'company_relationships',
+                                'company_relationships.related_company_id',
+                                '=',
+                                'establishments.company_id',
+                            )
+                            ->where('company_relationships.owner_company_id', $ownerId)
+                            ->where('company_relationships.kind', $customerKind)
+                            ->whereNull('company_relationships.deleted_at')
+                            ->whereNull('establishments.deleted_at');
+                    });
+            });
         });
     }
 

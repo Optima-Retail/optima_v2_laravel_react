@@ -81,6 +81,22 @@ final class WorkOrderStatusCatalog
     }
 
     /**
+     * Status IDs for pending/closed list filters (avoids whereHas on every row).
+     *
+     * @return list<int>
+     */
+    public function idsByOpen(bool $isOpen): array
+    {
+        return WorkOrderStatus::query()
+            ->where('is_open', $isOpen)
+            ->orderBy('id')
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    /**
      * Null means no matrix is configured for this origin (any same-kind status is allowed).
      *
      * @return list<int>|null

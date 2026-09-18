@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
-import { MultiSelect } from '@/components/ui/MultiSelect';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { AsyncMultiSelect } from '@/components/ui/AsyncMultiSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import type { UserOption } from '@/support/types/domain/common';
@@ -63,30 +63,26 @@ export function BrandForm({
                     error={errors.collaborator_ids}
                     className="sm:col-span-2"
                 >
-                    <MultiSelect
+                    <AsyncMultiSelect
                         id="collaborator_ids"
+                        resource="users"
                         value={values.collaborator_ids}
                         onChange={(collaboratorIds) => onChange('collaborator_ids', collaboratorIds)}
-                        options={userOptions.map((user) => ({
-                            value: String(user.id),
-                            label: user.label,
-                        }))}
+                        seedOptions={userOptions}
                         placeholder={t('brands.collaboratorsPlaceholder')}
                         invalid={Boolean(errors.collaborator_ids)}
                     />
                 </Field>
 
                 <Field label={t('brands.accountManager')} htmlFor="account_manager_id" error={errors.account_manager_id}>
-                    <SearchableSelect
+                    <AsyncSearchableSelect
                         id="account_manager_id"
+                        resource="users"
                         value={values.account_manager_id}
                         invalid={Boolean(errors.account_manager_id)}
                         onChange={(accountManagerId) => onChange('account_manager_id', accountManagerId)}
                         emptyLabel={t('brands.noAccountManager')}
-                        options={userOptions.map((user) => ({
-                            value: String(user.id),
-                            label: user.label,
-                        }))}
+                        seedOptions={userOptions}
                     />
                 </Field>
 
@@ -95,16 +91,14 @@ export function BrandForm({
                     htmlFor="commercial_manager_id"
                     error={errors.commercial_manager_id}
                 >
-                    <SearchableSelect
+                    <AsyncSearchableSelect
                         id="commercial_manager_id"
+                        resource="users"
                         value={values.commercial_manager_id}
                         invalid={Boolean(errors.commercial_manager_id)}
                         onChange={(commercialManagerId) => onChange('commercial_manager_id', commercialManagerId)}
                         emptyLabel={t('brands.noCommercialManager')}
-                        options={userOptions.map((user) => ({
-                            value: String(user.id),
-                            label: user.label,
-                        }))}
+                        seedOptions={userOptions}
                     />
                 </Field>
 

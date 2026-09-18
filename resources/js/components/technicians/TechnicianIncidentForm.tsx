@@ -2,9 +2,8 @@ import type { FormEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { Select } from '@/components/ui/Select';
-import { toCompanySelectOptions } from '@/support/companySelect';
 import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 
 export type TechnicianIncidentFormValues = {
@@ -53,14 +52,15 @@ export function TechnicianIncidentForm({
                 error={errors.technician_id}
                 required
             >
-                <SearchableSelect
+                <AsyncSearchableSelect
                     id="technician_id"
+                    resource="technicians"
                     value={values.technician_id}
                     invalid={Boolean(errors.technician_id)}
                     disabled={technicianLocked}
                     emptyLabel={t('common.select')}
                     onChange={(value) => onChange('technician_id', value)}
-                    options={toCompanySelectOptions(technicianOptions)}
+                    seedOptions={technicianOptions}
                 />
             </Field>
 
@@ -91,19 +91,15 @@ export function TechnicianIncidentForm({
                 error={errors.responded_by_id}
                 required
             >
-                <Select
+                <AsyncSearchableSelect
                     id="responded_by_id"
+                    resource="users"
                     value={values.responded_by_id}
                     invalid={Boolean(errors.responded_by_id)}
-                    onChange={(event) => onChange('responded_by_id', event.target.value)}
-                >
-                    <option value="">{t('common.select')}</option>
-                    {userOptions.map((option) => (
-                        <option key={option.id} value={option.id}>
-                            {option.label}
-                        </option>
-                    ))}
-                </Select>
+                    emptyLabel={t('common.select')}
+                    onChange={(value) => onChange('responded_by_id', value)}
+                    seedOptions={userOptions}
+                />
             </Field>
 
             <Field

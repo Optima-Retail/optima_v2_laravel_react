@@ -5,11 +5,10 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
-import { MultiSelect } from '@/components/ui/MultiSelect';
-import { SearchableSelect, type SelectOption } from '@/components/ui/SearchableSelect';
+import { AsyncMultiSelect } from '@/components/ui/AsyncMultiSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import { toCompanySelectOptions } from '@/support/companySelect';
 import type { CompanyOption } from '@/support/types/domain/common';
 
 export type ComplimentFormValues = {
@@ -42,13 +41,6 @@ type ComplimentFormProps = {
     submitIcon?: ReactNode;
     actions?: ReactNode;
 };
-
-function toSelectOptions(options: Option[]): SelectOption[] {
-    return options.map((option) => ({
-        value: String(option.id),
-        label: option.label,
-    }));
-}
 
 export function defaultComplimentFormValues(
     overrides: Partial<ComplimentFormValues> = {},
@@ -126,19 +118,15 @@ export function ComplimentForm({
 
                     {values.subject_type === 'brand' ? (
                         <Field label={t('compliments.brand')} htmlFor="brand_id" error={errors.brand_id} required>
-                            <Select
+                            <AsyncSearchableSelect
                                 id="brand_id"
+                                resource="brands"
                                 value={values.brand_id}
                                 invalid={Boolean(errors.brand_id)}
-                                onChange={(event) => onChange('brand_id', event.target.value)}
-                            >
-                                <option value="">{t('common.select')}</option>
-                                {brandOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </Select>
+                                emptyLabel={t('common.select')}
+                                onChange={(value) => onChange('brand_id', value)}
+                                seedOptions={brandOptions}
+                            />
                         </Field>
                     ) : null}
 
@@ -149,13 +137,14 @@ export function ComplimentForm({
                             error={errors.company_relationship_id}
                             required
                         >
-                            <SearchableSelect
+                            <AsyncSearchableSelect
                                 id="company_relationship_id"
+                                resource="customers"
                                 value={values.company_relationship_id}
                                 invalid={Boolean(errors.company_relationship_id)}
                                 emptyLabel={t('common.select')}
                                 onChange={(value) => onChange('company_relationship_id', value)}
-                                options={toCompanySelectOptions(customerOptions)}
+                                seedOptions={customerOptions}
                             />
                         </Field>
                     ) : null}
@@ -167,19 +156,16 @@ export function ComplimentForm({
                             error={errors.establishment_id}
                             required
                         >
-                            <Select
+                            <AsyncSearchableSelect
                                 id="establishment_id"
+                                resource="establishments"
                                 value={values.establishment_id}
                                 invalid={Boolean(errors.establishment_id)}
-                                onChange={(event) => onChange('establishment_id', event.target.value)}
-                            >
-                                <option value="">{t('common.select')}</option>
-                                {establishmentOptions.map((option) => (
-                                    <option key={option.id} value={option.id}>
-                                        {option.label}
-                                    </option>
-                                ))}
-                            </Select>
+                                emptyLabel={t('common.select')}
+                                onChange={(value) => onChange('establishment_id', value)}
+                                seedOptions={establishmentOptions}
+                                queryParams={{ rich: false }}
+                            />
                         </Field>
                     ) : null}
 
@@ -201,11 +187,12 @@ export function ComplimentForm({
                         required
                         className="sm:col-span-2"
                     >
-                        <MultiSelect
+                        <AsyncMultiSelect
                             id="user_ids"
+                            resource="users"
                             value={values.user_ids}
                             onChange={(userIds) => onChange('user_ids', userIds)}
-                            options={toSelectOptions(userOptions)}
+                            seedOptions={userOptions}
                             placeholder={t('compliments.usersPlaceholder')}
                             invalid={Boolean(errors.user_ids)}
                         />

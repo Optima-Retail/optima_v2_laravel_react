@@ -192,12 +192,26 @@ final class BrandService
     }
 
     /**
+     * Seed user options. Full lists load via /select-options/users.
+     *
      * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
     public function userOptions(?Company $owner = null, array $includeUserIds = []): array
     {
-        return CompanyMemberUsers::options($owner, $includeUserIds);
+        unset($owner);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
+    }
+
+    /**
+     * Limited member list for index filter selects.
+     *
+     * @return list<array{id: int, label: string}>
+     */
+    public function userFilterOptions(?Company $owner = null): array
+    {
+        return CompanyMemberUsers::searchOptions($owner, limit: 100);
     }
 
     /**

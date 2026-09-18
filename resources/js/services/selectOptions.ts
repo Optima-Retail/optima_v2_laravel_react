@@ -19,6 +19,7 @@ export type SelectOptionsResource =
     | 'brands'
     | 'users'
     | 'establishments'
+    | 'customers'
     | 'technicians'
     | 'contracts'
     | 'requesters'

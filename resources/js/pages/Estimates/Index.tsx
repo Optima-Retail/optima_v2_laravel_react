@@ -102,10 +102,23 @@ function formatTableDate(value: string | null | undefined, locale: string, empty
     return formatDateTime(value, locale) || empty;
 }
 
+function normalizePendingFilter(value: string | undefined | null): string {
+    if (value === '0' || value === '1' || value === 'all') {
+        return value;
+    }
+
+    // Legacy empty select = all
+    if (value === '') {
+        return 'all';
+    }
+
+    return '1';
+}
+
 function totalsQueryFromFilters(filters: Record<string, string>): string {
     const params = new URLSearchParams();
 
-    for (const key of ['search', 'pending', 'created_from', 'created_to'] as const) {
+    for (const key of ['search', 'created_from', 'created_to'] as const) {
         const value = filters[key]?.trim();
 
         if (value) {
@@ -113,9 +126,7 @@ function totalsQueryFromFilters(filters: Record<string, string>): string {
         }
     }
 
-    if (!params.has('pending')) {
-        params.set('pending', '1');
-    }
+    params.set('pending', normalizePendingFilter(filters.pending));
 
     return params.toString();
 }
@@ -136,7 +147,7 @@ export default function EstimatesIndex({ filters, statusOptions, can }: Estimate
     const [totalsQuery, setTotalsQuery] = useState(() =>
         totalsQueryFromFilters({
             search: filters.search,
-            pending: filters.pending || '1',
+            pending: normalizePendingFilter(filters.pending),
             created_from: filters.created_from,
             created_to: filters.created_to,
         }),
@@ -163,6 +174,16 @@ export default function EstimatesIndex({ filters, statusOptions, can }: Estimate
     }, [actionsOpen]);
 
     useEffect(() => {
+        const params = new URLSearchParams(totalsQuery);
+        const search = (params.get('search') ?? '').trim();
+
+        // Search aggregates cannot use indexes; skip totals while searching.
+        if (search !== '') {
+            setTotals(EMPTY_TOTALS);
+
+            return;
+        }
+
         const controller = new AbortController();
 
         void fetch(`${estimatesService.totalsPath}?${totalsQuery}`, {
@@ -199,7 +220,7 @@ export default function EstimatesIndex({ filters, statusOptions, can }: Estimate
     const initialFilterValues = useMemo(
         () => ({
             search: filters.search,
-            pending: filters.pending || '1',
+            pending: normalizePendingFilter(filters.pending),
             created_from: filters.created_from,
             created_to: filters.created_to,
         }),
@@ -229,7 +250,7 @@ export default function EstimatesIndex({ filters, statusOptions, can }: Estimate
         setTotalsQuery(
             totalsQueryFromFilters({
                 search: query.search ?? '',
-                pending: query.pending ?? '1',
+                pending: normalizePendingFilter(query.pending),
                 created_from: query.created_from ?? '',
                 created_to: query.created_to ?? '',
             }),
@@ -594,8 +615,9 @@ export default function EstimatesIndex({ filters, statusOptions, can }: Estimate
                             type: 'select',
                             name: 'pending',
                             label: t('estimates.pending'),
-                            emptyLabel: t('common.all'),
+                            emptyLabel: null,
                             options: [
+                                { value: 'all', label: t('common.all') },
                                 { value: '1', label: t('estimates.pendingOpen') },
                                 { value: '0', label: t('estimates.pendingClosed') },
                             ],

@@ -103,29 +103,6 @@ final class WorkOrderController extends Controller
         );
     }
 
-    public function totals(Request $request): JsonResponse
-    {
-        $this->authorize('viewAny', WorkOrder::class);
-
-        $owner = $this->activeCompany($request);
-        $filters = [
-            'search' => $request->string('search')->trim()->toString(),
-            'pending' => $request->has('pending')
-                ? $request->string('pending')->trim()->toString()
-                : '1',
-            'created_from' => $request->string('created_from')->trim()->toString(),
-            'created_to' => $request->string('created_to')->trim()->toString(),
-            'establishment_id' => $request->integer('establishment_id') ?: null,
-            'is_work_order' => true,
-        ];
-
-        if (! $request->has('pending') && ($filters['pending'] ?? '') === '') {
-            $filters['pending'] = '1';
-        }
-
-        return response()->json($this->workOrders->totalsForOwner($owner, $filters));
-    }
-
     public function downloadPdf(WorkOrder $workOrder): HttpResponse
     {
         $this->authorize('view', $workOrder);

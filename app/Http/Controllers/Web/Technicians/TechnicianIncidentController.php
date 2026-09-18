@@ -120,8 +120,13 @@ final class TechnicianIncidentController extends Controller
             'defaultTechnicianId' => $prefillTechnicianId,
             'defaultRespondedById' => $request->user()?->id,
             'typeOptions' => $this->incidents->typeOptions(),
-            'userOptions' => $this->incidents->userOptions($owner),
-            'technicianOptions' => $this->incidents->technicianOptions($owner),
+            'userOptions' => $request->user() !== null
+                ? $this->incidents->userOptions($owner, [(int) $request->user()->id])
+                : [],
+            'technicianOptions' => $this->incidents->technicianOptions(
+                $owner,
+                $prefillTechnicianId !== null ? [$prefillTechnicianId] : [],
+            ),
         ]);
     }
 

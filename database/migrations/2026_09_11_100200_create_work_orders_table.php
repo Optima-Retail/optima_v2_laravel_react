@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -21,6 +22,9 @@ use Illuminate\Support\Facades\Schema;
  * Skipped (dead or other domains): notification flags, OOH, plantilla/informe FKs,
  * FileMaker ids, ot_padre boolean, tiempo_enviado, visits, chat, invoices, nora.
  * `ots.iteracion_id` → `contract_iteration_id` added in create_contract_iterations_table (after contract_iterations).
+ *
+ * List/search indexes (owner covering, code-tail functional, subject FULLTEXT) live here so
+ * migrate:fresh builds them with the table — no follow-up alter migrations.
  */
 return new class extends Migration
 {
@@ -107,7 +111,26 @@ return new class extends Migration
             $table->index('estimate_num');
             $table->index('work_order_num');
             $table->index(['is_estimate', 'is_work_order']);
+
+            // Covering indexes for owner WO / estimate list + totals (status IN + soft-delete + SUM).
+            $table->index(
+                ['owner_company_id', 'is_work_order', 'status_id', 'deleted_at', 'total_euros', 'total_amount', 'cost_amount'],
+                'work_orders_owner_wo_list_idx',
+            );
+            $table->index(
+                ['owner_company_id', 'is_estimate', 'status_id', 'deleted_at', 'total_euros', 'total_amount', 'cost_amount'],
+                'work_orders_owner_est_list_idx',
+            );
         });
+
+        if (Schema::getConnection()->getDriverName() === 'mysql') {
+            // Digit search: SUBSTRING_INDEX(code|work_order_num|estimate_num, '/', -1)
+            DB::statement("CREATE INDEX `work_orders_code_tail_idx` ON work_orders ((SUBSTRING_INDEX(`code`, '/', -1)))");
+            DB::statement("CREATE INDEX `work_orders_wo_num_tail_idx` ON work_orders ((SUBSTRING_INDEX(`work_order_num`, '/', -1)))");
+            DB::statement("CREATE INDEX `work_orders_est_num_tail_idx` ON work_orders ((SUBSTRING_INDEX(`estimate_num`, '/', -1)))");
+            // Free-text search on subject + reference
+            DB::statement('CREATE FULLTEXT INDEX work_orders_subject_ft ON work_orders (subject, reference)');
+        }
     }
 
     public function down(): void

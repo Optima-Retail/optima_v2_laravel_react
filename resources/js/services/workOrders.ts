@@ -55,7 +55,6 @@ export const workOrdersService = {
     pdfPath: (id: number) => `${base}/${id}/pdf`,
     indexPath: base,
     dataPath: `${base}/data`,
-    totalsPath: `${base}/totals`,
     bulkStatusPath: `${base}/bulk-status`,
 
     async bulkStatus(payload: {

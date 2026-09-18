@@ -52,7 +52,7 @@ final class BrandController extends Controller
 
         return Inertia::render('Config/Brands/Index', [
             'filters' => $filters,
-            'userOptions' => $this->brands->userOptions($owner),
+            'userOptions' => $this->brands->userFilterOptions($owner),
             'can' => [
                 'create' => $request->user()?->can('create', Brand::class) ?? false,
             ],
@@ -95,10 +95,8 @@ final class BrandController extends Controller
     {
         $this->authorize('create', Brand::class);
 
-        $owner = app(ActiveCompany::class)->forUser($request->user());
-
         return Inertia::render('Config/Brands/Create', [
-            'userOptions' => $this->brands->userOptions($owner),
+            'userOptions' => [],
         ]);
     }
 

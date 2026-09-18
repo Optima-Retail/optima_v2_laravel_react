@@ -90,10 +90,12 @@ final class ComplimentController extends Controller
 
         return Inertia::render('Compliments/Create', [
             'typeOptions' => $this->compliments->typeOptions(),
-            'brandOptions' => $this->compliments->brandOptions($owner),
-            'customerOptions' => $this->compliments->customerOptions($owner),
-            'establishmentOptions' => $this->compliments->establishmentOptions($owner),
-            'userOptions' => $this->compliments->userOptions($owner),
+            'brandOptions' => [],
+            'customerOptions' => [],
+            'establishmentOptions' => [],
+            'userOptions' => $user !== null
+                ? $this->compliments->userOptions($owner, [(int) $user->id])
+                : [],
             'can' => [
                 'upload_attachments' => $user?->can('compliments.upload-attachments') ?? false,
             ],
@@ -132,7 +134,10 @@ final class ComplimentController extends Controller
                 ? $this->attachments->listForCompliment($compliment)
                 : [],
             'typeOptions' => $this->compliments->typeOptions(),
-            'brandOptions' => $this->compliments->brandOptions($owner),
+            'brandOptions' => $this->compliments->brandOptions(
+                $owner,
+                $compliment->brand_id !== null ? (int) $compliment->brand_id : null,
+            ),
             'customerOptions' => $this->compliments->customerOptions(
                 $owner,
                 $compliment->company_relationship_id !== null ? (int) $compliment->company_relationship_id : null,

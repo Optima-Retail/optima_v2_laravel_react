@@ -39,6 +39,7 @@ use App\Policies\EstimatePolicy;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator as LengthAwarePaginatorConcrete;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -887,51 +888,71 @@ final class WorkOrderService
             'id',
         );
 
-        return $this->filteredQueryForOwner($owner, $filters)
+        $query = $this->filteredQueryForOwner($owner, $filters)
             ->with([
-                'establishment',
-                'status',
-                'responsibleUser',
-                'type',
-                'priority',
-                'lines:id,work_order_id,quantity,unit_price,net_amount',
+                'establishment:id,name',
+                'status:id,name,color',
+                'responsibleUser:id,name',
+                'type:id,name,color',
+                'priority:id,name,color',
+                // List amounts use denormalized header cols; only need selected tech for display name.
                 'technicians' => fn ($query) => $query->where('is_selected', true),
-                'technicians.technician.relatedCompany',
+                'technicians.technician:id,related_company_id',
+                'technicians.technician.relatedCompany:id,name,tradename',
             ])
-            ->orderBy($sort, $direction)
+            ->orderBy($sort, $direction);
+
+        $search = trim((string) ($filters['search'] ?? ''));
+
+        // Leading-wildcard LIKE cannot use indexes; COUNT(*) over ~80k+ matches takes seconds.
+        // For search, skip the exact total and only detect whether another page exists.
+        if ($search !== '') {
+            $page = max(1, (int) ($filters['page'] ?? LengthAwarePaginatorConcrete::resolveCurrentPage()));
+            $rows = (clone $query)
+                ->forPage($page, $perPage + 1)
+                ->get();
+            $hasMore = $rows->count() > $perPage;
+            $items = $rows->take($perPage)->values();
+            $total = (($page - 1) * $perPage) + $items->count() + ($hasMore ? 1 : 0);
+
+            return (new LengthAwarePaginatorConcrete(
+                $items,
+                $total,
+                $perPage,
+                $page,
+                [
+                    'path' => LengthAwarePaginatorConcrete::resolveCurrentPath(),
+                    'pageName' => 'page',
+                ],
+            ))->withQueryString();
+        }
+
+        return $query
             ->paginate($perPage)
             ->withQueryString();
     }
 
     /**
      * Aggregate totals for the active list filters (legacy presupuestos indexTotales).
-     * Amounts come from billing lines + selected technicians (not only denormalized header cols).
+     * Uses denormalized header columns (kept in sync on save) so index lists stay fast.
      *
      * @param  array{search?: string|null, stage?: string|null, is_estimate?: bool|null, is_work_order?: bool|null, pending?: string|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null}  $filters
-     * @return array{count: int, total_amount: float, cost_amount: float, margin_percentage: float}
+     * @return array{count: int, total_amount: float, cost_amount: float, margin_percentage: float}|null
      */
-    public function totalsForOwner(Company $owner, array $filters = []): array
+    public function totalsForOwner(Company $owner, array $filters = []): ?array
     {
-        $filteredIds = $this->filteredQueryForOwner($owner, $filters)->select('work_orders.id');
+        // Same reason as paginateForOwner: LIKE '%…%' aggregates are multi-second scans.
+        if (trim((string) ($filters['search'] ?? '')) !== '') {
+            return null;
+        }
 
-        $quantity = (int) $this->filteredQueryForOwner($owner, $filters)->count();
+        $row = $this->filteredQueryForOwner($owner, $filters)
+            ->selectRaw('COUNT(*) as quantity')
+            ->selectRaw('COALESCE(SUM(COALESCE(total_euros, total_amount, 0)), 0) as total_amount')
+            ->selectRaw('COALESCE(SUM(COALESCE(cost_amount, 0)), 0) as cost_amount')
+            ->first();
 
-        $totalAmount = round((float) WorkOrderLine::query()
-            ->whereIn('work_order_id', $filteredIds)
-            ->selectRaw('COALESCE(SUM(COALESCE(net_amount, quantity * unit_price, 0)), 0) as aggregate')
-            ->value('aggregate'), 2);
-
-        $costAmount = round((float) WorkOrderTechnician::query()
-            ->whereIn('work_order_id', $filteredIds)
-            ->where('is_selected', true)
-            ->selectRaw('COALESCE(SUM(COALESCE(quote_total_euros, quote_net_amount, 0)), 0) as aggregate')
-            ->value('aggregate'), 2);
-
-        return $this->formatTotalsRow((object) [
-            'quantity' => $quantity,
-            'total_amount' => $totalAmount,
-            'cost_amount' => $costAmount,
-        ]);
+        return $this->formatTotalsRow($row);
     }
 
     /**
@@ -947,20 +968,13 @@ final class WorkOrderService
         $contractId = (int) ($filters['contract_id'] ?? 0);
         $createdFrom = trim((string) ($filters['created_from'] ?? ''));
         $createdTo = trim((string) ($filters['created_to'] ?? ''));
-        $companyIds = $this->accessibleCompanyIds($owner);
         $isEstimate = array_key_exists('is_estimate', $filters) ? $filters['is_estimate'] : null;
         $isWorkOrder = array_key_exists('is_work_order', $filters) ? $filters['is_work_order'] : null;
 
         return WorkOrder::query()
-            ->where(function ($query) use ($owner, $companyIds): void {
-                $query->where('owner_company_id', $owner->id)
-                    ->orWhere(function ($legacy) use ($companyIds): void {
-                        $legacy->whereNull('owner_company_id')
-                            ->whereHas('establishment', function ($establishment) use ($companyIds): void {
-                                $establishment->whereIn('company_id', $companyIds);
-                            });
-                    });
-            })
+            // All rows are owned; avoid OR + whereHas(establishment IN thousands) which blocks indexes.
+            ->where('owner_company_id', $owner->id)
+            ->tap(fn (Builder $query) => $this->applyOwnerListIndexHint($query, $filters))
             ->when($establishmentId > 0, function ($query) use ($establishmentId): void {
                 $query->where('establishment_id', $establishmentId);
             })
@@ -977,29 +991,123 @@ final class WorkOrderService
                 $query->where('stage', $stage);
             })
             ->when($pending === '1' || $pending === '0', function ($query) use ($pending): void {
-                $query->whereHas('status', function ($statusQuery) use ($pending): void {
-                    $statusQuery->where('is_open', $pending === '1');
-                });
+                $statusIds = $this->statuses->idsByOpen($pending === '1');
+                $query->whereIn('status_id', $statusIds !== [] ? $statusIds : [0]);
             })
             ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($inner) use ($search): void {
-                    $inner
-                        ->where('subject', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%")
-                        ->orWhere('estimate_num', 'like', "%{$search}%")
-                        ->orWhere('work_order_num', 'like', "%{$search}%")
-                        ->orWhere('estimate_old_num', 'like', "%{$search}%")
-                        ->orWhere('work_order_old_num', 'like', "%{$search}%")
-                        ->orWhere('reference', 'like', "%{$search}%")
-                        ->orWhereHas('establishment', function ($establishmentQuery) use ($search): void {
-                            $establishmentQuery
-                                ->where('name', 'like', "%{$search}%")
-                                ->orWhere('code', 'like', "%{$search}%");
-                        });
-                });
+                $this->applyOwnerListSearch($query, $search);
             })
             ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
             ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo));
+    }
+
+    /**
+     * Fast list search for ~900k work_orders rows.
+     *
+     * - Code-like tokens (OT26/224606, PRE26/…): indexed prefix/exact on number columns.
+     * - Digits only: match the numeric tail after "/" (functional index when present).
+     * - Free text: subject/reference + establishment name (avoid OR-ing every code column with %…%).
+     *
+     * @param  Builder<WorkOrder>  $query
+     */
+    private function applyOwnerListSearch(Builder $query, string $search): void
+    {
+        $like = '%'.$search.'%';
+        $prefix = $search.'%';
+        $digitsOnly = (bool) preg_match('/\A\d{3,}\z/', $search);
+        $codeLike = ! $digitsOnly && (bool) preg_match('/\A[A-Za-z0-9][A-Za-z0-9\/\-_.]*\z/', $search)
+            && (
+                str_contains($search, '/')
+                || str_contains($search, '-')
+                || (bool) preg_match('/\A[A-Za-z]{1,8}\d/', $search)
+            );
+
+        $establishmentIds = Establishment::query()
+            ->where(function ($establishmentQuery) use ($like): void {
+                $establishmentQuery
+                    ->where('name', 'like', $like)
+                    ->orWhere('code', 'like', $like);
+            })
+            ->limit(500)
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+
+        $query->where(function ($inner) use ($search, $like, $prefix, $digitsOnly, $codeLike, $establishmentIds): void {
+            if ($digitsOnly) {
+                // Only columns covered by functional tail indexes — extra ORs kill index_merge.
+                $inner
+                    ->whereRaw("SUBSTRING_INDEX(code, _utf8mb4'/', -1) = ?", [$search])
+                    ->orWhereRaw("SUBSTRING_INDEX(work_order_num, _utf8mb4'/', -1) = ?", [$search])
+                    ->orWhereRaw("SUBSTRING_INDEX(estimate_num, _utf8mb4'/', -1) = ?", [$search]);
+            } elseif ($codeLike) {
+                $inner
+                    ->where('code', $search)
+                    ->orWhere('code', 'like', $prefix)
+                    ->orWhere('estimate_num', $search)
+                    ->orWhere('estimate_num', 'like', $prefix)
+                    ->orWhere('work_order_num', $search)
+                    ->orWhere('work_order_num', 'like', $prefix);
+            } else {
+                // Newest-first LIMIT fills quickly when the term is common in recent rows.
+                // FULLTEXT is slower here because it ranks the whole table before status filters.
+                $inner
+                    ->where('subject', 'like', $like)
+                    ->orWhere('reference', 'like', $like);
+
+                if ($establishmentIds !== []) {
+                    $inner->orWhereIn('establishment_id', $establishmentIds);
+                }
+            }
+
+            if (($digitsOnly || $codeLike) && $establishmentIds !== []) {
+                $inner->orWhereIn('establishment_id', $establishmentIds);
+            }
+        });
+    }
+
+    /**
+     * Default index lists filter owner + is_work_order|is_estimate + status IN (…).
+     * MySQL often prefers a PRIMARY backward scan for ORDER BY id DESC LIMIT n, which is
+     * fine when many rows match (work orders) but catastrophic when few do (estimates).
+     * Force the covering owner-list indexes for the common unscoped list.
+     *
+     * @param  Builder<WorkOrder>  $query
+     * @param  array{search?: string|null, is_estimate?: bool|null, is_work_order?: bool|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null, pending?: string|null}  $filters
+     */
+    private function applyOwnerListIndexHint(Builder $query, array $filters): void
+    {
+        if (
+            trim((string) ($filters['search'] ?? '')) !== ''
+            || trim((string) ($filters['created_from'] ?? '')) !== ''
+            || trim((string) ($filters['created_to'] ?? '')) !== ''
+            || (int) ($filters['establishment_id'] ?? 0) > 0
+            || (int) ($filters['contract_id'] ?? 0) > 0
+        ) {
+            return;
+        }
+
+        $pending = trim((string) ($filters['pending'] ?? ''));
+
+        // Only force when status is filtered; "all" has no status_id predicate.
+        if ($pending !== '1' && $pending !== '0') {
+            return;
+        }
+
+        $isEstimate = array_key_exists('is_estimate', $filters) ? $filters['is_estimate'] : null;
+        $isWorkOrder = array_key_exists('is_work_order', $filters) ? $filters['is_work_order'] : null;
+
+        $index = match (true) {
+            // Estimates: PRIMARY backward scan skips most rows and is very slow; force covering index.
+            $isEstimate === true && $isWorkOrder !== true => 'work_orders_owner_est_list_idx',
+            default => null,
+        };
+
+        if ($index === null) {
+            return;
+        }
+
+        $query->from(DB::raw('`work_orders` FORCE INDEX (`'.$index.'`)'));
     }
 
     /**

@@ -415,7 +415,6 @@ Route::middleware('auth')->group(function (): void {
         Route::middleware('permission:work_orders.view')->group(function (): void {
             Route::get('/work-orders', [WorkOrderController::class, 'index'])->name('work-orders.index');
             Route::get('/work-orders/data', [WorkOrderController::class, 'data'])->name('work-orders.data');
-            Route::get('/work-orders/totals', [WorkOrderController::class, 'totals'])->name('work-orders.totals');
             Route::get('/work-orders/{work_order}/pdf', [WorkOrderController::class, 'downloadPdf'])
                 ->whereNumber('work_order')
                 ->name('work-orders.pdf');

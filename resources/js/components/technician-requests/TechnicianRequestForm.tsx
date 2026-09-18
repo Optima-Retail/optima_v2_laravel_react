@@ -4,6 +4,7 @@ import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
@@ -158,11 +159,12 @@ export function TechnicianRequestForm({
                         htmlFor="responsible_user_id"
                         error={errors.responsible_user_id}
                     >
-                        <SearchableSelect
+                        <AsyncSearchableSelect
                             id="responsible_user_id"
+                            resource="users"
                             value={values.responsible_user_id}
                             onChange={(value) => onChange('responsible_user_id', value)}
-                            options={toSelectOptions(userOptions)}
+                            seedOptions={userOptions}
                             invalid={Boolean(errors.responsible_user_id)}
                         />
                     </Field>
@@ -172,11 +174,12 @@ export function TechnicianRequestForm({
                         htmlFor="work_order_id"
                         error={errors.work_order_id}
                     >
-                        <SearchableSelect
+                        <AsyncSearchableSelect
                             id="work_order_id"
+                            resource="work-orders"
                             value={values.work_order_id}
                             onChange={(value) => onChange('work_order_id', value)}
-                            options={toSelectOptions(workOrderOptions)}
+                            seedOptions={workOrderOptions}
                             invalid={Boolean(errors.work_order_id)}
                         />
                     </Field>

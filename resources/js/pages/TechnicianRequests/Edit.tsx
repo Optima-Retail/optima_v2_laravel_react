@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Ban, Plus, Save, Trash2, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -9,11 +9,10 @@ import {
 } from '@/components/technician-requests/TechnicianRequestForm';
 import { PageHeader } from '@/components/page/PageHeader';
 import { Button } from '@/components/ui/Button';
-import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { confirmAction } from '@/helpers/confirm';
 import { AppLayout } from '@/layouts/AppLayout';
 import { technicianRequestsService } from '@/services';
-import { toCompanySelectOptions } from '@/support/companySelect';
 import type { DocumentChatPayload } from '@/support/types/domain/chat';
 import type { CompanyOption } from '@/support/types/domain/common';
 
@@ -127,14 +126,6 @@ export default function EditTechnicianRequest({
             service_type_ids: technicianRequest.service_type_ids.map(String),
         }),
     );
-
-    const availableTechnicians = useMemo(() => {
-        const attached = new Set(technicianRequest.technicians.map((item) => item.id));
-
-        return toCompanySelectOptions(
-            technicianOptions.filter((option) => !attached.has(option.id)),
-        );
-    }, [technicianOptions, technicianRequest.technicians]);
 
     function submit(event: FormEvent) {
         event.preventDefault();
@@ -334,11 +325,12 @@ export default function EditTechnicianRequest({
 
                         <div className="flex flex-wrap items-end gap-3">
                             <div className="min-w-[16rem] flex-1">
-                                <SearchableSelect
+                                <AsyncSearchableSelect
+                                    resource="technicians"
                                     value={technicianId}
                                     onChange={setTechnicianId}
-                                    options={availableTechnicians}
-                                    placeholder={t('technicianRequests.technicianPlaceholder')}
+                                    seedOptions={technicianOptions}
+                                    emptyLabel={t('technicianRequests.technicianPlaceholder')}
                                 />
                             </div>
                             <Button type="button" onClick={attachTechnician} disabled={!technicianId}>

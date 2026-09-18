@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Web;
 use App\Domain\Companies\Services\CompanyService;
 use App\Domain\Companies\Services\EstablishmentService;
 use App\Domain\Companies\Support\CompanyMemberUsers;
+use App\Domain\Compliments\Services\ComplimentService;
 use App\Domain\Config\Brands\Services\BrandService;
 use App\Domain\Contracts\Services\ContractService;
 use App\Domain\Incidents\Services\IncidentService;
+use App\Domain\TechnicianRequests\Services\TechnicianRequestService;
 use App\Domain\WorkOrders\Services\WorkOrderService;
 use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
@@ -17,11 +19,14 @@ use App\Models\Article;
 use App\Models\Brand;
 use App\Models\Company;
 use App\Models\CompanyRelationship;
+use App\Models\Compliment;
 use App\Models\Contract;
 use App\Models\Delegation;
 use App\Models\Establishment;
 use App\Models\Evaluation;
 use App\Models\Incident;
+use App\Models\TechnicianIncident;
+use App\Models\TechnicianRequest;
 use App\Models\User;
 use App\Models\WorkOrder;
 use Illuminate\Http\JsonResponse;
@@ -38,6 +43,8 @@ final class SelectOptionsController extends Controller
         private readonly ContractService $contracts,
         private readonly WorkOrderService $workOrders,
         private readonly IncidentService $incidents,
+        private readonly ComplimentService $compliments,
+        private readonly TechnicianRequestService $technicianRequests,
     ) {}
 
     public function __invoke(Request $request, string $resource): JsonResponse
@@ -59,6 +66,7 @@ final class SelectOptionsController extends Controller
             'brands' => $this->brandOptions($request, $search, $includeId, $limit),
             'users' => $this->userOptions($request, $owner, $search, $includeIds, $limit),
             'establishments' => $this->establishmentOptions($request, $owner, $search, $includeIds, $limit),
+            'customers' => $this->customerOptions($request, $owner, $search, $includeIds, $limit),
             'technicians' => $this->technicianOptions($request, $owner, $search, $includeIds, $limit),
             'contracts' => $this->contractOptions($request, $owner, $search, $includeIds, $limit),
             'requesters' => $this->requesterOptions($request, $owner, $search, $includeIds, $limit),
@@ -80,6 +88,8 @@ final class SelectOptionsController extends Controller
             Brand::class,
             Company::class,
             CompanyRelationship::class,
+            Compliment::class,
+            Incident::class,
         ]);
 
         return $this->brands->searchOptions(
@@ -102,6 +112,11 @@ final class SelectOptionsController extends Controller
             Establishment::class,
             Contract::class,
             WorkOrder::class,
+            Compliment::class,
+            Incident::class,
+            Brand::class,
+            TechnicianRequest::class,
+            TechnicianIncident::class,
         ]);
 
         $scope = $request->string('scope')->trim()->toString() ?: 'members';
@@ -137,6 +152,8 @@ final class SelectOptionsController extends Controller
             Establishment::class,
             Contract::class,
             WorkOrder::class,
+            Compliment::class,
+            Incident::class,
         ]);
 
         $companyId = $request->filled('company_id') ? $request->integer('company_id') : null;
@@ -164,12 +181,33 @@ final class SelectOptionsController extends Controller
      * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string, logo_url: string|null}>
      */
+    private function customerOptions(Request $request, Company $owner, string $search, array $includeIds, int $limit): array
+    {
+        $this->authorizeAny($request, [
+            Compliment::class,
+            CompanyRelationship::class,
+        ]);
+
+        return $this->compliments->searchCustomerOptions(
+            $owner,
+            search: $search !== '' ? $search : null,
+            includeIds: $includeIds,
+            limit: $limit,
+        );
+    }
+
+    /**
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
     private function technicianOptions(Request $request, Company $owner, string $search, array $includeIds, int $limit): array
     {
         $this->authorizeAny($request, [
             CompanyRelationship::class,
             Establishment::class,
             WorkOrder::class,
+            TechnicianRequest::class,
+            TechnicianIncident::class,
         ]);
 
         return $this->establishments->searchTechnicianOptions(
@@ -249,55 +287,17 @@ final class SelectOptionsController extends Controller
      */
     private function workOrderOptions(Request $request, Company $owner, string $search, array $includeIds, int $limit): array
     {
-        $this->authorizeAny($request, [WorkOrder::class]);
+        $this->authorizeAny($request, [
+            WorkOrder::class,
+            TechnicianRequest::class,
+        ]);
 
-        $needle = trim($search);
-
-        $rows = WorkOrder::query()
-            ->where('company_id', $owner->id)
-            ->when($needle !== '', function ($query) use ($needle): void {
-                $query->where(function ($inner) use ($needle): void {
-                    $inner->where('code', 'like', "%{$needle}%")
-                        ->orWhere('subject', 'like', "%{$needle}%")
-                        ->orWhere('reference', 'like', "%{$needle}%");
-                });
-            })
-            ->orderByDesc('id')
-            ->limit($limit)
-            ->get(['id', 'code', 'subject'])
-            ->map(fn (WorkOrder $workOrder): array => [
-                'id' => (int) $workOrder->id,
-                'label' => $workOrder->code
-                    ? "{$workOrder->code} — ".($workOrder->subject ?: '#'.$workOrder->id)
-                    : ($workOrder->subject ?: '#'.$workOrder->id),
-            ])
-            ->values()
-            ->all();
-
-        if ($includeIds !== []) {
-            $missingIds = array_values(array_diff(
-                $includeIds,
-                array_map(fn (array $row): int => (int) $row['id'], $rows),
-            ));
-
-            if ($missingIds !== []) {
-                $extra = WorkOrder::query()
-                    ->where('company_id', $owner->id)
-                    ->whereIn('id', $missingIds)
-                    ->get(['id', 'code', 'subject'])
-                    ->map(fn (WorkOrder $workOrder): array => [
-                        'id' => (int) $workOrder->id,
-                        'label' => $workOrder->code
-                            ? "{$workOrder->code} — ".($workOrder->subject ?: '#'.$workOrder->id)
-                            : ($workOrder->subject ?: '#'.$workOrder->id),
-                    ])
-                    ->all();
-
-                $rows = array_values(array_merge($extra, $rows));
-            }
-        }
-
-        return $rows;
+        return $this->technicianRequests->searchWorkOrderOptions(
+            $owner,
+            search: $search !== '' ? $search : null,
+            includeIds: $includeIds,
+            limit: $limit,
+        );
     }
 
     /**

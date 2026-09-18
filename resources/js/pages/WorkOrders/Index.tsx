@@ -3,16 +3,11 @@ import { Head, Link } from '@inertiajs/react';
 import { ChevronDown, ClipboardList, Plus, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { CellComponent, ColumnDefinition } from 'tabulator-tables';
-import {
-    EstablishmentDocumentTotals,
-    type EstablishmentDocumentTotalsData,
-} from '@/components/establishments/EstablishmentDocumentTotals';
 import { PageHeader } from '@/components/page/PageHeader';
 import {
     RemoteDataTable,
     type RemoteDataColumnHelpers,
     type RemoteDataTableHandle,
-    type RemoteQueryState,
 } from '@/components/table/RemoteDataTable';
 import { WorkOrderBulkStatusModal } from '@/components/work-orders/WorkOrderBulkStatusModal';
 import { confirmAction } from '@/helpers/confirm';
@@ -49,13 +44,6 @@ type WorkOrdersIndexProps = {
         delete: boolean;
         configure_pattern: boolean;
     };
-};
-
-const EMPTY_TOTALS: EstablishmentDocumentTotalsData = {
-    count: 0,
-    total_amount: 0,
-    cost_amount: 0,
-    margin_percentage: 0,
 };
 
 function subjectLabel(row: WorkOrderListItem, empty: string): string {
@@ -97,24 +85,6 @@ function formatTableDate(value: string | null | undefined, locale: string, empty
     return formatDateTime(value, locale) || empty;
 }
 
-function totalsQueryFromFilters(filters: Record<string, string>): string {
-    const params = new URLSearchParams();
-
-    for (const key of ['search', 'pending', 'created_from', 'created_to'] as const) {
-        const value = filters[key]?.trim();
-
-        if (value) {
-            params.set(key, value);
-        }
-    }
-
-    if (!params.has('pending')) {
-        params.set('pending', '1');
-    }
-
-    return params.toString();
-}
-
 export default function WorkOrdersIndex({ filters, statusOptions, can }: WorkOrdersIndexProps) {
     const { t, i18n } = useTranslation();
     const pushToast = useToastStore((state) => state.push);
@@ -123,19 +93,10 @@ export default function WorkOrdersIndex({ filters, statusOptions, can }: WorkOrd
     const actionsMenuRef = useRef<HTMLDivElement>(null);
     const empty = t('common.emDash');
     const noDate = t('establishments.documentColumns.noDate');
-    const [totals, setTotals] = useState<EstablishmentDocumentTotalsData>(EMPTY_TOTALS);
     const [selectedRows, setSelectedRows] = useState<WorkOrderListItem[]>([]);
     const [actionsOpen, setActionsOpen] = useState(false);
     const [bulkStatusOpen, setBulkStatusOpen] = useState(false);
     const [bulkStatusProcessing, setBulkStatusProcessing] = useState(false);
-    const [totalsQuery, setTotalsQuery] = useState(() =>
-        totalsQueryFromFilters({
-            search: filters.search,
-            pending: filters.pending || '1',
-            created_from: filters.created_from,
-            created_to: filters.created_to,
-        }),
-    );
 
     useEffect(() => {
         canRef.current = can;
@@ -156,40 +117,6 @@ export default function WorkOrdersIndex({ filters, statusOptions, can }: WorkOrd
 
         return () => document.removeEventListener('mousedown', onPointerDown);
     }, [actionsOpen]);
-
-    useEffect(() => {
-        const controller = new AbortController();
-
-        void fetch(`${workOrdersService.totalsPath}?${totalsQuery}`, {
-            headers: { Accept: 'application/json' },
-            signal: controller.signal,
-            credentials: 'same-origin',
-        })
-            .then(async (response) => {
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                return (await response.json()) as EstablishmentDocumentTotalsData;
-            })
-            .then((payload) => {
-                setTotals({
-                    count: Number(payload.count ?? 0),
-                    total_amount: Number(payload.total_amount ?? 0),
-                    cost_amount: Number(payload.cost_amount ?? 0),
-                    margin_percentage: Number(payload.margin_percentage ?? 0),
-                });
-            })
-            .catch((error: unknown) => {
-                if (error instanceof DOMException && error.name === 'AbortError') {
-                    return;
-                }
-
-                setTotals(EMPTY_TOTALS);
-            });
-
-        return () => controller.abort();
-    }, [totalsQuery]);
 
     const initialFilterValues = useMemo(
         () => ({
@@ -220,17 +147,6 @@ export default function WorkOrdersIndex({ filters, statusOptions, can }: WorkOrd
         [can.update],
     );
 
-    function handleQueryChange(query: RemoteQueryState) {
-        setTotalsQuery(
-            totalsQueryFromFilters({
-                search: query.search ?? '',
-                pending: query.pending ?? '1',
-                created_from: query.created_from ?? '',
-                created_to: query.created_to ?? '',
-            }),
-        );
-    }
-
     function openBulkStatus() {
         setActionsOpen(false);
 
@@ -257,7 +173,6 @@ export default function WorkOrdersIndex({ filters, statusOptions, can }: WorkOrd
             setSelectedRows([]);
             tableRef.current?.getTable()?.deselectRow();
             tableRef.current?.replaceData();
-            setTotalsQuery(totalsQueryFromFilters(tableRef.current?.getFilters() ?? initialFilterValues));
 
             if (result.failed.length === 0) {
                 pushToast(t('workOrders.bulkStatusSuccess', { count: result.updated }), 'success');
@@ -470,9 +385,6 @@ export default function WorkOrdersIndex({ filters, statusOptions, can }: WorkOrd
                         preserveScroll: true,
                         onSuccess: () => {
                             getTable()?.replaceData();
-                            setTotalsQuery(
-                                totalsQueryFromFilters(tableRef.current?.getFilters() ?? initialFilterValues),
-                            );
                         },
                     });
                 },
@@ -540,8 +452,6 @@ export default function WorkOrdersIndex({ filters, statusOptions, can }: WorkOrd
                     }
                 />
 
-                <EstablishmentDocumentTotals totals={totals} />
-
                 <RemoteDataTable<WorkOrderListItem>
                     ref={tableRef}
                     ajaxURL={workOrdersService.dataPath}
@@ -552,7 +462,6 @@ export default function WorkOrdersIndex({ filters, statusOptions, can }: WorkOrd
                     }}
                     pageSize={Number(filters.per_page) || 25}
                     initialFilters={initialFilterValues}
-                    onQueryChange={handleQueryChange}
                     onRowSelectionChanged={setSelectedRows}
                     options={selectionOptions}
                     filterFields={[

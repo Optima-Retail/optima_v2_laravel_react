@@ -26,7 +26,8 @@ export type FilterField =
     | (FilterFieldBase & {
           type: 'select';
           options: FilterOption[];
-          emptyLabel?: string;
+          /** Empty option label. Pass `null` to hide the empty option (options must include every choice). */
+          emptyLabel?: string | null;
       })
     | (FilterFieldBase & {
           type: 'multiselect';
@@ -166,7 +167,9 @@ export function FilterBar({
                             value={values[field.name] ?? ''}
                             onChange={(event) => onChange(field.name, event.target.value)}
                         >
-                            <option value="">{field.emptyLabel ?? t('common.all')}</option>
+                            {field.emptyLabel !== null ? (
+                                <option value="">{field.emptyLabel ?? t('common.all')}</option>
+                            ) : null}
                             {field.options.map((option) => (
                                 <option key={option.value} value={option.value}>
                                     {option.label}

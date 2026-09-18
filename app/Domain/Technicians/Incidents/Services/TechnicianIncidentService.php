@@ -8,7 +8,6 @@ use App\Domain\Companies\Enums\CompanyRelationshipKind;
 use App\Domain\Companies\Support\CompanyMemberUsers;
 use App\Domain\StatusChanges\Services\StatusChangeHistoryService;
 use App\Models\Company;
-use App\Models\CompanyRelationship;
 use App\Models\TechnicianIncident;
 use App\Models\TechnicianIncidentStatus;
 use App\Models\TechnicianIncidentType;
@@ -58,22 +57,24 @@ final class TechnicianIncidentService
         );
 
         return TechnicianIncident::query()
-            ->with(['status', 'type', 'technician.relatedCompany', 'requestedBy', 'respondedBy', 'verifiedBy'])
-            ->whereHas('technician', function ($query) use ($owner): void {
-                $query
-                    ->where('owner_company_id', $owner->id)
-                    ->where('kind', CompanyRelationshipKind::Technician->value);
+            ->select('technician_incidents.*')
+            ->join('company_relationships as tech_scope', function ($join) use ($owner): void {
+                $join->on('tech_scope.id', '=', 'technician_incidents.technician_id')
+                    ->where('tech_scope.owner_company_id', '=', $owner->id)
+                    ->where('tech_scope.kind', '=', CompanyRelationshipKind::Technician->value)
+                    ->whereNull('tech_scope.deleted_at');
             })
+            ->with(['status', 'type', 'technician.relatedCompany', 'requestedBy', 'respondedBy', 'verifiedBy'])
             ->when($technicianId !== null, function ($query) use ($technicianId): void {
-                $query->where('technician_id', $technicianId);
+                $query->where('technician_incidents.technician_id', $technicianId);
             })
             ->when($search !== '', function ($query) use ($search): void {
-                $query->where('incident_text', 'like', "%{$search}%");
+                $query->where('technician_incidents.incident_text', 'like', "%{$search}%");
             })
-            ->when($statusId !== '', fn ($query) => $query->where('status_id', (int) $statusId))
-            ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
-            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
-            ->orderBy($sort, $direction)
+            ->when($statusId !== '', fn ($query) => $query->where('technician_incidents.status_id', (int) $statusId))
+            ->when($createdFrom !== '', fn ($query) => $query->whereDate('technician_incidents.created_at', '>=', $createdFrom))
+            ->when($createdTo !== '', fn ($query) => $query->whereDate('technician_incidents.created_at', '<=', $createdTo))
+            ->orderBy("technician_incidents.{$sort}", $direction)
             ->paginate($perPage)
             ->withQueryString();
     }
@@ -214,31 +215,28 @@ final class TechnicianIncidentService
     }
 
     /**
+     * Seed user options. Full lists load via /select-options/users.
+     *
      * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
     public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return CompanyMemberUsers::options($owner, $includeUserIds);
+        unset($owner);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * Seed technician options. Full lists load via /select-options/technicians.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function technicianOptions(Company $owner): array
+    public function technicianOptions(Company $owner, array $includeIds = []): array
     {
-        return CompanyRelationship::query()
-            ->with('relatedCompany:id,name,logo')
-            ->where('owner_company_id', $owner->id)
-            ->where('kind', CompanyRelationshipKind::Technician->value)
-            ->orderBy('id')
-            ->get()
-            ->map(fn (CompanyRelationship $relationship): array => $relationship->toSelectOption(
-                $relationship->relatedCompany?->name ?? (string) $relationship->id,
-            ))
-            ->sortBy(fn (array $option): string => mb_strtolower($option['label']))
-            ->values()
-            ->all();
+        return app(\App\Domain\Companies\Services\EstablishmentService::class)
+            ->technicianOptions($owner, $includeIds);
     }
 
     /**

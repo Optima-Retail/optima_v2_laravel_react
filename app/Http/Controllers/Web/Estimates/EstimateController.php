@@ -59,7 +59,8 @@ final class EstimateController extends Controller
 
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
-            'pending' => $request->has('pending')
+            // Absent → default open. Explicit "all" stays as "all" for the select UI.
+            'pending' => $request->exists('pending')
                 ? $request->string('pending')->trim()->toString()
                 : '1',
             'created_from' => $request->string('created_from')->trim()->toString(),
@@ -70,6 +71,10 @@ final class EstimateController extends Controller
                 'per_page' => $request->integer('per_page', 25),
             ]),
         ];
+
+        if ($filters['pending'] === '') {
+            $filters['pending'] = 'all';
+        }
 
         $user = $request->user();
 
@@ -102,8 +107,13 @@ final class EstimateController extends Controller
 
         $scopedToEstablishment = (int) ($filters['establishment_id'] ?? 0) > 0;
 
-        if (! $scopedToEstablishment && ! $request->has('pending') && ($filters['pending'] ?? '') === '') {
+        // Default to open only when the client omitted pending entirely (first paint).
+        if (! $scopedToEstablishment && ! $request->exists('pending')) {
             $filters['pending'] = '1';
+        }
+
+        if (($filters['pending'] ?? '') === 'all') {
+            $filters['pending'] = '';
         }
 
         return TabulatorResponse::fromPaginator(
@@ -118,7 +128,7 @@ final class EstimateController extends Controller
         $owner = $this->activeCompany($request);
         $filters = [
             'search' => $request->string('search')->trim()->toString(),
-            'pending' => $request->has('pending')
+            'pending' => $request->exists('pending')
                 ? $request->string('pending')->trim()->toString()
                 : '1',
             'created_from' => $request->string('created_from')->trim()->toString(),
@@ -127,11 +137,18 @@ final class EstimateController extends Controller
             'is_estimate' => true,
         ];
 
-        if (! $request->has('pending') && ($filters['pending'] ?? '') === '') {
-            $filters['pending'] = '1';
+        if ($filters['pending'] === 'all') {
+            $filters['pending'] = '';
         }
 
-        return response()->json($this->workOrders->totalsForOwner($owner, $filters));
+        $totals = $this->workOrders->totalsForOwner($owner, $filters);
+
+        return response()->json($totals ?? [
+            'count' => 0,
+            'total_amount' => 0,
+            'cost_amount' => 0,
+            'margin_percentage' => 0,
+        ]);
     }
 
     public function downloadPdf(WorkOrder $estimate): HttpResponse

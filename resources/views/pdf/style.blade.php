@@ -9,8 +9,8 @@ $debug = false;
     }
 
     /*
-     | DomPDF ignores barryvdh setOption('margin_*').
-     | Real inset is applied via .page-pad padding (reliable in DomPDF).
+     | DomPDF: never wrap the whole document in one table cell (blank first page).
+     | Inset via body padding. Fixed header/footer repeat on every page.
      */
     @page {
         size: A4;
@@ -19,6 +19,8 @@ $debug = false;
 
     body {
         margin: 0;
+        /* top clears fixed header; sides/bottom match previous inset */
+        padding: 130px 52px 56px 52px;
         font-family: DejaVu Sans, sans-serif;
         font-size: 11.5px;
         color: #1f2937;
@@ -26,17 +28,20 @@ $debug = false;
     }
 
     .page-pad {
-        padding: 48px 52px 100px 52px;
+        padding: 0;
+        margin: 0;
     }
 
-    .page-shell {
-        width: 100%;
-        border-collapse: collapse;
+    .pdf-header-fixed {
+        position: fixed;
+        top: 48px;
+        left: 52px;
+        right: 52px;
     }
 
     .pdf-top {
         width: 100%;
-        margin: 0 0 14px 0;
+        margin: 0;
         padding: 0 0 12px 0;
         border-bottom: 1.5px solid #c5d6e8;
     }
@@ -78,21 +83,54 @@ $debug = false;
 
     footer {
         position: fixed;
-        bottom: 32px;
+        bottom: 28px;
         left: 52px;
         right: 52px;
     }
 
     .footer-description {
         border-top: 1px solid #c5d6e8;
-        padding-top: 7px;
-        font-size: 9px;
+        padding-top: 6px;
+        font-size: 8.5px;
+        color: #5b6b7c;
+        line-height: 1.3;
+        text-align: center;
+    }
+
+    .pdf-legal {
+        margin-top: 14px;
+        font-size: 8.5px;
         color: #5b6b7c;
         line-height: 1.35;
+        text-align: justify;
+        page-break-inside: avoid;
     }
 
     section {
         padding: 9px 0;
+    }
+
+    .table-data {
+        margin-top: 6px;
+        width: 100%;
+        font-size: 11.5px;
+        border-collapse: collapse;
+        border: 1px solid #d7e3ef;
+    }
+
+    .table-data tr * {
+        padding: 5px 6px;
+    }
+
+    .table-data th {
+        text-align: left;
+        font-weight: bold;
+        color: #2f4f73;
+        background-color: #e8f1fa;
+    }
+
+    .table-data tr:nth-child(even) {
+        background-color: #f3f6f9;
     }
 
     .optima-logo-cabecera {
@@ -126,29 +164,6 @@ $debug = false;
         border-bottom: 1.5px solid #b7cce0;
         margin: 0 0 7px 0;
         padding: 0 0 4px 0;
-    }
-
-    .table-data {
-        margin-top: 6px;
-        width: 100%;
-        font-size: 11.5px;
-        border-collapse: collapse;
-        border: 1px solid #d7e3ef;
-    }
-
-    .table-data tr * {
-        padding: 5px 6px;
-    }
-
-    .table-data th {
-        text-align: left;
-        font-weight: bold;
-        color: #2f4f73;
-        background-color: #e8f1fa;
-    }
-
-    .table-data tr:nth-child(even) {
-        background-color: #f3f6f9;
     }
 
     table {

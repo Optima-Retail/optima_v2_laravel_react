@@ -72,7 +72,7 @@ final class TechnicianRequestController extends Controller
                 ->values()
                 ->all(),
             'priorityOptions' => $this->technicianRequests->priorityOptions(),
-            'userOptions' => $this->technicianRequests->userOptions($owner),
+            'userOptions' => $this->technicianRequests->userFilterOptions($owner),
             'can' => [
                 'create' => $request->user()?->can('create', TechnicianRequest::class) ?? false,
                 'update' => $request->user()?->can('technician_requests.update') ?? false,
@@ -124,11 +124,13 @@ final class TechnicianRequestController extends Controller
                 : 38,
             'statusOptions' => $this->technicianRequests->statusOptions(),
             'priorityOptions' => $this->technicianRequests->priorityOptions(),
-            'userOptions' => $this->technicianRequests->userOptions($owner),
+            'userOptions' => $request->user() !== null
+                ? $this->technicianRequests->userOptions($owner, [(int) $request->user()->id])
+                : [],
             'languageOptions' => $this->technicianRequests->languageOptions(),
             'countryOptions' => $this->technicianRequests->countryOptions(),
             'serviceTypeOptions' => $this->technicianRequests->serviceTypeOptions(),
-            'workOrderOptions' => $this->technicianRequests->workOrderOptions($owner),
+            'workOrderOptions' => [],
         ]);
     }
 
@@ -179,7 +181,7 @@ final class TechnicianRequestController extends Controller
                 $owner,
                 $form['work_order_id'] !== null ? (int) $form['work_order_id'] : null,
             ),
-            'technicianOptions' => $this->technicianRequests->technicianOptions($owner),
+            'technicianOptions' => [],
             'chat' => $user !== null
                 ? $this->chats->payload(ChatDocumentType::TechnicianRequest, (int) $technicianRequest->id, $user)
                 : null,

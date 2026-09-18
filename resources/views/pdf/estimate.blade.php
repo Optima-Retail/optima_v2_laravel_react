@@ -8,18 +8,17 @@
     @include('pdf.style')
 </head>
 <body>
-    {{-- DomPDF: table cell padding is the reliable way to create page margins --}}
-    <table class="page-shell" width="100%" cellspacing="0" cellpadding="0">
-        <tr>
-            <td class="page-pad">
-                <div class="pdf-top">
-                    @include('pdf.componentes.header', [
-                        'issuerName' => $issuer['name'] ?? '',
-                        'issuerTaxId' => $issuer['tax_id'] ?? '',
-                        'issuerAddress' => $issuer['address'] ?? '',
-                    ])
-                </div>
+    <div class="pdf-header-fixed">
+        <div class="pdf-top">
+            @include('pdf.componentes.header', [
+                'issuerName' => $issuer['name'] ?? '',
+                'issuerTaxId' => $issuer['tax_id'] ?? '',
+                'issuerAddress' => $issuer['address'] ?? '',
+            ])
+        </div>
+    </div>
 
+    <div class="page-pad">
                 <div class="pdf-meta">
                     @include('pdf.componentes.info_estimate', [
                         'lang' => $lang,
@@ -157,18 +156,15 @@
                         </tr>
                     </table>
                 </section>
-            </td>
-        </tr>
-    </table>
+
+                <div class="pdf-legal">
+                    {{ __('pdf.presupuestos.footer.footer2', [], $lang) }}
+                </div>
+    </div>
 
     <footer>
         <div class="footer-description">
-            <div style="text-align: center; padding: 2px">
-                {{ __('pdf.presupuestos.footer.footer1', [], $lang) }}
-            </div>
-            <div style="text-align: justify; padding: 2px">
-                {{ __('pdf.presupuestos.footer.footer2', [], $lang) }}
-            </div>
+            {{ __('pdf.presupuestos.footer.footer1', [], $lang) }}
         </div>
     </footer>
 </body>

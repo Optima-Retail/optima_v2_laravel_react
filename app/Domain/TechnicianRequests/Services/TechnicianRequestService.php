@@ -403,12 +403,26 @@ final class TechnicianRequestService
     }
 
     /**
+     * Seed user options. Full lists load via /select-options/users.
+     *
      * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
     public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return CompanyMemberUsers::options($owner, $includeUserIds);
+        unset($owner);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
+    }
+
+    /**
+     * Limited member list for index filter selects.
+     *
+     * @return list<array{id: int, label: string}>
+     */
+    public function userFilterOptions(Company $owner): array
+    {
+        return CompanyMemberUsers::searchOptions($owner, limit: 100);
     }
 
     /**
@@ -460,87 +474,113 @@ final class TechnicianRequestService
     }
 
     /**
-     * @return list<array{id: int, label: string}>
+     * Seed technician options. Full lists load via /select-options/technicians.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function technicianOptions(Company $owner): array
+    public function technicianOptions(Company $owner, array $includeIds = []): array
     {
-        return CompanyRelationship::query()
-            ->with('relatedCompany:id,name,tradename,logo')
-            ->where('owner_company_id', $owner->id)
-            ->where('kind', CompanyRelationshipKind::Technician->value)
-            ->orderBy('id')
-            ->get()
-            ->map(function (CompanyRelationship $relationship): array {
-                $company = $relationship->relatedCompany;
-                $label = $company?->tradename
-                    ?: $company?->name
-                    ?: "#{$relationship->id}";
-
-                return $relationship->toSelectOption($label);
-            })
-            ->values()
-            ->all();
+        return app(\App\Domain\Companies\Services\EstablishmentService::class)
+            ->technicianOptions($owner, $includeIds);
     }
 
     /**
-     * Recent work orders for optional linking (scoped via accessible customer establishments).
+     * Seed work-order options. Full lists load via /select-options/work-orders.
      *
      * @return list<array{id: int, label: string}>
      */
     public function workOrderOptions(Company $owner, ?int $includeId = null): array
     {
-        $companyIds = $owner->ownedRelationships()
-            ->where('kind', CompanyRelationshipKind::Customer->value)
-            ->pluck('related_company_id')
-            ->map(fn ($id) => (int) $id)
-            ->unique()
-            ->values()
-            ->all();
+        return $this->searchWorkOrderOptions(
+            $owner,
+            includeIds: $includeId !== null && $includeId > 0 ? [$includeId] : [],
+            onlyIncludeIds: true,
+        );
+    }
 
-        $companyIds[] = (int) $owner->id;
-        $companyIds = array_values(array_unique($companyIds));
+    /**
+     * Lightweight options for async work-order pickers.
+     *
+     * @param  list<int>  $includeIds
+     * @return list<array{id: int, label: string}>
+     */
+    public function searchWorkOrderOptions(
+        Company $owner,
+        ?string $search = null,
+        array $includeIds = [],
+        ?int $limit = 50,
+        bool $onlyIncludeIds = false,
+    ): array {
+        $includeIds = array_values(array_unique(array_filter(
+            array_map('intval', $includeIds),
+            fn (int $id): bool => $id > 0,
+        )));
 
-        $query = WorkOrder::query()
-            ->where(function (Builder $inner) use ($owner, $companyIds): void {
-                $inner
-                    ->where('owner_company_id', $owner->id)
-                    ->orWhere(function (Builder $legacy) use ($companyIds): void {
-                        $legacy->whereNull('owner_company_id')
-                            ->where(function (Builder $scope) use ($companyIds): void {
-                                $scope
-                                    ->whereIn('billing_company_id', $companyIds)
-                                    ->orWhereHas('establishment', fn (Builder $establishment) => $establishment->whereIn('company_id', $companyIds));
-                            });
-                    });
+        if ($onlyIncludeIds) {
+            if ($includeIds === []) {
+                return [];
+            }
+
+            return WorkOrder::query()
+                ->where('owner_company_id', $owner->id)
+                ->whereIn('id', $includeIds)
+                ->orderByDesc('id')
+                ->get(['id', 'code', 'subject'])
+                ->map(fn (WorkOrder $workOrder): array => $this->workOrderSelectOption($workOrder))
+                ->values()
+                ->all();
+        }
+
+        $needle = trim((string) $search);
+
+        $rows = WorkOrder::query()
+            ->where('owner_company_id', $owner->id)
+            ->when($needle !== '', function (Builder $query) use ($needle): void {
+                $query->where(function (Builder $inner) use ($needle): void {
+                    $inner->where('code', 'like', "%{$needle}%")
+                        ->orWhere('subject', 'like', "%{$needle}%")
+                        ->orWhere('reference', 'like', "%{$needle}%")
+                        ->orWhere('id', 'like', "%{$needle}%");
+                });
             })
             ->orderByDesc('id')
-            ->limit(100);
-
-        $ids = $query
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if ($includeId !== null && ! in_array($includeId, $ids, true)) {
-            array_unshift($ids, $includeId);
-        }
-
-        if ($ids === []) {
-            return [];
-        }
-
-        return WorkOrder::query()
-            ->whereIn('id', $ids)
-            ->orderByDesc('id')
-            ->get(['id', 'code'])
-            ->map(fn (WorkOrder $workOrder): array => [
-                'id' => $workOrder->id,
-                'label' => $workOrder->code
-                    ? "#{$workOrder->id} — {$workOrder->code}"
-                    : "#{$workOrder->id}",
-            ])
+            ->limit(max(1, min($limit ?? 50, 100)))
+            ->get(['id', 'code', 'subject'])
+            ->map(fn (WorkOrder $workOrder): array => $this->workOrderSelectOption($workOrder))
             ->values()
             ->all();
+
+        if ($includeIds !== []) {
+            $present = array_map(fn (array $row): int => (int) $row['id'], $rows);
+            $missing = array_values(array_diff($includeIds, $present));
+
+            if ($missing !== []) {
+                $extra = WorkOrder::query()
+                    ->where('owner_company_id', $owner->id)
+                    ->whereIn('id', $missing)
+                    ->get(['id', 'code', 'subject'])
+                    ->map(fn (WorkOrder $workOrder): array => $this->workOrderSelectOption($workOrder))
+                    ->all();
+
+                $rows = array_values(array_merge($extra, $rows));
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array{id: int, label: string}
+     */
+    private function workOrderSelectOption(WorkOrder $workOrder): array
+    {
+        return [
+            'id' => $workOrder->id,
+            'label' => $workOrder->code
+                ? "#{$workOrder->id} — {$workOrder->code}"
+                : "#{$workOrder->id}",
+        ];
     }
 
     /**
