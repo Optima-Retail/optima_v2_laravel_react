@@ -4,6 +4,7 @@ import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
+import { AsyncSearchableSelect } from '@/components/ui/AsyncSearchableSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import type { UserOption } from '@/support/types/domain/common';
 import type { EstablishmentOption } from '@/support/types/domain/establishment';
@@ -100,16 +101,15 @@ export function EvaluationForm({
                         error={errors.establishment_id}
                         required
                     >
-                        <SearchableSelect
+                        <AsyncSearchableSelect
                             id="establishment_id"
+                            resource="establishments"
                             value={values.establishment_id}
                             invalid={Boolean(errors.establishment_id)}
                             onChange={(value) => onChange('establishment_id', value)}
                             emptyLabel={t('common.select')}
-                            options={establishmentOptions.map((option) => ({
-                                value: String(option.id),
-                                label: option.label,
-                            }))}
+                            seedOptions={establishmentOptions}
+                            queryParams={{ rich: false }}
                         />
                     </Field>
 
@@ -133,13 +133,14 @@ export function EvaluationForm({
                         htmlFor="responsible_user_id"
                         error={errors.responsible_user_id}
                     >
-                        <SearchableSelect
+                        <AsyncSearchableSelect
                             id="responsible_user_id"
+                            resource="users"
                             value={values.responsible_user_id}
                             invalid={Boolean(errors.responsible_user_id)}
                             onChange={(value) => onChange('responsible_user_id', value)}
                             emptyLabel={t('common.select')}
-                            options={toSelectOptions(userOptions)}
+                            seedOptions={userOptions}
                         />
                     </Field>
 

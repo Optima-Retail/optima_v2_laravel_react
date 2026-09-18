@@ -14,6 +14,7 @@ use App\Models\TechnicianIncidentType;
 use App\Models\User;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as LengthAwarePaginatorConcrete;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -54,17 +55,28 @@ final class TechnicianIncidentService
             $filters,
             ['id', 'due_at', 'responded_at', 'verified_at', 'created_at', 'is_verified'],
             'id',
+            'desc',
         );
 
-        return TechnicianIncident::query()
-            ->select('technician_incidents.*')
-            ->join('company_relationships as tech_scope', function ($join) use ($owner): void {
-                $join->on('tech_scope.id', '=', 'technician_incidents.technician_id')
-                    ->where('tech_scope.owner_company_id', '=', $owner->id)
-                    ->where('tech_scope.kind', '=', CompanyRelationshipKind::Technician->value)
+        $listRelations = [
+            'status:id,name,color',
+            'type:id,name',
+            'technician.relatedCompany:id,name,tradename',
+            'requestedBy:id,name',
+            'respondedBy:id,name',
+            'verifiedBy:id,name',
+        ];
+
+        $baseQuery = TechnicianIncident::query()
+            ->select('technician_incidents.id')
+            ->whereExists(function ($query) use ($owner): void {
+                $query->selectRaw('1')
+                    ->from('company_relationships as tech_scope')
+                    ->whereColumn('tech_scope.id', 'technician_incidents.technician_id')
+                    ->where('tech_scope.owner_company_id', $owner->id)
+                    ->where('tech_scope.kind', CompanyRelationshipKind::Technician->value)
                     ->whereNull('tech_scope.deleted_at');
             })
-            ->with(['status', 'type', 'technician.relatedCompany', 'requestedBy', 'respondedBy', 'verifiedBy'])
             ->when($technicianId !== null, function ($query) use ($technicianId): void {
                 $query->where('technician_incidents.technician_id', $technicianId);
             })
@@ -74,9 +86,44 @@ final class TechnicianIncidentService
             ->when($statusId !== '', fn ($query) => $query->where('technician_incidents.status_id', (int) $statusId))
             ->when($createdFrom !== '', fn ($query) => $query->whereDate('technician_incidents.created_at', '>=', $createdFrom))
             ->when($createdTo !== '', fn ($query) => $query->whereDate('technician_incidents.created_at', '<=', $createdTo))
-            ->orderBy("technician_incidents.{$sort}", $direction)
-            ->paginate($perPage)
-            ->withQueryString();
+            ->orderBy("technician_incidents.{$sort}", $direction);
+
+        $page = max(1, (int) ($filters['page'] ?? LengthAwarePaginatorConcrete::resolveCurrentPage()));
+
+        // ~65k rows: exact COUNT(*) with join is costly; detect has-more only (same pattern as evaluations).
+        $ids = (clone $baseQuery)
+            ->forPage($page, $perPage + 1)
+            ->pluck('technician_incidents.id')
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+        $hasMore = $ids->count() > $perPage;
+        $pageIds = $ids->take($perPage)->values();
+
+        $rows = $pageIds->isEmpty()
+            ? collect()
+            : TechnicianIncident::query()
+                ->with($listRelations)
+                ->whereIn('id', $pageIds->all())
+                ->get()
+                ->keyBy('id');
+
+        $items = $pageIds
+            ->map(fn (int $id) => $rows->get($id))
+            ->filter()
+            ->values();
+
+        $total = (($page - 1) * $perPage) + $items->count() + ($hasMore ? 1 : 0);
+
+        return (new LengthAwarePaginatorConcrete(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => LengthAwarePaginatorConcrete::resolveCurrentPath(),
+                'pageName' => 'page',
+            ],
+        ))->withQueryString();
     }
 
     /**

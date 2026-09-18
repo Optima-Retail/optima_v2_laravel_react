@@ -96,7 +96,10 @@ final class EvaluationController extends Controller
             'evaluationStatusOptions' => $this->evaluations->evaluationStatusOptions(
                 $evaluation->evaluation_status_id !== null ? (int) $evaluation->evaluation_status_id : null,
             ),
-            'userOptions' => $this->evaluations->userOptions($owner),
+            'userOptions' => $this->evaluations->userOptions(
+                $owner,
+                $evaluation->responsible_user_id !== null ? [(int) $evaluation->responsible_user_id] : [],
+            ),
             'establishmentOptions' => $this->evaluations->establishmentOptions(
                 $owner,
                 $evaluation->establishment_id !== null ? [(int) $evaluation->establishment_id] : [],

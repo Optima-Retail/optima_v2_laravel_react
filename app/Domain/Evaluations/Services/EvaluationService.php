@@ -14,6 +14,7 @@ use App\Models\Evaluation;
 use App\Models\EvaluationStatus;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\LengthAwarePaginator as LengthAwarePaginatorConcrete;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -40,38 +41,26 @@ final class EvaluationService
     }
 
     /**
-     * Establishments for accessible client companies.
-     *
-     * @return list<array{id: int, label: string, company_id: int}>
-     */
-    /**
-     * Active establishments for selects. Keep `$includeIds` so edit still shows saved inactive values.
+     * Seed establishment options. Full lists load via /select-options/establishments.
      *
      * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string, company_id: int}>
      */
     public function establishmentOptions(Company $owner, array $includeIds = []): array
     {
-        $ids = $this->accessibleCompanyIds($owner);
-
-        if ($ids === []) {
-            return [];
-        }
+        unset($owner);
 
         $includeIds = array_values(array_unique(array_filter(
             array_map('intval', $includeIds),
             fn (int $id): bool => $id > 0,
         )));
 
-        return Establishment::query()
-            ->whereIn('company_id', $ids)
-            ->where(function ($query) use ($includeIds): void {
-                $query->where('is_active', true);
+        if ($includeIds === []) {
+            return [];
+        }
 
-                if ($includeIds !== []) {
-                    $query->orWhereIn('id', $includeIds);
-                }
-            })
+        return Establishment::query()
+            ->whereIn('id', $includeIds)
             ->orderBy('name')
             ->get(['id', 'name', 'code', 'company_id'])
             ->map(fn (Establishment $establishment): array => [
@@ -114,12 +103,16 @@ final class EvaluationService
     }
 
     /**
+     * Seed user options. Full lists load via /select-options/users.
+     *
      * @param  list<int>  $includeUserIds
      * @return list<array{id: int, label: string}>
      */
     public function userOptions(Company $owner, array $includeUserIds = []): array
     {
-        return CompanyMemberUsers::options($owner, $includeUserIds);
+        unset($owner);
+
+        return CompanyMemberUsers::optionsByIds($includeUserIds);
     }
 
     /**
@@ -160,33 +153,55 @@ final class EvaluationService
             $filters,
             ['id', 'subject', 'next_action_at', 'visit_count', 'call_count', 'created_at'],
             'id',
+            'desc',
         );
 
         $companyIds = $this->accessibleCompanyIds($owner);
 
-        return Evaluation::query()
-            ->with(['establishment', 'status', 'responsibleUser'])
-            ->whereHas('establishment', function ($query) use ($companyIds): void {
-                $query->whereIn('company_id', $companyIds);
+        if ($companyIds === []) {
+            return new LengthAwarePaginatorConcrete([], 0, $perPage);
+        }
+
+        $query = Evaluation::query()
+            ->select('evaluations.*')
+            ->join('establishments as eval_est', function ($join) use ($companyIds): void {
+                $join->on('eval_est.id', '=', 'evaluations.establishment_id')
+                    ->whereIn('eval_est.company_id', $companyIds);
             })
-            ->when($search !== '', function ($query) use ($search): void {
-                $query->where(function ($inner) use ($search): void {
+            ->with(['establishment:id,name,code,company_id', 'status:id,name,color', 'responsibleUser:id,name'])
+            ->when($search !== '', function ($builder) use ($search): void {
+                $builder->where(function ($inner) use ($search): void {
                     $inner
-                        ->where('subject', 'like', "%{$search}%")
-                        ->orWhere('public_id', 'like', "%{$search}%")
-                        ->orWhereHas('establishment', function ($establishmentQuery) use ($search): void {
-                            $establishmentQuery
-                                ->where('name', 'like', "%{$search}%")
-                                ->orWhere('code', 'like', "%{$search}%");
-                        });
+                        ->where('evaluations.subject', 'like', "%{$search}%")
+                        ->orWhere('evaluations.public_id', 'like', "%{$search}%")
+                        ->orWhere('eval_est.name', 'like', "%{$search}%")
+                        ->orWhere('eval_est.code', 'like', "%{$search}%");
                 });
             })
-            ->when($evaluationStatusId !== '', fn ($query) => $query->where('evaluation_status_id', (int) $evaluationStatusId))
-            ->when($createdFrom !== '', fn ($query) => $query->whereDate('created_at', '>=', $createdFrom))
-            ->when($createdTo !== '', fn ($query) => $query->whereDate('created_at', '<=', $createdTo))
-            ->orderBy($sort, $direction)
-            ->paginate($perPage)
-            ->withQueryString();
+            ->when($evaluationStatusId !== '', fn ($builder) => $builder->where('evaluations.evaluation_status_id', (int) $evaluationStatusId))
+            ->when($createdFrom !== '', fn ($builder) => $builder->whereDate('evaluations.created_at', '>=', $createdFrom))
+            ->when($createdTo !== '', fn ($builder) => $builder->whereDate('evaluations.created_at', '<=', $createdTo))
+            ->orderBy("evaluations.{$sort}", $direction);
+
+        // ~200k rows: exact COUNT(*) with establishment scope is expensive. Detect has-more only.
+        $page = max(1, (int) ($filters['page'] ?? LengthAwarePaginatorConcrete::resolveCurrentPage()));
+        $rows = (clone $query)
+            ->forPage($page, $perPage + 1)
+            ->get();
+        $hasMore = $rows->count() > $perPage;
+        $items = $rows->take($perPage)->values();
+        $total = (($page - 1) * $perPage) + $items->count() + ($hasMore ? 1 : 0);
+
+        return (new LengthAwarePaginatorConcrete(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => LengthAwarePaginatorConcrete::resolveCurrentPath(),
+                'pageName' => 'page',
+            ],
+        ))->withQueryString();
     }
 
     /**

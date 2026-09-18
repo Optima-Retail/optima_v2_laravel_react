@@ -100,20 +100,6 @@ final class ContractService
         ?int $limit = 50,
         bool $onlyIncludeIds = false,
     ): array {
-        $ids = $this->accessibleCompanyIds($owner);
-
-        if ($ids === []) {
-            return [];
-        }
-
-        if ($companyId !== null && $companyId > 0) {
-            if (! in_array($companyId, $ids, true)) {
-                return [];
-            }
-
-            $ids = [$companyId];
-        }
-
         $includeIds = array_values(array_unique(array_filter(
             array_map('intval', $includeIds),
             fn (int $id): bool => $id > 0,
@@ -139,26 +125,57 @@ final class ContractService
                 ->all();
         }
 
+        $ownerId = (int) $owner->id;
+        $customerKind = CompanyRelationshipKind::Customer->value;
+
+        if ($companyId !== null && $companyId > 0) {
+            $allowed = $owner->ownedRelationships()
+                ->where('kind', $customerKind)
+                ->where('related_company_id', $companyId)
+                ->exists();
+
+            if (! $allowed) {
+                return [];
+            }
+        }
+
         $needle = trim((string) $search);
 
-        $rows = Establishment::query()
-            ->whereIn('company_id', $ids)
-            ->where(function ($query) use ($includeIds): void {
-                $query->where('is_active', true);
+        $query = Establishment::query()
+            ->select('establishments.id', 'establishments.name', 'establishments.code', 'establishments.company_id')
+            ->when(
+                $companyId !== null && $companyId > 0,
+                function ($builder) use ($companyId): void {
+                    $builder->where('establishments.company_id', $companyId);
+                },
+                function ($builder) use ($ownerId, $customerKind): void {
+                    $builder->join('company_relationships as cr_scope', function ($join) use ($ownerId, $customerKind): void {
+                        $join->on('cr_scope.related_company_id', '=', 'establishments.company_id')
+                            ->where('cr_scope.owner_company_id', '=', $ownerId)
+                            ->where('cr_scope.kind', '=', $customerKind)
+                            ->whereNull('cr_scope.deleted_at');
+                    });
+                },
+            )
+            ->where(function ($builder) use ($includeIds): void {
+                $builder->where('establishments.is_active', true);
 
                 if ($includeIds !== []) {
-                    $query->orWhereIn('id', $includeIds);
+                    $builder->orWhereIn('establishments.id', $includeIds);
                 }
             })
-            ->when($needle !== '', function ($query) use ($needle): void {
-                $query->where(function ($inner) use ($needle): void {
-                    $inner->where('name', 'like', "%{$needle}%")
-                        ->orWhere('code', 'like', "%{$needle}%");
+            ->when($needle !== '', function ($builder) use ($needle): void {
+                $builder->where(function ($inner) use ($needle): void {
+                    $inner->where('establishments.name', 'like', "%{$needle}%")
+                        ->orWhere('establishments.code', 'like', "%{$needle}%");
                 });
             })
-            ->orderBy('name')
-            ->when($limit !== null, fn ($query) => $query->limit($limit))
-            ->get(['id', 'name', 'code', 'company_id'])
+            ->orderBy('establishments.name')
+            ->when($limit !== null, fn ($builder) => $builder->limit($limit));
+
+        $rows = $query
+            ->get()
+            ->unique('id')
             ->map(fn (Establishment $establishment): array => [
                 'id' => $establishment->id,
                 'label' => $establishment->code

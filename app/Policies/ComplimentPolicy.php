@@ -14,6 +14,9 @@ final class ComplimentPolicy
 {
     use ChecksDiscoveredPermissions;
 
+    /** @var array<string, bool> */
+    private array $accessCache = [];
+
     public function viewAny(User $user): bool
     {
         return $this->allows($user, 'view') && $this->hasActiveCompany($user);
@@ -66,12 +69,18 @@ final class ComplimentPolicy
 
     private function canAccess(User $user, Compliment $compliment): bool
     {
+        $cacheKey = $user->id.':'.$compliment->id;
+
+        if (array_key_exists($cacheKey, $this->accessCache)) {
+            return $this->accessCache[$cacheKey];
+        }
+
         $active = app(ActiveCompany::class)->forUser($user);
 
         if ($active === null) {
-            return false;
+            return $this->accessCache[$cacheKey] = false;
         }
 
-        return app(ComplimentService::class)->canAccess($active, $compliment);
+        return $this->accessCache[$cacheKey] = app(ComplimentService::class)->canAccess($active, $compliment);
     }
 }

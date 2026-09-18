@@ -886,33 +886,41 @@ final class WorkOrderService
             $filters,
             ['id', 'code', 'subject', 'stage', 'created_at'],
             'id',
+            'desc',
         );
+        $filters['direction'] = $direction;
+        $filters['sort'] = $sort;
 
-        $query = $this->filteredQueryForOwner($owner, $filters)
-            ->with([
-                'establishment:id,name',
-                'status:id,name,color',
-                'responsibleUser:id,name',
-                'type:id,name,color',
-                'priority:id,name,color',
-                // List amounts use denormalized header cols; only need selected tech for display name.
-                'technicians' => fn ($query) => $query->where('is_selected', true),
-                'technicians.technician:id,related_company_id',
-                'technicians.technician.relatedCompany:id,name,tradename',
-            ])
+        $listRelations = [
+            'establishment:id,name',
+            'status:id,name,color',
+            'responsibleUser:id,name',
+            'type:id,name,color',
+            'priority:id,name,color',
+            // List amounts use denormalized header cols; only need selected tech for display name.
+            'technicians' => fn ($query) => $query->where('is_selected', true),
+            'technicians.technician:id,related_company_id',
+            'technicians.technician.relatedCompany:id,name,tradename',
+        ];
+
+        $baseQuery = $this->filteredQueryForOwner($owner, $filters)
             ->orderBy($sort, $direction);
 
         $search = trim((string) ($filters['search'] ?? ''));
+        $page = max(1, (int) ($filters['page'] ?? LengthAwarePaginatorConcrete::resolveCurrentPage()));
 
         // Leading-wildcard LIKE cannot use indexes; COUNT(*) over ~80k+ matches takes seconds.
         // For search, skip the exact total and only detect whether another page exists.
         if ($search !== '') {
-            $page = max(1, (int) ($filters['page'] ?? LengthAwarePaginatorConcrete::resolveCurrentPage()));
-            $rows = (clone $query)
+            $ids = (clone $baseQuery)
+                ->select('work_orders.id')
                 ->forPage($page, $perPage + 1)
-                ->get();
-            $hasMore = $rows->count() > $perPage;
-            $items = $rows->take($perPage)->values();
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->values();
+            $hasMore = $ids->count() > $perPage;
+            $pageIds = $ids->take($perPage)->values();
+            $items = $this->hydrateWorkOrdersByIds($pageIds, $listRelations);
             $total = (($page - 1) * $perPage) + $items->count() + ($hasMore ? 1 : 0);
 
             return (new LengthAwarePaginatorConcrete(
@@ -927,9 +935,50 @@ final class WorkOrderService
             ))->withQueryString();
         }
 
-        return $query
-            ->paginate($perPage)
-            ->withQueryString();
+        // Deferred join: resolve matching ids first (covering/index-friendly), then hydrate rows.
+        // Avoids SELECT * during PRIMARY order-scans that skip most estimate rows (~18s → ~50ms).
+        $total = (clone $baseQuery)->toBase()->getCountForPagination();
+        $ids = (clone $baseQuery)
+            ->select('work_orders.id')
+            ->forPage($page, $perPage)
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->values();
+        $items = $this->hydrateWorkOrdersByIds($ids, $listRelations);
+
+        return (new LengthAwarePaginatorConcrete(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => LengthAwarePaginatorConcrete::resolveCurrentPath(),
+                'pageName' => 'page',
+            ],
+        ))->withQueryString();
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, int>  $ids
+     * @param  array<string, mixed>  $relations
+     * @return \Illuminate\Support\Collection<int, WorkOrder>
+     */
+    private function hydrateWorkOrdersByIds($ids, array $relations)
+    {
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        $rows = WorkOrder::query()
+            ->with($relations)
+            ->whereIn('id', $ids->all())
+            ->get()
+            ->keyBy('id');
+
+        return $ids
+            ->map(fn (int $id) => $rows->get($id))
+            ->filter()
+            ->values();
     }
 
     /**
@@ -1067,13 +1116,12 @@ final class WorkOrderService
     }
 
     /**
-     * Default index lists filter owner + is_work_order|is_estimate + status IN (…).
-     * MySQL often prefers a PRIMARY backward scan for ORDER BY id DESC LIMIT n, which is
-     * fine when many rows match (work orders) but catastrophic when few do (estimates).
-     * Force the covering owner-list indexes for the common unscoped list.
+     * Sparse estimate lists: PRIMARY ORDER BY id DESC skips most rows (~18s). Force covering index.
+     * Work-order lists sorted ASC with status IN: PRIMARY forward scan is slow; force covering index.
+     * Work-order DESC: leave PRIMARY (recent rows usually match open statuses).
      *
      * @param  Builder<WorkOrder>  $query
-     * @param  array{search?: string|null, is_estimate?: bool|null, is_work_order?: bool|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null, pending?: string|null}  $filters
+     * @param  array{search?: string|null, is_estimate?: bool|null, is_work_order?: bool|null, establishment_id?: int|string|null, contract_id?: int|string|null, created_from?: string|null, created_to?: string|null, pending?: string|null, direction?: string|null}  $filters
      */
     private function applyOwnerListIndexHint(Builder $query, array $filters): void
     {
@@ -1087,19 +1135,16 @@ final class WorkOrderService
             return;
         }
 
-        $pending = trim((string) ($filters['pending'] ?? ''));
-
-        // Only force when status is filtered; "all" has no status_id predicate.
-        if ($pending !== '1' && $pending !== '0') {
-            return;
-        }
-
         $isEstimate = array_key_exists('is_estimate', $filters) ? $filters['is_estimate'] : null;
         $isWorkOrder = array_key_exists('is_work_order', $filters) ? $filters['is_work_order'] : null;
+        $pending = trim((string) ($filters['pending'] ?? ''));
+        $direction = strtolower(trim((string) ($filters['direction'] ?? 'desc')));
 
         $index = match (true) {
-            // Estimates: PRIMARY backward scan skips most rows and is very slow; force covering index.
             $isEstimate === true && $isWorkOrder !== true => 'work_orders_owner_est_list_idx',
+            $isWorkOrder === true
+                && ($pending === '1' || $pending === '0')
+                && $direction === 'asc' => 'work_orders_owner_wo_list_idx',
             default => null,
         };
 

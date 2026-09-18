@@ -117,6 +117,7 @@ final class SelectOptionsController extends Controller
             Brand::class,
             TechnicianRequest::class,
             TechnicianIncident::class,
+            Evaluation::class,
         ]);
 
         $scope = $request->string('scope')->trim()->toString() ?: 'members';
@@ -154,6 +155,7 @@ final class SelectOptionsController extends Controller
             WorkOrder::class,
             Compliment::class,
             Incident::class,
+            Evaluation::class,
         ]);
 
         $companyId = $request->filled('company_id') ? $request->integer('company_id') : null;

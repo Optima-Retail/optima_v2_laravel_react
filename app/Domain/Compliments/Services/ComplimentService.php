@@ -17,6 +17,7 @@ use App\Models\Establishment;
 use App\Support\ListQuery;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator as LengthAwarePaginatorConcrete;
 use Illuminate\Support\Facades\DB;
 
 final class ComplimentService
@@ -113,7 +114,7 @@ final class ComplimentService
             'desc',
         );
 
-        $paginator = $this->scopedQuery($owner)
+        $paginatorQuery = $this->scopedQuery($owner)
             ->with([
                 'type:id,name',
                 'brand:id,name',
@@ -144,9 +145,28 @@ final class ComplimentService
             ->when($complimentTypeId !== '', fn (Builder $query) => $query->where('compliments.compliment_type_id', (int) $complimentTypeId))
             ->when($createdFrom !== '', fn (Builder $query) => $query->whereDate('compliments.created_at', '>=', $createdFrom))
             ->when($createdTo !== '', fn (Builder $query) => $query->whereDate('compliments.created_at', '<=', $createdTo))
-            ->orderBy("compliments.{$sort}", $direction)
-            ->paginate($perPage)
-            ->withQueryString();
+            ->orderBy("compliments.{$sort}", $direction);
+
+        // Scoped OR + subqueries make COUNT(*) expensive; page fetch is cheap. Detect has-more only.
+        $page = max(1, (int) ($filters['page'] ?? LengthAwarePaginatorConcrete::resolveCurrentPage()));
+        $rows = (clone $paginatorQuery)
+            ->forPage($page, $perPage + 1)
+            ->get();
+        $hasMore = $rows->count() > $perPage;
+        $items = $rows->take($perPage)->values();
+        $total = (($page - 1) * $perPage) + $items->count() + ($hasMore ? 1 : 0);
+
+        $paginator = new LengthAwarePaginatorConcrete(
+            $items,
+            $total,
+            $perPage,
+            $page,
+            [
+                'path' => LengthAwarePaginatorConcrete::resolveCurrentPath(),
+                'pageName' => 'page',
+            ],
+        );
+        $paginator->withQueryString();
 
         return $paginator->through(fn (Compliment $compliment): array => $this->toListItem($compliment));
     }
@@ -508,7 +528,7 @@ final class ComplimentService
     }
 
     /**
-     * Scope compliments to the owner's customers via subqueries (avoids huge whereIn lists).
+     * Scope compliments to the owner's customers via subqueries (avoids huge whereIn ID lists in PHP).
      *
      * @return Builder<Compliment>
      */
