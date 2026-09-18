@@ -14,6 +14,7 @@ import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
+import { CompanySearchableSelect } from '@/components/companies/CompanySearchableSelect';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 import { toCompanySelectOptions } from '@/support/companySelect';
 import { clampDecimalPlaces } from '@/support/coordinates';
@@ -76,7 +77,7 @@ type EstablishmentFormProps = {
     values: EstablishmentFormValues;
     errors: Partial<Record<string, string>>;
     processing: boolean;
-    companyOptions: CompanyOption[];
+    companyOptions?: CompanyOption[];
     countryOptions: UserOption[];
     provinceOptions: ProvinceOption[];
     timezoneOptions: UserOption[];
@@ -245,7 +246,7 @@ export function EstablishmentForm({
     values,
     errors,
     processing,
-    companyOptions,
+    companyOptions = [],
     countryOptions,
     provinceOptions,
     timezoneOptions,
@@ -334,13 +335,14 @@ export function EstablishmentForm({
                 <TabPanel id="identity">
                     <div className="grid gap-5 sm:grid-cols-2">
                     <Field label={t('establishments.client')} htmlFor="company_id" error={errors.company_id} className="sm:col-span-2" required>
-                        <SearchableSelect
+                        <CompanySearchableSelect
                             id="company_id"
                             value={values.company_id}
                             invalid={Boolean(errors.company_id)}
                             onChange={(value) => onChange('company_id', value)}
                             emptyLabel={t('common.select')}
-                            options={toCompanySelectOptions(companyOptions)}
+                            scope="client"
+                            seedOptions={companyOptions}
                         />
                     </Field>
 
@@ -574,13 +576,14 @@ export function EstablishmentForm({
                     </Field>
 
                     <Field label={t('establishments.billingCompany')} htmlFor="billing_company_id" error={errors.billing_company_id}>
-                        <SearchableSelect
+                        <CompanySearchableSelect
                             id="billing_company_id"
                             value={values.billing_company_id}
                             invalid={Boolean(errors.billing_company_id)}
                             onChange={(value) => onChange('billing_company_id', value)}
                             emptyLabel={t('common.none')}
-                            options={toCompanySelectOptions(companyOptions)}
+                            scope="client"
+                            seedOptions={companyOptions}
                         />
                     </Field>
 

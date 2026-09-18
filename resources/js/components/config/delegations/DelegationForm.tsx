@@ -1,11 +1,11 @@
 import type { FormEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { CompanySearchableSelect } from '@/components/companies/CompanySearchableSelect';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Toggle } from '@/components/ui/Toggle';
-import { toCompanySelectOptions } from '@/support/companySelect';
 import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
 
@@ -26,7 +26,7 @@ type DelegationFormProps = {
     values: DelegationFormValues;
     errors: Partial<Record<keyof DelegationFormValues, string>>;
     processing: boolean;
-    companyOptions: CompanyOption[];
+    companyOptions?: CompanyOption[];
     currencyOptions: UserOption[];
     countryOptions: UserOption[];
     seriesOptions: UserOption[];
@@ -41,7 +41,7 @@ export function DelegationForm({
     values,
     errors,
     processing,
-    companyOptions,
+    companyOptions = [],
     currencyOptions,
     countryOptions,
     seriesOptions,
@@ -76,13 +76,14 @@ export function DelegationForm({
                 </Field>
 
                 <Field label={t('delegations.company')} htmlFor="company_id" error={errors.company_id}>
-                    <SearchableSelect
+                    <CompanySearchableSelect
                         id="company_id"
                         value={values.company_id}
                         invalid={Boolean(errors.company_id)}
                         onChange={(value) => onChange('company_id', value)}
                         emptyLabel={t('common.none')}
-                        options={toCompanySelectOptions(companyOptions)}
+                        scope="all"
+                        seedOptions={companyOptions}
                     />
                 </Field>
 

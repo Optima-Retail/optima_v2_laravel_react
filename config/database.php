@@ -64,6 +64,38 @@ return [
             ]) : [],
         ],
 
+        'legacy' => [
+            'driver' => 'mysql',
+            'host' => env('LEGACY_DB_HOST', '127.0.0.1'),
+            'port' => env('LEGACY_DB_PORT', '3307'),
+            'database' => env('LEGACY_DB_DATABASE', 'laravel'),
+            'username' => env('LEGACY_DB_USERNAME', 'sail'),
+            'password' => env('LEGACY_DB_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+            'engine' => null,
+        ],
+
+        'migration_destination' => [
+            'driver' => 'mysql',
+            'host' => env('MIGRATION_DEST_DB_HOST', '127.0.0.1'),
+            'port' => env('MIGRATION_DEST_DB_PORT', '13311'),
+            'database' => env('MIGRATION_DEST_DB_DATABASE', 'laravel'),
+            'username' => env('MIGRATION_DEST_DB_USERNAME', 'sail'),
+            'password' => env('MIGRATION_DEST_DB_PASSWORD'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                Mysql::ATTR_SSL_CA => env('MIGRATION_DEST_DB_SSL_CA'),
+                Mysql::ATTR_SSL_VERIFY_SERVER_CERT => filter_var(env('MIGRATION_DEST_DB_SSL_VERIFY', false), FILTER_VALIDATE_BOOLEAN),
+            ], static fn ($value): bool => $value !== null && $value !== '') : [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

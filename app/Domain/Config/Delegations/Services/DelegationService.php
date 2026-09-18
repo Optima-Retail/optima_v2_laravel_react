@@ -89,23 +89,27 @@ final class DelegationService
     }
 
     /**
+     * Seed options for Inertia pages (selected company only). Full lists load via /companies/options.
+     *
      * @return list<array{id: int, label: string, logo_url: string|null}>
      */
     public function companyOptions(?int $includeId = null): array
     {
-        return Company::query()
-            ->where(function ($query) use ($includeId): void {
-                $query->where('is_active', true);
+        return $includeId !== null
+            ? app(\App\Domain\Companies\Services\CompanyService::class)->optionsByIds([$includeId])
+            : [];
+    }
 
-                if ($includeId !== null) {
-                    $query->orWhereKey($includeId);
-                }
-            })
-            ->orderBy('name')
-            ->get(['id', 'name', 'tax_id', 'logo'])
-            ->map(fn (Company $company): array => $company->toSelectOption())
-            ->values()
-            ->all();
+    /**
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function searchCompanyOptions(?string $search = null, ?int $includeId = null, ?int $limit = 50): array
+    {
+        return app(\App\Domain\Companies\Services\CompanyService::class)->searchOptions(
+            search: $search,
+            includeId: $includeId,
+            limit: $limit,
+        );
     }
 
     /**

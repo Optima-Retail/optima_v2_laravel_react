@@ -139,8 +139,11 @@ Legacy 2026 CRM `companies` / `contacts` / `workplaces` / `deals` sits **beside*
 | [18-technician-rates-ratings-establishment-lists.md](18-technician-rates-ratings-establishment-lists.md) | Technician rates / ratings / establishment lists |
 | [19-establishment-attachments-and-templates.md](19-establishment-attachments-and-templates.md) | Establishment attachments + plantilla work_order_type_id |
 | [20-status-change-histories.md](20-status-change-histories.md) | Status audit + History-tab system chat lines |
+| [22-wsl-test-mapping.md](22-wsl-test-mapping.md) | **Current test mapping** (WSL `laravel` source → V2). Supersedes 01–08 for users/clientes/tecnicos/brands/establishments. |
 
 Machine-readable mappings: `database/migration/mappings/`.
+
+> **Test import:** use [22-wsl-test-mapping.md](22-wsl-test-mapping.md). Files 01–08 are historical (73-migration snapshot; NIF no-merge; membership unresolved).
 
 ## Unresolved questions (must be answered before import)
 

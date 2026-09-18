@@ -25,7 +25,7 @@ function optionContent(option: SelectOption): ReactNode {
 
 type SearchableSelectProps = {
     id?: string;
-    options: SelectOption[];
+    options?: SelectOption[];
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
@@ -33,13 +33,17 @@ type SearchableSelectProps = {
     invalid?: boolean;
     disabled?: boolean;
     className?: string;
+    /** When set, options are loaded remotely on open / search (local filter disabled). */
+    loadOptions?: (query: string) => Promise<SelectOption[]>;
+    /** Seed options for the current value before the first remote load. */
+    seedOptions?: SelectOption[];
 };
 
 const LIST_MAX_HEIGHT = 224;
 
 export function SearchableSelect({
     id,
-    options,
+    options: staticOptions = [],
     value,
     onChange,
     placeholder,
@@ -47,24 +51,48 @@ export function SearchableSelect({
     invalid = false,
     disabled = false,
     className,
+    loadOptions,
+    seedOptions = [],
 }: SearchableSelectProps) {
     const { t } = useTranslation();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
     const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
+    const [remoteOptions, setRemoteOptions] = useState<SelectOption[]>(seedOptions);
+    const [loading, setLoading] = useState(false);
+    const [loadedOnce, setLoadedOnce] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
     const listRef = useRef<HTMLUListElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const loadSeq = useRef(0);
     const listId = useId();
     const resolvedPlaceholder = placeholder ?? t('common.select');
+    const isAsync = typeof loadOptions === 'function';
+
+    const options = useMemo(() => {
+        if (! isAsync) {
+            return staticOptions;
+        }
+
+        const byValue = new Map<string, SelectOption>();
+        for (const option of [...seedOptions, ...remoteOptions]) {
+            byValue.set(option.value, option);
+        }
+
+        return Array.from(byValue.values());
+    }, [isAsync, staticOptions, seedOptions, remoteOptions]);
 
     const selected = useMemo(
-        () => options.find((option) => option.value === value) ?? null,
-        [options, value],
+        () => options.find((option) => option.value === value) ?? seedOptions.find((option) => option.value === value) ?? null,
+        [options, seedOptions, value],
     );
 
     const filtered = useMemo(() => {
+        if (isAsync) {
+            return remoteOptions;
+        }
+
         const needle = query.trim().toLowerCase();
 
         if (!needle) {
@@ -72,7 +100,7 @@ export function SearchableSelect({
         }
 
         return options.filter((option) => option.label.toLowerCase().includes(needle));
-    }, [options, query]);
+    }, [isAsync, remoteOptions, options, query]);
 
     const items = useMemo(() => {
         if (!emptyLabel) {
@@ -88,6 +116,33 @@ export function SearchableSelect({
 
         return [emptyItem, ...filtered];
     }, [emptyLabel, filtered, query]);
+
+    async function runLoad(nextQuery: string) {
+        if (!loadOptions) {
+            return;
+        }
+
+        const seq = ++loadSeq.current;
+        setLoading(true);
+
+        try {
+            const rows = await loadOptions(nextQuery);
+            if (seq !== loadSeq.current) {
+                return;
+            }
+            setRemoteOptions(rows);
+            setLoadedOnce(true);
+        } catch {
+            if (seq !== loadSeq.current) {
+                return;
+            }
+            setRemoteOptions(seedOptions);
+        } finally {
+            if (seq === loadSeq.current) {
+                setLoading(false);
+            }
+        }
+    }
 
     function updateMenuPosition() {
         const rect = rootRef.current?.getBoundingClientRect();
@@ -128,7 +183,7 @@ export function SearchableSelect({
             window.removeEventListener('resize', updateMenuPosition);
             window.removeEventListener('scroll', updateMenuPosition, true);
         };
-    }, [open, items.length]);
+    }, [open, items.length, loading]);
 
     useEffect(() => {
         function onPointerDown(event: MouseEvent) {
@@ -147,7 +202,20 @@ export function SearchableSelect({
 
     useEffect(() => {
         setActiveIndex(0);
-    }, [query, open]);
+    }, [query, open, remoteOptions]);
+
+    useEffect(() => {
+        if (!open || !isAsync) {
+            return;
+        }
+
+        const handle = window.setTimeout(() => {
+            void runLoad(query);
+        }, loadedOnce ? 250 : 0);
+
+        return () => window.clearTimeout(handle);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- reload on open/query only
+    }, [open, query, isAsync]);
 
     function openList() {
         if (disabled) {
@@ -229,7 +297,9 @@ export function SearchableSelect({
                   style={menuStyle}
                   className="overflow-auto rounded-xl border border-line bg-surface py-1 shadow-lg"
               >
-                  {items.length === 0 ? (
+                  {loading && items.length === 0 ? (
+                      <li className="px-3 py-2 text-sm text-ink-muted">{t('common.loading')}</li>
+                  ) : items.length === 0 ? (
                       <li className="px-3 py-2 text-sm text-ink-muted">{t('common.noResults')}</li>
                   ) : (
                       items.map((option, index) => {
@@ -312,6 +382,7 @@ export function SearchableSelect({
                     aria-haspopup="listbox"
                     aria-controls={listId}
                     aria-activedescendant={open && activeOption ? `${listId}-${activeOption.value || 'empty'}` : undefined}
+                    aria-busy={loading}
                     role="combobox"
                     autoComplete="off"
                     className={cn(

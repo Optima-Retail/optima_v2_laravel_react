@@ -6,11 +6,17 @@ namespace App\Http\Controllers\Web\Companies;
 
 use App\Domain\Companies\Enums\CompanyKind;
 use App\Domain\Companies\Services\CompanyService;
+use App\Domain\Companies\Services\EstablishmentService;
 use App\Domain\Config\Provinces\Services\ProvinceService;
+use App\Http\Controllers\Concerns\ResolvesActiveCompany;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\Companies\StoreCompanyRequest;
 use App\Http\Requests\Web\Companies\UpdateCompanyRequest;
 use App\Models\Company;
+use App\Models\CompanyRelationship;
+use App\Models\Contract;
+use App\Models\Delegation;
+use App\Models\Establishment;
 use App\Support\ListQuery;
 use App\Support\TabulatorQuery;
 use App\Support\TabulatorResponse;
@@ -22,8 +28,11 @@ use Inertia\Response;
 
 final class CompanyController extends Controller
 {
+    use ResolvesActiveCompany;
+
     public function __construct(
         private readonly CompanyService $companies,
+        private readonly EstablishmentService $establishments,
         private readonly ProvinceService $provinces,
     ) {}
 
@@ -74,6 +83,56 @@ final class CompanyController extends Controller
         return TabulatorResponse::fromPaginator(
             $this->companies->paginateForWeb($filters, member: $request->user()),
         );
+    }
+
+    /**
+     * Async options for company SearchableSelect pickers (loaded on open / search).
+     *
+     * scope=party — all active companies except current owner (clients/techs/suppliers)
+     * scope=client — customer companies of the active owner (establishments/contracts)
+     * scope=all — all active companies (delegations)
+     */
+    public function options(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($user !== null, 401);
+        abort_unless(
+            $user->can('viewAny', Company::class)
+            || $user->can('viewAny', CompanyRelationship::class)
+            || $user->can('create', CompanyRelationship::class)
+            || $user->can('viewAny', Establishment::class)
+            || $user->can('viewAny', Contract::class)
+            || $user->can('viewAny', Delegation::class),
+            403,
+        );
+
+        $scope = $request->string('scope')->trim()->toString() ?: 'party';
+        $search = $request->string('search')->trim()->toString();
+        $includeId = $request->filled('include_id') ? $request->integer('include_id') : null;
+        $exceptId = $request->filled('except_id') ? $request->integer('except_id') : null;
+        $limit = max(1, min($request->integer('limit', 50), 100));
+
+        $options = match ($scope) {
+            'client' => $this->establishments->searchClientCompanyOptions(
+                $this->activeCompany($request),
+                search: $search !== '' ? $search : null,
+                includeId: $includeId,
+                limit: $limit,
+            ),
+            'all' => $this->companies->searchOptions(
+                search: $search !== '' ? $search : null,
+                includeId: $includeId,
+                limit: $limit,
+            ),
+            default => $this->companies->searchOptions(
+                search: $search !== '' ? $search : null,
+                exceptId: $exceptId ?? $this->activeCompany($request)->id,
+                includeId: $includeId,
+                limit: $limit,
+            ),
+        };
+
+        return response()->json(['data' => $options]);
     }
 
     public function create(): Response

@@ -11,8 +11,8 @@ import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
+import { CompanySearchableSelect } from '@/components/companies/CompanySearchableSelect';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
-import { toCompanySelectOptions } from '@/support/companySelect';
 import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import type {
     ContractFormData,
@@ -43,7 +43,7 @@ type ContractFormProps = {
     errors: Record<string, string | undefined>;
     processing: boolean;
     codeDisabled?: boolean;
-    companyOptions: CompanyOption[];
+    companyOptions?: CompanyOption[];
     contractStatusOptions: UserOption[];
     languageOptions: UserOption[];
     userOptions: UserOption[];
@@ -148,7 +148,7 @@ export function ContractForm({
     errors,
     processing,
     codeDisabled = false,
-    companyOptions,
+    companyOptions = [],
     contractStatusOptions,
     languageOptions,
     userOptions,
@@ -215,10 +215,11 @@ export function ContractForm({
                         </Field>
 
                         <Field label={t('contracts.client')} htmlFor="company_id" error={errors.company_id} required>
-                            <SearchableSelect
+                            <CompanySearchableSelect
                                 id="company_id"
                                 value={values.company_id}
-                                options={toCompanySelectOptions(companyOptions)}
+                                scope="client"
+                                seedOptions={companyOptions}
                                 invalid={Boolean(errors.company_id)}
                                 onChange={(value) => onChange('company_id', value)}
                             />

@@ -42,35 +42,36 @@ final class ContractService
     }
 
     /**
-     * @return list<array{id: int, label: string, logo_url: string|null}>
-     */
-    /**
-     * Client companies for selects (active only). Keep `$includeId` for edit forms.
+     * Seed options for Inertia pages (selected client company only). Full lists load via /companies/options.
      *
      * @return list<array{id: int, label: string, logo_url: string|null}>
      */
     public function clientCompanyOptions(Company $owner, ?int $includeId = null): array
     {
+        unset($owner);
+
+        return $includeId !== null
+            ? app(\App\Domain\Companies\Services\CompanyService::class)->optionsByIds([$includeId])
+            : [];
+    }
+
+    /**
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function searchClientCompanyOptions(
+        Company $owner,
+        ?string $search = null,
+        ?int $includeId = null,
+        ?int $limit = 50,
+    ): array {
         $ids = $this->accessibleCompanyIds($owner);
 
-        if ($ids === []) {
-            return [];
-        }
-
-        return Company::query()
-            ->whereIn('id', $ids)
-            ->where(function ($query) use ($includeId): void {
-                $query->where('is_active', true);
-
-                if ($includeId !== null) {
-                    $query->orWhereKey($includeId);
-                }
-            })
-            ->orderBy('name')
-            ->get(['id', 'name', 'tax_id', 'logo'])
-            ->map(fn (Company $company): array => $company->toSelectOption())
-            ->values()
-            ->all();
+        return app(\App\Domain\Companies\Services\CompanyService::class)->searchOptions(
+            search: $search,
+            includeId: $includeId,
+            onlyIds: $ids,
+            limit: $limit,
+        );
     }
 
     /**

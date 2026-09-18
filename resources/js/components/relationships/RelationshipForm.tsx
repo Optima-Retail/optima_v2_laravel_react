@@ -14,13 +14,13 @@ import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
 import { Input } from '@/components/ui/Input';
 import { MultiSelect } from '@/components/ui/MultiSelect';
+import { CompanySearchableSelect } from '@/components/companies/CompanySearchableSelect';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import { Select } from '@/components/ui/Select';
 import { TabPanel, Tabs, type TabItem } from '@/components/ui/Tabs';
 import { Toggle } from '@/components/ui/Toggle';
 import { RichTextEditor } from '@/components/ui/RichTextEditor';
 import type { RelationshipProfileValues } from '@/support/relationshipForm';
-import { toCompanySelectOptions } from '@/support/companySelect';
 import type { CompanyOption, UserOption } from '@/support/types/domain/common';
 import type { RelationshipFormOptions } from '@/support/types/domain/company-relationship';
 import { FieldHelpScope } from '@/components/field-help/FieldHelpScope';
@@ -49,7 +49,7 @@ type RelationshipFormProps = {
     values: RelationshipFormValues;
     errors: Partial<Record<string, string>>;
     processing: boolean;
-    companyOptions: CompanyOption[];
+    companyOptions?: CompanyOption[];
     brandOptions?: UserOption[];
     formOptions?: RelationshipFormOptions;
     profileMode?: 'customer' | 'supplier' | 'technician';
@@ -101,7 +101,7 @@ export function RelationshipForm({
     values,
     errors,
     processing,
-    companyOptions,
+    companyOptions = [],
     brandOptions = [],
     formOptions = emptyFormOptions,
     profileMode,
@@ -338,12 +338,13 @@ export function RelationshipForm({
                         className="sm:col-span-2"
                         required
                     >
-                        <SearchableSelect
+                        <CompanySearchableSelect
                             id="related_company_id"
                             value={values.related_company_id}
                             invalid={Boolean(errors.related_company_id)}
                             onChange={(value) => onChange('related_company_id', value)}
-                            options={toCompanySelectOptions(companyOptions)}
+                            scope="party"
+                            seedOptions={companyOptions}
                         />
                     </Field>
                 )}

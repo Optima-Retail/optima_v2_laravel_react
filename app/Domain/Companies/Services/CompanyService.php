@@ -302,22 +302,98 @@ final class CompanyService
     }
 
     /**
+     * Seed options for Inertia pages (selected company only). Full lists load via /companies/options.
+     *
      * @return list<array{id: int, label: string, logo_url: string|null}>
      */
     public function companyOptions(?int $exceptId = null, ?int $includeId = null): array
     {
-        return Company::query()
-            ->when($exceptId !== null, fn ($query) => $query->where('id', '!=', $exceptId))
-            ->where(function ($query) use ($includeId): void {
-                $query->where('is_active', true);
+        unset($exceptId);
+
+        return $includeId !== null ? $this->optionsByIds([$includeId]) : [];
+    }
+
+    /**
+     * Lightweight options for async company pickers. Pass `$limit` null only for rare full dumps.
+     *
+     * @param  list<int>|null  $onlyIds
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function searchOptions(
+        ?string $search = null,
+        ?int $exceptId = null,
+        ?int $includeId = null,
+        ?array $onlyIds = null,
+        ?int $limit = 50,
+        string $labelStyle = 'tax_id',
+    ): array {
+        if ($onlyIds !== null && $onlyIds === []) {
+            return $includeId !== null
+                ? $this->optionsByIds([$includeId], $labelStyle)
+                : [];
+        }
+
+        $needle = trim((string) $search);
+
+        $query = Company::query()
+            ->when($exceptId !== null, fn ($builder) => $builder->where('id', '!=', $exceptId))
+            ->when($onlyIds !== null, fn ($builder) => $builder->whereIn('id', $onlyIds))
+            ->where(function ($builder) use ($includeId): void {
+                $builder->where('is_active', true);
 
                 if ($includeId !== null) {
-                    $query->orWhereKey($includeId);
+                    $builder->orWhereKey($includeId);
                 }
             })
+            ->when($needle !== '', function ($builder) use ($needle): void {
+                $builder->where(function ($inner) use ($needle): void {
+                    $inner
+                        ->where('name', 'like', "%{$needle}%")
+                        ->orWhere('tradename', 'like', "%{$needle}%")
+                        ->orWhere('tax_id', 'like', "%{$needle}%")
+                        ->orWhere('slug', 'like', "%{$needle}%");
+                });
+            })
             ->orderBy('name')
-            ->get(['id', 'name', 'tax_id', 'logo'])
-            ->map(fn (Company $company): array => $company->toSelectOption())
+            ->select(['id', 'name', 'tradename', 'tax_id', 'logo']);
+
+        if ($limit !== null) {
+            $query->limit(max(1, min($limit, 100)));
+        }
+
+        $rows = $query
+            ->get()
+            ->map(fn (Company $company): array => $company->toSelectOption($labelStyle))
+            ->values()
+            ->all();
+
+        if ($includeId !== null && ! collect($rows)->contains(fn (array $row): bool => (int) $row['id'] === $includeId)) {
+            $extra = Company::query()->whereKey($includeId)->first(['id', 'name', 'tradename', 'tax_id', 'logo']);
+            if ($extra !== null) {
+                array_unshift($rows, $extra->toSelectOption($labelStyle));
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  list<int>  $ids
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function optionsByIds(array $ids, string $labelStyle = 'tax_id'): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return Company::query()
+            ->whereIn('id', $ids)
+            ->orderBy('name')
+            ->get(['id', 'name', 'tradename', 'tax_id', 'logo'])
+            ->map(fn (Company $company): array => $company->toSelectOption($labelStyle))
             ->values()
             ->all();
     }

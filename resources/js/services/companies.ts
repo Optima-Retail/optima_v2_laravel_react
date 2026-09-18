@@ -1,10 +1,21 @@
 import { router } from '@inertiajs/react';
 import { cleanQuery, type InertiaFormPoster, type ListQuery, type SearchOptions, visitPage } from '@/services/shared';
+import type { CompanyOption } from '@/support/types/domain/common';
 
 const base = '/companies';
 
 export type CompanyListQuery = ListQuery & {
     kind?: string;
+};
+
+export type CompanyOptionsScope = 'party' | 'client' | 'all';
+
+export type CompanyOptionsQuery = {
+    search?: string;
+    scope?: CompanyOptionsScope;
+    exceptId?: number | null;
+    includeId?: number | null;
+    limit?: number;
 };
 
 export const companiesService = {
@@ -20,6 +31,42 @@ export const companiesService = {
             }),
             { preserveState: true, replace: true, ...options },
         );
+    },
+
+    async options(query: CompanyOptionsQuery = {}): Promise<CompanyOption[]> {
+        const params = new URLSearchParams();
+        if (query.search?.trim()) {
+            params.set('search', query.search.trim());
+        }
+        if (query.scope) {
+            params.set('scope', query.scope);
+        }
+        if (query.exceptId) {
+            params.set('except_id', String(query.exceptId));
+        }
+        if (query.includeId) {
+            params.set('include_id', String(query.includeId));
+        }
+        if (query.limit) {
+            params.set('limit', String(query.limit));
+        }
+
+        const response = await fetch(`${base}/options?${params.toString()}`, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Company options failed (${response.status})`);
+        }
+
+        const payload = (await response.json()) as { data?: CompanyOption[] };
+
+        return payload.data ?? [];
     },
 
     store(form: InertiaFormPoster) {
@@ -67,4 +114,5 @@ export const companiesService = {
     editPath: (id: number) => `${base}/${id}/edit`,
     indexPath: base,
     dataPath: `${base}/data`,
+    optionsPath: `${base}/options`,
 };

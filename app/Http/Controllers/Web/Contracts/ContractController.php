@@ -113,7 +113,10 @@ final class ContractController extends Controller
             'defaultContractStatusId' => $this->contracts->defaultContractStatusId(),
             'suggestedCode' => $suggestedCode,
             'codeIsAutomatic' => $codeIsAutomatic,
-            'companyOptions' => $this->contracts->clientCompanyOptions($owner),
+            'companyOptions' => $this->contracts->clientCompanyOptions(
+                $owner,
+                $clientIds[0] ?? null,
+            ),
             'contractStatusOptions' => $this->contracts->contractStatusOptions(),
             'languageOptions' => $this->contracts->languageOptions(),
             'userOptions' => $this->contracts->userOptions($owner),

@@ -100,7 +100,10 @@ final class EstablishmentController extends Controller
 
         return Inertia::render('Establishments/Create', [
             'defaultCompanyId' => $defaultCompanyId,
-            'companyOptions' => $this->establishments->clientCompanyOptions($owner),
+            'companyOptions' => $this->establishments->clientCompanyOptions(
+                $owner,
+                includeIds: array_values(array_filter([$defaultCompanyId])),
+            ),
             'countryOptions' => $this->companies->countryOptions(),
             'provinceOptions' => $this->provinces->options(),
             'timezoneOptions' => $this->establishments->timezoneOptions(),
@@ -148,7 +151,10 @@ final class EstablishmentController extends Controller
                 : null,
             'companyOptions' => $this->establishments->clientCompanyOptions(
                 $owner,
-                $establishment->company_id !== null ? (int) $establishment->company_id : null,
+                includeIds: array_values(array_filter([
+                    $establishment->company_id !== null ? (int) $establishment->company_id : null,
+                    $establishment->billing_company_id !== null ? (int) $establishment->billing_company_id : null,
+                ])),
             ),
             'countryOptions' => $this->companies->countryOptions(),
             'provinceOptions' => $this->provinces->options(),

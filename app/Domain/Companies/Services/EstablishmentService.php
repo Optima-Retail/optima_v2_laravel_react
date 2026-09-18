@@ -46,35 +46,40 @@ final class EstablishmentService
     }
 
     /**
-     * @return list<array{id: int, label: string, logo_url: string|null}>
-     */
-    /**
-     * Client companies for selects (active only). Keep `$includeId` for edit forms.
+     * Seed options for Inertia pages (selected client companies only). Full lists load via /companies/options.
      *
+     * @param  list<int>  $includeIds
      * @return list<array{id: int, label: string, logo_url: string|null}>
      */
-    public function clientCompanyOptions(Company $owner, ?int $includeId = null): array
+    public function clientCompanyOptions(Company $owner, ?int $includeId = null, array $includeIds = []): array
     {
-        $ids = $this->accessibleCompanyIds($owner);
+        unset($owner);
 
-        if ($ids === []) {
-            return [];
+        $ids = $includeIds;
+        if ($includeId !== null) {
+            $ids[] = $includeId;
         }
 
-        return Company::query()
-            ->whereIn('id', $ids)
-            ->where(function ($query) use ($includeId): void {
-                $query->where('is_active', true);
+        return app(CompanyService::class)->optionsByIds($ids);
+    }
 
-                if ($includeId !== null) {
-                    $query->orWhereKey($includeId);
-                }
-            })
-            ->orderBy('name')
-            ->get(['id', 'name', 'tax_id', 'logo'])
-            ->map(fn (Company $company): array => $company->toSelectOption())
-            ->values()
-            ->all();
+    /**
+     * @return list<array{id: int, label: string, logo_url: string|null}>
+     */
+    public function searchClientCompanyOptions(
+        Company $owner,
+        ?string $search = null,
+        ?int $includeId = null,
+        ?int $limit = 50,
+    ): array {
+        $ids = $this->accessibleCompanyIds($owner);
+
+        return app(CompanyService::class)->searchOptions(
+            search: $search,
+            includeId: $includeId,
+            onlyIds: $ids,
+            limit: $limit,
+        );
     }
 
     /**

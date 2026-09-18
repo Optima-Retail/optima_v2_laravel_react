@@ -116,6 +116,10 @@ Route::middleware('auth')->group(function (): void {
             ->name('document-chats.attachments.download');
     });
 
+    Route::middleware('company.context')->group(function (): void {
+        Route::get('/companies/options', [CompanyController::class, 'options'])->name('companies.options');
+    });
+
     Route::middleware('permission:companies.view')->group(function (): void {
         Route::get('/companies', [CompanyController::class, 'index'])->name('companies.index');
         Route::get('/companies/data', [CompanyController::class, 'data'])->name('companies.data');
